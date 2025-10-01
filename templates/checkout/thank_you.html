@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Благодарим!{% endblock %}
+
+{% block content %}
+    <section class="hero small">
+        <div class="container center">
+            <h1>Благодарим за поръчката!</h1>
+            {% if order %}
+                <p>Номер на поръчка: <strong>#{{ order.id }}</strong></p>
+                <p>Статус: {% if order.paid %}<strong>Платена</strong>{% else %}Чака плащане{% endif %}</p>
+                <p>Крайна сума: <strong>{{ order.total_bgn }} лв</strong> / <strong>€ {{ order.total_eur }}</strong></p>
+                <p>Ще се свържем с вас на {{ order.email }}.</p>
+            {% else %}
+                <p>Поръчката е завършена.</p>
+            {% endif %}
+            <a class="btn btn-primary" href="/">Към началната страница</a>
+        </div>
+    </section>
+{% endblock %}

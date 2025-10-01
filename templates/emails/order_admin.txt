@@ -1,0 +1,32 @@
+[Order #{{ order.id }}] {{ event|default:"created" }} — {% if order.paid %}PAID{% else %}UNPAID{% endif %}
+
+Customer:
+- Name: {{ order.full_name }}
+- Email: {{ order.email }}
+- Phone: {{ order.phone }}
+
+Delivery:
+- Method: {{ order.get_delivery_method_display }}
+- Courier: {{ order.get_courier_display }}
+{% if order.delivery_method == "address" %}
+- Address: {{ order.address_line }}, {{ order.postal_code }} {{ order.city }}
+{% else %}
+- Office/APS: {{ order.office_text }}
+{% endif %}
+
+Items:
+{% with first_item=order.items.all.0 %}
+- Product: {{ first_item.product.name }} x {{ first_item.quantity }}
+{% endwith %}
+
+Totals:
+- Subtotal: {{ order.subtotal_bgn }} лв / € {{ order.subtotal_eur }}
+- Shipping: {{ order.shipping_bgn }} лв / € {{ order.shipping_eur }}
+- Total: {{ order.total_bgn }} лв / € {{ order.total_eur }}
+
+Payment:
+- Method: {{ order.get_payment_method_display|default:"Наложен платеж" }}
+- Paid: {% if order.paid %}Yes{% else %}No{% endif %}
+
+Admin link: {{ site_url }}/admin/shop/order/{{ order.id }}/change/
+Created at: {{ order.created_at|date:"Y-m-d H:i" }}

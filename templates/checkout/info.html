@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Поръчка — Информация{% endblock %}
+
+{% block content %}
+    <section class="section">
+        <div class="container checkout-grid">
+            <div class="checkout-main">
+                <h2>Данни за поръчка</h2>
+                <form method="post" class="form">
+                    {% csrf_token %}
+                    {% if messages %}
+                        <div class="alerts">
+                            {% for m in messages %}
+                                <div class="alert">{{ m }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="field-grid">
+                        <label>Име и фамилия {{ form.full_name }}</label>
+                        <label>Имейл {{ form.email }}</label>
+                        <label>Телефон {{ form.phone }}</label>
+                    </div>
+
+                    <div class="field-grid">
+                        <label>Метод на доставка {{ form.delivery_method }}</label>
+                        <label>Куриер {{ form.courier }}</label>
+                    </div>
+
+                    <div class="field-grid" data-address>
+                        <label>Адрес {{ form.address_line }}</label>
+                        <label>Град {{ form.city }}</label>
+                        <label>Пощенски код {{ form.postal_code }}</label>
+                    </div>
+
+                    <div class="field-grid" data-office style="display:none">
+                        <label>Офис/АПС {{ form.office_text }}</label>
+                    </div>
+
+                    <div class="field-grid">
+                        <label>Количество {{ form.quantity }}</label>
+                    </div>
+
+                    <div class="actions">
+                        <a href="/" class="btn btn-secondary">Назад</a>
+                        <button class="btn btn-primary">Завърши поръчката</button>
+                    </div>
+                </form>
+            </div>
+
+            <aside class="checkout-summary">
+                <div class="card summary-card">
+                    <div class="summary-head">Резюме</div>
+                    <div class="summary-item">
+                        <img src="{% static 'images/book.svg' %}" alt="" class="thumb">
+                        <div>
+                            <div class="title">Живот без шум</div>
+                            {% if product %}
+                                <div class="price-row">
+                                    <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
+                                    <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
+                                </div>
+                                <div class="small muted">Доставка: 5 лв / € 2.50</div>
+                                <div class="total-row" style="margin-top:8px">
+                                    <div>Крайна сума:&nbsp;</div>
+                                    <div class="total">
+                                        <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / € <span
+                                            data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </section>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Toggle address/office on load
+            const sel = document.querySelector('select[name="delivery_method"]');
+            const address = document.querySelector("[data-address]");
+            const office = document.querySelector("[data-office]");
+            const qty = document.querySelector('input[name="quantity"]');
+
+            function applyDelivery() {
+                if (!sel || !address || !office) return;
+                if (sel.value === "address") {
+                    address.style.display = "grid";
+                    office.style.display = "none";
+                } else {
+                    address.style.display = "none";
+                    office.style.display = "grid";
+                }
+            }
+
+            if (sel) {
+                applyDelivery();
+                sel.addEventListener("change", applyDelivery);
+            }
+
+            // Live totals
+            function toNum(s) {
+                return parseFloat(String(s).replace(",", ".").trim()) || 0;
+            }
+
+            function fmt(n) {
+                return (Math.round(n * 100) / 100).toFixed(2);
+            }
+
+            const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
+            const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
+            const outBGN = document.querySelector("[data-total-bgn]");
+            const outEUR = document.querySelector("[data-total-eur]");
+
+            function recalc() {
+                const q = toNum(qty?.value || 1);
+                const shipBGN = 5.00, shipEUR = 2.50;
+                if (outBGN) outBGN.textContent = fmt(pBGN * q + shipBGN);
+                if (outEUR) outEUR.textContent = fmt(pEUR * q + shipEUR);
+            }
+
+            if (qty) {
+                qty.addEventListener("input", recalc);
+                recalc();
+            }
+        });
+    </script>
+{% endblock %}

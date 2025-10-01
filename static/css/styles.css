@@ -1,0 +1,1655 @@
+/* ========== THEME ==========
+   Light page, black text, red accent like the mockups
+================================ */
+:root {
+    /*--bg: #D9D9D9;*/
+    --ink: #0d0d0d;
+    --muted: #6f6f75;
+    --red: #c7392f; /* primary accent */
+    --red-600: #b02f27;
+    --border: #ffffff;
+    --soft: #f6f6f7; /* very light grey areas */
+}
+
+* {
+    box-sizing: border-box
+}
+
+html, body {
+    margin: 0;
+    padding: 0
+}
+
+body {
+    font: 16px/1.6 Inter, system-ui, Segoe UI, Roboto, Arial;
+    color: var(--ink);
+    background: var(--bg);
+}
+
+img {
+    max-width: 100%;
+    display: block
+}
+
+a {
+    text-decoration: none;
+    color: inherit
+}
+
+/* ========== GRID/CONTAINERS ========== */
+.container {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px
+}
+
+/* ========== HEADER ========== */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #fffebf00;
+    backdrop-filter: saturate(120%) blur(6px);
+    /*border-bottom: 1px solid var(--border);*/
+}
+
+.nav {
+    min-height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px
+}
+
+.brand {
+    font-weight: 800;
+    letter-spacing: .2px
+}
+
+.nav-links {
+    display: flex;
+    gap: 22px;
+    align-items: center
+}
+
+.nav-links a {
+    color: var(--ink);
+    opacity: .85
+}
+
+.nav-links a:hover {
+    opacity: 1
+}
+
+/* ========== BUTTONS ========== */
+.btn {
+    display: inline-block;
+    border: 1px solid var(--ink);
+    padding: 10px 18px;
+    border-radius: 999px;
+    transition: .15s;
+    background: #fff
+}
+
+.btn:hover {
+    transform: translateY(-1px)
+}
+
+.btn-primary {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff
+}
+
+.btn-primary:hover {
+    background: var(--red-600)
+}
+
+.btn-secondary {
+    background: #fff
+}
+
+/* ========== TYPOGRAPHY ========== */
+h1, h2, h3 {
+    font-family: Merriweather, Georgia, serif;
+    color: var(--ink);
+    margin: 0 0 10px
+}
+
+h1 {
+    font-size: 48px;
+    line-height: 1.15
+}
+
+h2 {
+    font-size: 30px
+}
+
+h3 {
+    font-size: 20px
+}
+
+.lead {
+    color: #333;
+    opacity: .85
+}
+
+/* ========== HOME: HERO ========== */
+.hero {
+    padding: 64px 0;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%)
+}
+
+.hero-grid {
+    display: grid;
+    grid-template-columns:1.05fr .95fr;
+    gap: 32px;
+    align-items: center
+}
+
+.hero-copy .price-row {
+    display: flex;
+    gap: 12px;
+    margin: 18px 0 26px
+}
+
+.price-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    min-width: 120px;
+    text-align: center;
+    background: #fff
+}
+
+.price-card .price {
+    font-weight: 800
+}
+
+.price-card .meta {
+    font-size: 12px;
+    color: var(--muted)
+}
+
+.hero-art {
+    justify-self: end;
+    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, .12))
+}
+
+/* ========== SECTIONS ========== */
+.section {
+    padding: 70px 0;
+    border-bottom: 1px solid var(--border)
+}
+
+.section.alt {
+    background: #fafafa
+}
+
+.two-col {
+    display: grid;
+    grid-template-columns:1fr 1fr;
+    gap: 28px;
+    align-items: start
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap: 18px
+}
+
+.card {
+    background: #fff;
+    /*border: 1px solid var(--border);*/
+    border-radius: 14px;
+    padding: 16px
+}
+
+.checklist {
+    margin: 0;
+    padding: 0 0 0 18px
+}
+
+.muted {
+    color: var(--muted)
+}
+
+.small {
+    font-size: 13px
+}
+
+/* ========== CTA STRIP ========== */
+.cta {
+    padding: 64px 0;
+    background: #111;
+    color: #fff
+}
+
+.cta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px
+}
+
+.cta .btn-primary {
+    background: var(--red);
+    color: #ffffff;
+    /*border-color: #fff*/
+}
+
+.cta .btn-primary:hover {
+    background: #f2f2f2
+}
+
+/* ========== CHECKOUT LAYOUT ========== */
+.checkout-grid {
+    display: grid;
+    grid-template-columns:1.1fr .9fr;
+    gap: 30px
+}
+
+.checkout-main h2 {
+    margin: 0 0 14px
+}
+
+.form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px
+}
+
+.form input[type="text"],
+.form input[type="email"],
+.form input[type="number"],
+.form select {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 12px;
+    color: var(--ink);
+    outline: none
+}
+
+.field-grid {
+    display: grid;
+    grid-template-columns:1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px
+}
+
+.field-grid[data-address] {
+    grid-template-columns:1fr 1fr 1fr
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 14px
+}
+
+/* ===== Tilted grey panel on the right ===== */
+.checkout-summary {
+    position: relative
+}
+
+.checkout-summary::before {
+    content: "";
+    position: absolute;
+    inset: -40px -9999px -40px -40px;
+    background: #ffffff;
+    transform: skewY(-4deg);
+    z-index: -1;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.summary-card {
+    background: transparent;
+    border: none;
+    padding-top: 10px
+}
+
+.summary-head {
+    font-weight: 800;
+    margin-bottom: 12px
+}
+
+.summary-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px
+}
+
+.summary-item .thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    padding: 6px
+}
+
+.pill-row, .price-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap
+}
+
+.pill {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 13px
+}
+
+.total-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px dashed var(--border);
+    padding-top: 12px;
+    margin-top: 8px
+}
+
+.total {
+    font-weight: 900
+}
+
+/* ========== ALERTS ========== */
+.alerts .alert {
+    background: #fff1f1;
+    border: 1px solid #ffd0d0;
+    color: #8b1d15;
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin-bottom: 8px
+}
+
+/* ========== FOOTER ========== */
+.site-footer {
+    padding: 36px 0;
+    border-top: 1px solid var(--border);
+    background: #fafafa;
+    color: #333
+}
+
+/* ========== PAYMENT TILES (still supported if you re-enable) ========== */
+.pay-tiles ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns:1fr 1fr;
+    gap: 12px
+}
+
+.pay-tiles li {
+    margin: 0
+}
+
+.pay-tiles input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0
+}
+
+.pay-tiles label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    cursor: pointer;
+    transition: .15s;
+}
+
+.pay-tiles label:has(> input[type="radio"]:checked) {
+    outline: 2px solid var(--red);
+    border-color: transparent;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(199, 57, 47, .12) inset;
+}
+
+.pay-tiles label:has(> input[type="radio"]:focus-visible) {
+    outline: 2px dashed var(--red)
+}
+
+.pay-tiles label::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #bbb
+}
+
+.pay-tiles label:has(> input[type="radio"]:checked)::before {
+    border-color: var(--red);
+    box-shadow: inset 0 0 0 4px var(--red)
+}
+
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+    .hero-grid {
+        grid-template-columns:1fr
+    }
+
+    .hero-art {
+        justify-self: center
+    }
+}
+
+@media (max-width: 900px) {
+    .two-col {
+        grid-template-columns:1fr
+    }
+
+    .grid-3 {
+        grid-template-columns:1fr
+    }
+
+    .checkout-grid {
+        grid-template-columns:1fr
+    }
+
+    .checkout-summary::before {
+        transform: none;
+        inset: 20px -24px -20px -24px
+    }
+
+    .field-grid {
+        grid-template-columns:1fr
+    }
+
+    .field-grid[data-address] {
+        grid-template-columns:1fr
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 38px
+    }
+
+    .btn {
+        width: 100%;
+        text-align: center
+    }
+
+    .actions {
+        flex-direction: column
+    }
+}
+
+/*!* ----- Payment tiles ----- *!*/
+/*.pay-tiles ul {*/
+/*    list-style: none;*/
+/*    margin: 0;*/
+/*    padding: 0;*/
+/*    display: grid;*/
+/*    grid-template-columns:1fr 1fr;*/
+/*    gap: 12px*/
+/*}*/
+
+/*.pay-tiles li {*/
+/*    margin: 0*/
+/*}*/
+
+/*!* hide the native radios but keep them focusable *!*/
+/*.pay-tiles input[type="radio"] {*/
+/*    position: absolute;*/
+/*    opacity: 0;*/
+/*    pointer-events: none;*/
+/*    width: 0;*/
+/*    height: 0;*/
+/*}*/
+
+/*!* the tile itself is the LABEL *!*/
+/*.pay-tiles label {*/
+/*    display: flex;*/
+/*    align-items: center;*/
+/*    gap: 12px;*/
+/*    background: var(--panel);*/
+/*    border: 1px solid var(--border);*/
+/*    border-radius: 16px;*/
+/*    padding: 14px;*/
+/*    cursor: pointer;*/
+/*    transition: .15s;*/
+/*}*/
+
+/*!* highlight WHEN the label contains a checked input *!*/
+/*.pay-tiles label:has(> input[type="radio"]:checked) {*/
+/*    outline: 2px solid var(--primary);*/
+/*    border-color: transparent;*/
+/*    background: #151525;*/
+/*    box-shadow: 0 0 0 2px rgba(108, 124, 255, .2) inset;*/
+/*}*/
+
+/*!* keyboard focus ring *!*/
+/*.pay-tiles label:has(> input[type="radio"]:focus-visible) {*/
+/*    outline: 2px dashed var(--primary);*/
+/*}*/
+
+/*!* optional tiny icon circle *!*/
+/*.pay-tiles label::before {*/
+/*    content: "";*/
+/*    width: 14px;*/
+/*    height: 14px;*/
+/*    border-radius: 50%;*/
+/*    border: 2px solid var(--muted);*/
+/*}*/
+
+/*.pay-tiles label:has(> input[type="radio"]:checked)::before {*/
+/*    border-color: var(--primary);*/
+/*    box-shadow: inset 0 0 0 4px var(--primary);*/
+/*}*/
+
+/*!* ----- Mobile polish ----- *!*/
+/*@media (max-width: 900px) {*/
+/*    .pay-tiles ul {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+/*}*/
+
+/*@media (max-width: 420px) {*/
+/*    .btn {*/
+/*        width: 100%;*/
+/*        text-align: center*/
+/*    }*/
+
+/*    .actions {*/
+/*        flex-direction: column*/
+/*    }*/
+/*}*/
+
+/*!* stack grids nicely on phones *!*/
+/*@media (max-width: 900px) {*/
+/*    .hero-grid {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+
+/*    .two-col {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+
+/*    .grid-3 {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+
+/*    .checkout-grid {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+
+/*    .checkout-summary {*/
+/*        position: relative;*/
+/*        top: auto*/
+/*    }*/
+
+/*    .field-grid {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+
+/*    .field-grid[data-address] {*/
+/*        grid-template-columns:1fr*/
+/*    }*/
+/*}*/
+
+/*!* larger tap targets on mobile *!*/
+/*@media (max-width: 600px) {*/
+/*    .form input, .form select {*/
+/*        padding: 14px 14px*/
+/*    }*/
+
+/*    .pay-tiles label {*/
+/*        padding: 16px*/
+/*    }*/
+/*}*/
+
+/* ============================
+   HERO: black/white split + diagonal cut
+   ============================ */
+.hero.hero-split {
+    position: relative;
+    overflow: hidden;
+    padding: 84px 0 96px; /* a bit taller like the mock */
+    background: #D9D9D9; /* page white on the right side */
+    border-bottom: none;
+}
+
+.hero.hero-split::before {
+    /* LEFT black block */
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 58vw; /* covers left half on desktop */
+    background: #0d0d0f; /* deep black */
+    transform: none;
+    z-index: 0;
+}
+
+.hero.hero-split::after {
+    /* bottom diagonal white slice */
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    bottom: -60px;
+    height: 160px;
+    background: #fff;
+    transform: skewY(-3.5deg);
+    z-index: 0;
+    border-top: 1px solid var(--border);
+}
+
+.hero.hero-split .container {
+    position: relative;
+    z-index: 1
+}
+
+.hero.hero-split .hero-grid {
+    grid-template-columns:1.05fr .95fr;
+    gap: 40px
+}
+
+.hero.hero-split .hero-copy {
+    color: #fff; /* on dark */
+}
+
+.hero.hero-split .hero-copy h1 {
+    color: #fff
+}
+
+.hero.hero-split .lead {
+    color: #d8d8dc;
+    opacity: 1
+}
+
+.hero.hero-split .price-card {
+    background: #131316;
+    border-color: #232329;
+    color: #fff
+}
+
+.hero.hero-split .price-card .meta {
+    color: #9a9aa6
+}
+
+.hero.hero-split .btn-primary {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff
+}
+
+/* book art shadow stronger on light side */
+.hero.hero-split .hero-art {
+    justify-self: end;
+    filter: drop-shadow(0 20px 40px rgba(0, 0, 0, .25))
+}
+
+/* ============================
+   ABOUT / FEATURES band (white)
+   ============================ */
+.section.section-white {
+    background: #fff;
+    border-bottom: none;
+    padding: 72px 0
+}
+
+.section.section-white .card {
+    background: #fff
+}
+
+/* ============================
+   AUTHOR: light grey split with diagonal
+   ============================ */
+.section.author-split {
+    position: relative;
+    overflow: hidden;
+    padding: 86px 0;
+    background: #ededf0;
+    border-top: none;
+    border-bottom: none;
+}
+
+.section.author-split::before {
+    /* top diagonal white into grey */
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    top: -80px;
+    height: 160px;
+    background: #fff;
+    transform: skewY(-3.5deg);
+    border-bottom: 1px solid var(--border);
+}
+
+.section.author-split::after {
+    /* bottom diagonal back to white */
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    bottom: -80px;
+    height: 160px;
+    background: #fff;
+    transform: skewY(-3.5deg);
+    border-top: 1px solid var(--border);
+}
+
+.section.author-split .two-col {
+    grid-template-columns: .9fr 1.1fr;
+    align-items: center
+}
+
+.author-portrait {
+    max-width: 520px;
+    width: 100%;
+    filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .15));
+}
+
+.author-copy h2 {
+    margin-bottom: 10px
+}
+
+/* ============================
+   TOC band (white) + compact cards
+   ============================ */
+.section.section-toc {
+    background: #fff;
+    padding: 64px 0 90px
+}
+
+.section.section-toc .card {
+    padding: 14px 16px;
+    /*border-radius: 999px;*/
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.section.section-toc .card.strong {
+    text-align: start;
+}
+
+/* ============================
+   CTA dark footer strip
+   ============================ */
+.cta.cta-dark {
+    padding: 80px 0;
+    background: #0e0e10;
+    color: #fff;
+    border-top: 1px solid #151515;
+}
+
+.cta.cta-dark .btn-primary {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff
+}
+
+.cta.cta-dark .btn-primary:hover {
+    background: var(--red-600)
+}
+
+/* ============================
+   RESPONSIVE tweaks for split sections
+   ============================ */
+@media (max-width: 1024px) {
+    .hero.hero-split::before {
+        width: 100%
+    }
+
+    /* black fills behind when stacked */
+    .hero.hero-split .hero-art {
+        justify-self: center
+    }
+}
+
+@media (max-width: 900px) {
+    .hero.hero-split {
+        padding: 64px 0 76px
+    }
+
+    .section.author-split .two-col {
+        grid-template-columns:1fr
+    }
+
+    .author-portrait {
+        max-width: 420px;
+        margin: 0 auto 18px
+    }
+}
+
+
+/* ============================
+   QUOTE slab (black with angled bottom into grey)
+   ============================ */
+.section.quote-slab {
+    position: relative;
+    overflow: hidden;
+    padding: 90px 0 150px;
+    background: #0b0b0d;
+    color: #fff;
+    border: 0;
+}
+
+.section.quote-slab::before {
+    /* optional subtle top white slice; keeps the same diagonal language */
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    top: -80px;
+    height: 160px;
+    background: #fff;
+    transform: skewY(-3.5deg);
+    border-bottom: 1px solid var(--border);
+}
+
+.section.quote-slab::after {
+    /* the angled bottom edge that "hands off" into the grey author band */
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    bottom: -80px;
+    height: 160px;
+    background: rgba(237, 237, 240, 1);
+    transform: skewY(-3.5deg);
+    border-top: 0px rgba(237, 237, 240, 1);
+}
+
+.quote-inner {
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.section.quote-slab blockquote {
+    max-width: 940px;
+    text-align: center;
+    font-family: Merriweather, Georgia, serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 1.9;
+    color: #f1f1f1;
+    letter-spacing: .2px;
+    margin: 0;
+}
+
+/* When author follows the quote slab, remove its own top diagonal */
+.section.author-split.is-attached {
+    padding-top: 56px
+}
+
+.section.author-split.is-attached::before {
+    display: none
+}
+
+/* Feather-blend the portrait bottom so it melts into the grey band */
+.author-portrait.blend {
+    display: block;
+    /* fade bottom 30% */
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, rgba(0, 0, 0, 0) 100%);
+    mask-image: linear-gradient(to bottom, black 70%, rgba(0, 0, 0, 0) 100%);
+    /* let it overlap a bit toward the lower diagonal */
+    margin-bottom: -14px;
+}
+
+/* Slightly tighten the author layout on wide screens to match composition */
+.section.author-split .two-col {
+    grid-template-columns: .95fr 1.05fr;
+    align-items: center;
+}
+
+/* Responsive polish so the diagonals remain clean */
+@media (max-width: 900px) {
+    .section.quote-slab {
+        padding: 70px 0 110px
+    }
+
+    .section.quote-slab::before,
+    .section.quote-slab::after {
+        left: -24px;
+        right: -24px
+    }
+
+    .author-portrait.blend {
+        max-width: 420px;
+        margin: 0 auto 6px
+    }
+}
+
+/* Author portrait base */
+.author-portrait {
+    display: block;
+    max-width: 520px;
+    width: 100%;
+}
+
+/* Wrapper with drop shadow */
+/*.portrait-wrap {*/
+/*    position: relative;*/
+/*    display: inline-block;*/
+/*    filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .15));*/
+/*    !* overlap slightly into the lower diagonal so the fade melts in *!*/
+/*    margin-bottom: -18px;*/
+/*}*/
+
+/* 100%-reliable overlay fade to the author bg (#ededf0) */
+.portrait-wrap.blend::after {
+    content: "";
+    position: absolute;
+    left: -8%;
+    right: -8%;
+    bottom: -18px;
+    height: 40%;
+    /* fade from transparent to the section bg */
+    background: linear-gradient(
+            to bottom,
+            rgba(237, 237, 240, 0) 0%,
+            rgb(255, 255, 255) 85%,
+            rgba(237, 237, 240, 1) 100%
+    );
+    pointer-events: none;
+}
+
+/* Optional enhancement: keep mask fade for browsers that apply it to <img> */
+/*.author-portrait.mask-fade {*/
+/*    -webkit-mask-image: linear-gradient(to bottom, black 72%, rgba(0, 0, 0, 0) 100%);*/
+/*    mask-image: linear-gradient(to bottom, black 72%, rgba(0, 0, 0, 0) 100%);*/
+/*}*/
+
+
+/* ===== Full-bleed to the LEFT of the page (inside our .container) =====
+   Makes the figure align to the viewport's left edge, not the container. */
+.bleed-left {
+    /*position: relative;*/
+    /* Container has max-width:1160px and side padding:24px.
+       This calc pushes the element left by the leftover gutter. */
+    margin-left: calc((100vw - 1160px) / -2 - 24px);
+}
+
+/* keep it from overflowing vertically weirdly */
+.section.author-split .two-col > .bleed-left {
+    align-self: center
+}
+
+/* ===== Existing bottom blend stays (from previous step) ===== */
+.portrait-wrap.blend::after {
+    content: "";
+    position: absolute;
+    left: -8%;
+    right: -8%;
+    bottom: -18px;
+    height: 40%;
+    background: linear-gradient(
+            to bottom,
+            rgba(237, 237, 240, 0) 0%,
+            rgba(237, 237, 240, .85) 75%,
+            rgba(237, 237, 240, 1) 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ===== NEW: right-edge fade into the grey background ===== */
+.portrait-wrap.fade-right::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -28px; /* overlap slightly beyond image edge */
+    width: 180px; /* how wide the fade is */
+    background: linear-gradient(
+            to right,
+            rgba(237, 237, 240, 0) 0%,
+            rgba(237, 237, 240, .85) 75%,
+            rgba(237, 237, 240, 1) 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Make the portrait large enough to read when it’s full-bleed */
+.author-portrait {
+    display: block;
+    max-width: 620px; /* adjust to your taste */
+    width: 100%;
+    filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .15));
+}
+
+/* Responsive: ease bleed on narrow screens so it doesn’t feel cramped */
+@media (max-width: 1200px) {
+    .bleed-left {
+        margin-left: calc((100vw - 100%) / -2);
+    }
+
+    /* simpler safe bleed */
+}
+
+@media (max-width: 900px) {
+    .bleed-left {
+        margin-left: 0;
+    }
+
+    /* stop bleeding on phones */
+    .portrait-wrap.fade-right::before {
+        width: 120px;
+        right: -16px;
+    }
+
+    .portrait-wrap.blend::after {
+        height: 38%;
+        bottom: -12px;
+    }
+}
+
+/* Remove bottom diagonal; keep the author band as a clean grey block */
+.section.author-split.is-flat::after {
+    display: none;
+}
+
+/* Tweak spacing now that the diagonal is gone */
+.section.author-split.is-flat {
+    padding-bottom: 0px;
+}
+
+/* Stronger bottom blend into the grey background (works with SVGs) */
+.portrait-wrap.blend::after {
+    content: "";
+    position: absolute;
+    left: -14%; /* widen a bit to cover any outer glow from the SVG */
+    right: -14%;
+    bottom: -28px; /* tuck slightly under the section’s bottom */
+    height: 56%; /* more fade area so it looks continuous */
+    background: linear-gradient(
+            to bottom,
+            rgba(237, 237, 240, 0) 0%,
+            rgba(237, 237, 240, .60) 55%,
+            rgba(237, 237, 240, .85) 80%,
+            #ededf0 100%
+    );
+    pointer-events: none;
+    z-index: 2; /* ensure the blend sits above the image */
+}
+
+/* Right-edge fade (keep as-is; included for completeness) */
+.portrait-wrap.fade-right::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -28px;
+    width: 180px;
+    background: linear-gradient(
+            to right,
+            rgba(237, 237, 240, 0) 0%,
+            rgba(237, 237, 240, .85) 75%,
+            #ededf0 100%
+    );
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* =========================================
+   FIX: Author band — keep TOP diagonal only,
+   remove BOTTOM diagonal, and hide any
+   1px seam at the section’s bottom.
+   ========================================= */
+
+/* Keep the TOP diagonal (::before) as-is; remove ONLY the BOTTOM one */
+.section.author-split::after {
+    display: none; /* <-- removes bottom diagonal */
+}
+
+/* Safety: the grey section itself should not draw a bottom border */
+.section.author-split {
+    border-bottom: 0;
+}
+
+/* Make the portrait’s bottom fade overlap the section edge a bit more
+   so no white seam can peek through at certain zoom levels */
+.portrait-wrap.blend::after {
+    left: -16%;
+    right: -16%;
+    bottom: -42px; /* tuck under the section edge */
+    height: 35%; /* longer fade for a softer blend */
+    background: linear-gradient(
+            to bottom,
+            rgba(237, 237, 240, 0) 0%,
+            rgba(237, 237, 240, .70) 60%,
+            rgba(237, 237, 240, .92) 85%,
+            #ededf0 100%
+    );
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Rare sub-pixel gap fix (some GPUs at odd zoom levels). This nudges
+   the TOP diagonal (which we keep) to overlap by 1px so there’s never
+   a hairline between the black quote slab and the grey author band. */
+.section.author-split::before {
+    margin-bottom: -1px;
+}
+
+/* If the next white section tried to draw a top border, suppress it */
+.section.author-split + .section {
+    border-top: 0;
+}
+
+/* ============================
+   CHAPTERS slab (diagonal light grey)
+   ============================ */
+.section.chapters-slab {
+    position: relative;
+    overflow: hidden;
+    padding: 82px 0; /* visual height */
+    background: #ededf0; /* same grey you use */
+    border-top: 1px solid #ffffff; /* blend with white above */
+    border-bottom: 1px solid #ffffff;
+}
+
+/* top & bottom diagonals just for this slab */
+.section.chapters-slab::before,
+.section.chapters-slab::after {
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    height: 150px;
+    transform: skewY(3.5deg);
+    z-index: 0;
+}
+
+.section.chapters-slab::before { /* top slice from white into grey */
+    top: -100px;
+    background: #ffffff;
+    /*border-bottom: 1px solid #ffffff;*/
+}
+
+.section.chapters-slab::after { /* bottom slice back to white */
+    bottom: -100px;
+    background: #ffffff;
+    /*border-top: 1px solid #ffffff;*/
+}
+
+/* layout */
+.chapters-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 28px;
+    align-items: center;
+}
+
+.chapters-copy h2 {
+    margin-bottom: 18px;
+}
+
+/* native accordion styling */
+.acc {
+    /*background: #ffffff;*/
+    /*border: 1px solid #ececec;*/
+    border-radius: 12px;
+    margin: 12px 0;
+    overflow: hidden;
+}
+
+.acc summary {
+    list-style: none; /* removes default marker */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+}
+
+.acc summary::-webkit-details-marker {
+    display: none;
+}
+
+.acc h3 {
+    font-size: 18px;
+    margin: 0;
+    font-family: Merriweather, Georgia, serif;
+}
+
+/* small chevron */
+.acc .chev {
+    width: 10px;
+    height: 10px;
+    border-right: 2px solid #c7392f; /* red accent */
+    border-bottom: 2px solid #c7392f;
+    transform: rotate(-45deg);
+    transition: transform .2s ease;
+}
+
+.acc[open] .chev {
+    transform: rotate(135deg);
+}
+
+/* link under accordions */
+.chapters-more {
+    display: inline-block;
+    margin-top: 10px;
+    color: #c7392f;
+    font-weight: 600;
+    border-bottom: 1px dashed rgba(199, 57, 47, .35);
+}
+
+/* book art */
+.chapters-art img {
+    width: 100%;
+    max-width: 520px;
+    filter: drop-shadow(0 16px 40px rgba(0, 0, 0, .18));
+    transform: rotate(-2deg);
+    transform-origin: center;
+}
+
+/* responsive */
+@media (max-width: 1024px) {
+    .chapters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chapters-art {
+        order: -1;
+        justify-self: center;
+    }
+
+    .chapters-art img {
+        transform: none;
+    }
+}
+
+/* ========== INFO slab (ear) ========== */
+.section.info-slab {
+    position: relative;
+    overflow: hidden;
+    background: #ffffff; /* light grey band like the mock */
+    border: 0;
+    padding: 72px 0; /* vertical rhythm similar to others */
+    padding-bottom: 20vw;
+}
+
+/* Top diagonal only (white slice). Bottom stays flat */
+.section.info-slab::before {
+    content: "";
+    position: absolute;
+    left: -6vw;
+    right: -6vw;
+    top: -90px;
+    height: 160px;
+    background: #ffffff; /* page white above */
+    transform: skewY(3.5deg); /* diag: left high → right low (like screenshot) */
+    border-bottom: 1px solid #ffffff;
+    z-index: 0;
+}
+
+/* Layout */
+.info-grid {
+    position: relative;
+    z-index: 1; /* above the diagonal slice */
+    display: grid;
+    grid-template-columns: .9fr 1.1fr; /* image left, text right */
+    gap: 32px;
+    align-items: center;
+}
+
+/* Ear image */
+.info-art img {
+    max-width: 520px;
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 14px 32px rgba(0, 0, 0, .12));
+}
+
+/* Headline spacing */
+.info-copy h2 {
+    margin: 0 0 18px;
+}
+
+/* Optional: a bit of padding inside dropdown content */
+.acc-body {
+    padding: 0 18px 14px;
+}
+
+/* Chevron reuse (if you already styled .chev, this is not needed) */
+.acc summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+}
+
+.acc summary .chev {
+    width: 10px;
+    height: 10px;
+    border-right: 2px solid #c7392f;
+    border-bottom: 2px solid #c7392f;
+    transform: rotate(-45deg);
+}
+
+.acc[open] summary .chev {
+    transform: rotate(45deg);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .info-art img {
+        max-width: 420px;
+        margin: 0 auto;
+    }
+}
+
+/* keep items aligned from the top, not centered */
+.info-grid {
+    display: grid;
+    grid-template-columns: .9fr 1.1fr; /* your existing columns */
+    gap: 32px;
+    align-items: start; /* <-- changed from center */
+}
+
+/* pin the ear image */
+.info-art {
+    align-self: start; /* top of the row */
+    /*position: sticky; !* sticks while scrolling *!*/
+    top: 96px; /* tweak to sit nicely under your header */
+    z-index: 1; /* above the grey bg slice */
+}
+
+/* image itself unchanged */
+.info-art img {
+    max-width: 520px;
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 14px 32px rgba(0, 0, 0, .12));
+}
+
+/* mobile: revert to normal flow so it doesn't cover content */
+@media (max-width: 900px) {
+    .info-art {
+        position: static;
+        top: auto;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+/* ===== CTA: floating book over full-black bar ===== */
+.cta.cta-book {
+    position: relative;
+    background: #0b0b0d; /* solid black bar */
+    color: #fff;
+    padding: 460px 0 96px; /* tall so the book can overlap */
+    overflow: visible; /* allow the book to sit above */
+    border-top: 1px solid #151515; /* keeps your theme rhythm */
+}
+
+.cta-book-floating {
+    position: absolute;
+    left: 50%;
+    top: -220px; /* how far the book floats up */
+    transform: translateX(-70%);
+    pointer-events: none; /* clicks go through */
+    z-index: 1;
+    scale: 0.8;
+}
+
+.cta-book-img {
+    width: min(480px, 60vw);
+    display: block;
+    filter: drop-shadow(0 32px 64px rgba(0, 0, 0, .55));
+}
+
+/* content inside the black bar */
+.cta-book-inner {
+    position: relative;
+    z-index: 2; /* above the background, below book shadow */
+    text-align: center;
+}
+
+.cta-book-inner h2 {
+    font-family: Merriweather, Georgia, serif;
+    font-size: 34px;
+    line-height: 1.25;
+    margin: 8px 0 10px;
+}
+
+.cta-book-old {
+    color: #d9d9d9;
+    opacity: .85;
+    text-decoration: line-through;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.cta-book-price {
+    font-weight: 800;
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+
+/* red, pill-shaped button */
+.btn-pill {
+    border-radius: 999px;
+    padding: 12px 22px;
+}
+
+.cta-book-btn {
+    background: var(--red); /* ensure it’s red even if other CTAs differ */
+    border-color: var(--red);
+    color: #fff;
+}
+
+.cta-book-btn:hover {
+    background: var(--red-600);
+    border-color: var(--red-600);
+}
+
+.cta-book-meta {
+    margin-top: 18px;
+    font-size: 13px;
+    opacity: .95;
+    display: inline-flex;
+    gap: 26px;
+}
+
+/* ---- Responsive polish ---- */
+@media (max-width: 900px) {
+    .cta.cta-book {
+        padding: 140px 0 84px;
+    }
+
+    .cta-book-floating {
+        top: -170px;
+    }
+
+    .cta-book-img {
+        width: min(420px, 70vw);
+    }
+}
+
+@media (max-width: 520px) {
+    .cta.cta-book {
+        padding: 120px 0 72px;
+    }
+
+    .cta-book-floating {
+        top: -140px;
+    }
+
+    .cta-book-img {
+        width: min(360px, 78vw);
+    }
+
+    .cta-book-inner h2 {
+        font-size: 28px;
+    }
+}
+
+/* ===== Enhanced footer (mockup-like) ===== */
+.site-footer.pro-footer {
+    background: #fafafa;
+    color: #222;
+    border-top: 1px solid #eaeaea;
+    padding: 40px 0 38px;
+}
+
+.footer-wrap {
+    max-width: 920px; /* tighter center column like the mock */
+    margin: 0 auto;
+    text-align: center;
+}
+
+.footer-nav,
+.footer-legal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px 28px;
+    margin: 8px 0;
+}
+
+.footer-nav a,
+.footer-legal a {
+    font-size: 14px;
+    color: #222;
+    opacity: .85;
+    text-decoration: none;
+}
+
+.footer-nav a:hover,
+.footer-legal a:hover {
+    opacity: 1;
+    color: #0d0d0d;
+}
+
+.footer-socials {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 16px 0 18px;
+}
+
+.footer-socials .social {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #e6e6e6;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #111;
+    transition: .15s;
+    background: #fff;
+}
+
+.footer-socials .social:hover {
+    border-color: #c7392f;
+    color: #c7392f; /* red accent on hover */
+    transform: translateY(-1px);
+}
+
+.footer-rule {
+    border: 0;
+    border-top: 1px solid #ededed;
+    margin: 18px auto 16px;
+    max-width: 760px;
+}
+
+.footer-copy {
+    display: grid;
+    gap: 6px;
+    justify-items: center;
+    font-size: 12px;
+    color: #333;
+}
+
+.footer-copy .muted {
+    color: #6f6f75;
+}
+
+/* mobile polish */
+@media (max-width: 600px) {
+    .footer-nav, .footer-legal {
+        gap: 12px 18px;
+    }
+}
+
+@media (max-width: 900px) {
+    .cta.cta-book {
+        margin-top: 40vw;
+    }
+
+    .author-portrait {
+        display: none;
+    }
+
+    .section.author-split .two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .portrait-wrap.fade-right::before {
+        display: none;
+    }
+
+    .portrait-wrap.fade-right::after {
+        display: none;
+    }
+
+    .hero.hero-split .hero-art {
+        display: none;
+    }
+
+    .hero.hero-split .hero-grid {
+        grid-template-columns: 1fr;
+    }
+    .hero.hero-split::after{
+        display: none;
+    }
+    .section.quote-slab::before, .section.quote-slab::after {
+        display: none;
+    }
+    .author-copy {
+        padding-bottom: 5vw;
+    }
+    .mobile {
+        display: none;
+    }
+    .brand {
+        display: none;
+    }
+    .site-header{
+        display: none;
+    }
+}

@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Живот без шум — Официален сайт{% endblock %}
+
+{% block content %}
+
+    {# ===== HERO: black/white split with book ===== #}
+    <section class="hero hero-split">
+        <div class="container hero-grid">
+            <div class="hero-copy">
+                <h1>Живот без шум</h1>
+                <p class="lead">Излекувах се от шум в ушите – и промених живота си. Книгата „Живот без шум“ показва пътя
+                    към изцеление при хронични заболявания като тинитус, тревожност и паник атаки – там, където
+                    медицината често мълчи. С надежда, която започва отвътре.</p>
+                <div class="price-row">
+                    {% if product %}
+                        <div class="price-card">
+                            <div class="price">{{ product.price_bgn }} лв</div>
+                            <div class="meta">вкл. ДДС</div>
+                        </div>
+                        <div class="price-card">
+                            <div class="price">€ {{ product.price_eur }}</div>
+                            <div class="meta">EEA цена</div>
+                        </div>
+                    {% endif %}
+                </div>
+                <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Поръчай сега</a>
+            </div>
+            <div class="hero-art">
+                <img src="{% static 'images/book.svg' %}" alt="Книга Живот без шум">
+            </div>
+        </div>
+    </section>
+
+    {# ===== ABOUT band (white) ===== #}
+    <section id="about" class="section section-toc">
+        <div class="container">
+            <h2>Защо да прочетеш „Живот без шум“
+                Mоята лична история как се преборих с шума в ушите</h2>
+            <p>Тези които страдат от шум в ушите или или други хронични състояния като паник атаки, тревожност,
+                безсъние и др., знаят колко изтощаващо може да е то. В тази книга ще откриеш моята истинска история
+                – какво опитах, кое не проработи и кои стъпки доведоха до промяната. Споделям личния си опит с
+                лечение и премахване на шум в ушите, както и вътрешната трансформация, която отвори пътя към трайно
+                подобрение.</p>
+            <div class="grid-3">
+                <div class="card">
+                    <a><strong>Истинска
+                        история</strong></br></br>Личен разказ за живота с хронични състояния. Открито
+                        споделям
+                        как преминах през отчаянието, страха и пътя към осъзнаването.</a>
+                </div>
+                <div class="card">
+                    <a><strong>От отчаяния до надежда</strong></br></br>Животът с шум в ушите може да бъде непоносим, но
+                        промяната е възможна, дори когато всичко изглежда безнадеждно.</a>
+                </div>
+                <div class="card">
+                    <a><strong>Лечението е възможно</strong></br></br>Това не е медицински наръчник, който казва, че шум
+                        в
+                        ушите няма лечение. Това е споделен опит и насоки, които вдъхновяват за действие и ново начало.</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ===== QUOTE slab (black) with angled bottom to grey) ===== #}
+    <section class="section quote-slab">
+        <div class="container quote-inner">
+            <blockquote>
+                „Повече от десет години „излежавам“ своята присъда в затвора на собствения си ум,
+                под безмилостното кънтене на шум, който крещи отвътре, а никой друг не чува.“
+            </blockquote>
+        </div>
+    </section>
+
+    {# ===== AUTHOR band (light grey) with portrait.svg ===== #}
+    <section id="author" class="section author-split is-attached is-flat">
+        <div class="container two-col">
+            <div class="portrait-wrap blend bleed-left fade-right">
+                <img class="author-portrait" src="{% static 'images/portrait.svg' %}" alt="Автор – портрет">
+            </div>
+            <div class="author-copy">
+                <h2>Моят път: От шума в ушите до “Живот без шум”</h2>
+                <p>Излекувах се от шум в ушите.</p>
+                <p class="small muted">Дълго време живях в капана на тинитуса. Опитвах десетки решения, търсех тишина,
+                    която никога не идваше. Днес споделям моята история в книгата "Живот без шум".</p>
+                <p class="small muted" style="color: #0b0b0d">Филип Стоянов</p>
+                <p class="small muted" style="color: #0b0b0d">Автор</p>
+
+                <a href="{% url 'checkout_info' %}" class="btn btn-primary">Купи сега</a>
+            </div>
+        </div>
+    </section>
+
+    {# ===== TOC (white) – pill cards ===== #}
+    <section id="target" class="section section-toc">
+        <div class="container">
+            <h2>Книгата „Живот без шум“ е за теб, ако страдаш от шум в ушите</h2>
+            <p>Тази книга е написана за хора, които живеят с хронични заболявания като шум в ушите  и търсят надежда. В
+                нея ще откриеш подкрепа и личен опит от човек, който е преминал по същия път.</p>
+            <div class="grid-3">
+                <div class="card">
+                    <a><strong>Ако търсиш надежда и практични решения</strong></br></br>Години наред живях с постоянния
+                        звън и
+                        бучене. В книгата споделям какви стъпки ми помогнаха да върна тишината – не обещания, а реални
+                        преживявания.</a>
+                </div>
+                <div class="card">
+                    <a><strong>Ако търсиш вдъхновение и мотивация</strong></br></br>Шумът в ушите и другите хронични
+                        заболявания често водят до отчаяние. Тази история показва, че надежда има – и че промяната е
+                        възможна, дори когато изглежда невъзможна.</a>
+                </div>
+                <div class="card">
+                    <a><strong>Ако искаш да знаеш, че не си сам в тази борба</strong></br></br>Хиляди хора преминават
+                        през същото изпитание. С тази книга ще усетиш, че някой те разбира напълно и споделя своя опит
+                        открито и честно.</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ===== CHAPTERS slab (light grey with diagonals + dropdowns) ===== #}
+    <section id="toc" class="section chapters-slab">
+        <div class="container chapters-grid">
+            <div class="chapters-copy">
+                <h2>Какво ще откриеш в книгата: Съдържание и послания</h2>
+
+                <details class="acc" open>
+                    <summary>
+                        <h3>Началото</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                    <div class="acc-body">
+                        “Спомням си първата нощ, в която разбрах, че звъненето няма да спре. Лежах буден, втренчен в
+                        тавана, с пулс като на заек пред вълча бърлога. Паниката и тревожността вече бяха обзели
+                        съзнанието ми – не като натрапници, а....”
+                    </div>
+                </details>
+
+                <details class="acc">
+                    <summary>
+                        <h3>И нека бъде шум</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                </details>
+
+                <details class="acc">
+                    <summary>
+                        <h3>Какво научих от борбата си с тинитуса?</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                </details>
+
+                <a href="#" class="chapters-more">Прочети първите страници</a>
+            </div>
+
+            <div class="chapters-art">
+                <img src="{% static 'images/book.svg' %}" alt="Живот без шум — книга">
+            </div>
+        </div>
+    </section>
+
+    {# ===== INFO slab (light grey, top diagonal only, dropdowns) ===== #}
+    <section id="usefull" class="section info-slab">
+        <div class="container info-grid">
+            <div class="info-art">
+                <img src="{% static 'images/ear.svg' %}" alt="Илюстрация на ухо">
+            </div>
+
+            <div class="info-copy">
+                <h2>
+                    Полезна информация<br>
+                    за тинитус: причини,<br>
+                    лечение и премахване
+                </h2>
+
+                <details class="acc" open>
+                    <summary>
+                        <h3>01. Какво е шум в ушите?</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                    <div class="acc-body">
+                        Шум в ушите е усещане за звън, бучене или писукане,
+                        което се чува без външен източник. Милиони хора по
+                        света живеят с това състояние.
+                    </div>
+                </details>
+
+                <details class="acc">
+                    <summary>
+                        <h3>02. Причини за шум в ушите.</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                    <div class="acc-body">
+                        Те могат да бъдат различни – от излагане на силен шум до стрес и здравословни проблеми. В
+                        книгата разказвам какво научих за причините по моя път.
+                    </div>
+                </details>
+
+                <details class="acc">
+                    <summary>
+                        <h3>03. Как се излекувах от тинитус?</h3>
+                        <span class="chev" aria-hidden="true"></span>
+                    </summary>
+                    <div class="acc-body">
+                        Моят личен опит е събран в „Живот без шум“. Това, което за лекарите е диагноза без лечение, за
+                        мен се превърна в история на промяна.
+                    </div>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    {# ===== CTA – floating book over black bar ===== #}
+    <section class="cta cta-book">
+        <!-- floating book (sits outside the container so it can overlap the bar) -->
+        <div class="cta-book-floating">
+            <img src="{% static 'images/front_book.svg' %}" alt="Живот без шум — книга" class="cta-book-img">
+        </div>
+
+        <div class="container cta-book-inner">
+            <h2 style="color: #ffffff">“Живот без шум”</h2>
+
+            <div class="cta-book-old">75,50 лв | 40,00 €</div>
+            <div class="cta-book-price">53,50 лв | 22,00 €</div>
+
+            <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-pill cta-book-btn">Купи сега</a>
+        </div>
+        <div class="cta-book-meta" style="display: flex; justify-content: center; color: var(--red)">
+            <span>14 дни право на връщане</span>
+        </div>
+    </section>
+
+
+{% endblock %}

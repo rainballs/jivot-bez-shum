@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Поръчка — Плащане{% endblock %}
+
+{% block content %}
+    <section class="section">
+        <div class="container checkout-grid">
+            <div class="checkout-main">
+                <h2>Избери начин на плащане</h2>
+
+                <form method="post" class="form">
+                    {% csrf_token %}
+                    <div class="pay-tiles">
+                        {# Rendered by RadioSelect - we’ll style it as tiles #}
+                        {{ form.payment_method }}
+                    </div>
+
+                    <div class="actions">
+                        <a href="{% url 'checkout_info' %}" class="btn btn-secondary">Назад</a>
+                        <button class="btn btn-primary">Завърши поръчката</button>
+                    </div>
+                </form>
+            </div>
+
+            <aside class="checkout-summary">
+                <div class="card summary-card">
+                    <div class="summary-head">Резюме</div>
+                    <div class="summary-item">
+                        <img src="{% static 'images/book.svg' %}" alt="" class="thumb">
+                        <div>
+                            <div class="title">Живот без шум</div>
+                            <div class="pill-row">
+                                <span class="pill">{{ order.subtotal_bgn }} лв + 5 лв</span>
+                                <span class="pill">€ {{ order.subtotal_eur }} + € 2.50</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="total-row">
+                        <div>Крайна сума:&nbsp;</div>
+                        <div class="total">
+                            {{ order.total_bgn }} лв &nbsp; / &nbsp; € {{ order.total_eur }}
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </section>
+{% endblock %}
