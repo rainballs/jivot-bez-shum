@@ -1,69 +1,63 @@
+cat > .gitignore << 'EOF'
 # --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 
-# Virtual environments
-.venv/
+# Virtual envs
 venv/
+.venv/
 env/
 ENV/
-
-# Distribution / packaging
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-parts/
-sdist/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Unit test / coverage
-.coverage
-.coverage.*
-.cache
-pytest_cache/
-htmlcov/
-
-# Logs
+.sri/  # ignore if you accidentally created one
+# Pip & build artifacts
 *.log
+pip-wheel-metadata/
+site/
+dist/
+build/
+*.egg-info/
+.eggs/
 
 # --- Django ---
-# Local SQLite DB
+# Local DB (keep out of git). If you truly deploy SQLite in prod, remove this line.
 db.sqlite3
-db.sqlite3-journal
+*.sqlite3
 
-# Collected static (STATIC_ROOT)
+# Collected static and uploaded media (keep sources in /static/, but ignore collectstatic output)
 staticfiles/
 static_root/
-
-# User uploads
 media/
+public/media/
 
-# Django stuff:
-local_settings.py
+# If you use whitenoise: ignore collectstatic output path if different
+static_cdn/
+media_cdn/
 
-# --- Env / secrets ---
-.env
-.env.*
-!.env.example
+# Django cache & test artifacts
+*.pot
+*.mo
+.coverage
+htmlcov/
+.pytest_cache/
 
-# --- Editors / OS ---
-.vscode/
-.idea/
-*.iml
+# Editor / OS
 .DS_Store
+.idea/
+.vscode/
+*.swp
 Thumbs.db
 
-# --- Node / frontend (if any) ---
+# Env/config secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Node (if you ever have frontend bits)
 node_modules/
-dist/
-build/
-.next/
-.cache/
+npm-debug.log*
+yarn.lock
+package-lock.json
+EOF
