@@ -259,8 +259,8 @@
         <div class="container cta-book-inner">
             <h2 style="color: #ffffff">“Живот без шум”</h2>
 
-            <div class="cta-book-old">75,50 лв | 40,00 €</div>
-            <div class="cta-book-price">53,50 лв | 22,00 €</div>
+{#            <div class="cta-book-old">75,50 лв | 40,00 €</div>#}
+            <div class="cta-book-price">{{ product.price_bgn }} лв | {{ product.price_eur }} €</div>
 
             <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-pill cta-book-btn">Купи сега</a>
         </div>
