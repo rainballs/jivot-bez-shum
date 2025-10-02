@@ -4,11 +4,15 @@
 
 {% block content %}
     <section class="section">
-        <div class="container checkout-grid">
-            <div class="checkout-main">
-                <h2>Данни за поръчка</h2>
-                <form method="post" class="form">
-                    {% csrf_token %}
+        <div class="container">
+            <!-- one form that spans both columns -->
+            <form method="post" class="checkout-grid-2col">
+                {% csrf_token %}
+
+                <!-- LEFT: form fields -->
+                <div class="checkout-main">
+                    <h2>Данни за поръчка</h2>
+
                     {% if messages %}
                         <div class="alerts">
                             {% for m in messages %}
@@ -36,53 +40,56 @@
                     <div class="field-grid" data-office style="display:none">
                         <label>Офис/АПС {{ form.office_text }}</label>
                     </div>
+                </div>
 
-                    <div class="field-grid">
-                        <label>Количество {{ form.quantity }}</label>
-                    </div>
+                <!-- RIGHT: summary, quantity and submit -->
+                <aside class="checkout-summary">
+                    <div class="card summary-card">
+                        <div class="summary-head">Резюме</div>
 
-                    <div class="actions">
-                        <a href="/" class="btn btn-secondary">Назад</a>
-                        <button class="btn btn-primary">Завърши поръчката</button>
-                    </div>
-                </form>
-            </div>
-
-            <aside class="checkout-summary">
-                <div class="card summary-card">
-                    <div class="summary-head">Резюме</div>
-                    <div class="summary-item">
-                        <img src="{% static 'images/book.svg' %}" alt="" class="thumb">
-                        <div>
-                            <div class="title">Живот без шум</div>
-                            {% if product %}
-                                <div class="price-row">
-                                    <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
-                                    <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
-                                </div>
-                                <div class="small muted">Доставка: 5 лв / € 2.50</div>
-                                <div class="total-row" style="margin-top:8px">
-                                    <div>Крайна сума:&nbsp;</div>
-                                    <div class="total">
-                                        <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / € <span
-                                            data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
+                        <div class="summary-item">
+                            <img src="{% static 'images/book.svg' %}" alt="" class="thumb">
+                            <div>
+                                <div class="title">Живот без шум</div>
+                                {% if product %}
+                                    <div class="price-row">
+                                        <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
+                                        <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
                                     </div>
-                                </div>
-                            {% endif %}
+                                    <div class="small muted">Доставка: 5 лв / € 2.50</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="qty-row">
+                            <label>Количество</label>
+                            {{ form.quantity }}
+                        </div>
+
+                        <div class="total-row">
+                            <div>Крайна сума:</div>
+                            <div class="total">
+                                <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / €
+                                <span data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
+                            </div>
+                        </div>
+
+                        <div class="actions actions-right">
+                            <a href="/" class="btn btn-secondary">Назад</a>
+                            <button class="btn btn-primary">Завърши поръчката</button>
                         </div>
                     </div>
-                </div>
-            </aside>
+                </aside>
+            </form>
         </div>
     </section>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // Toggle address/office on load
+            // Toggle address vs office
             const sel = document.querySelector('select[name="delivery_method"]');
             const address = document.querySelector("[data-address]");
             const office = document.querySelector("[data-office]");
-            const qty = document.querySelector('input[name="quantity"]');
 
             function applyDelivery() {
                 if (!sel || !address || !office) return;
@@ -100,7 +107,7 @@
                 sel.addEventListener("change", applyDelivery);
             }
 
-            // Live totals
+            // Live totals (same logic, quantity is now on the right)
             function toNum(s) {
                 return parseFloat(String(s).replace(",", ".").trim()) || 0;
             }
@@ -113,6 +120,7 @@
             const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
             const outBGN = document.querySelector("[data-total-bgn]");
             const outEUR = document.querySelector("[data-total-eur]");
+            const qty = document.querySelector('input[name="quantity"]');
 
             function recalc() {
                 const q = toNum(qty?.value || 1);
@@ -128,3 +136,4 @@
         });
     </script>
 {% endblock %}
+

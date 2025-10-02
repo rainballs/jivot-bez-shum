@@ -28,7 +28,6 @@ class DeliveryMethod(models.TextChoices):
 
 
 class Courier(models.TextChoices):
-    SPEEDY = "speedy", _("Спиди")
     EKONT = "econt", _("Еконт")
 
 
@@ -45,7 +44,7 @@ class Order(models.Model):
     phone = models.CharField(max_length=32, verbose_name=_("Телефон"))
 
     delivery_method = models.CharField(max_length=16, choices=DeliveryMethod.choices, default=DeliveryMethod.TO_ADDRESS)
-    courier = models.CharField(max_length=16, choices=Courier.choices, default=Courier.SPEEDY)
+    courier = models.CharField(max_length=16, choices=Courier.choices, default=Courier.EKONT)
 
     address_line = models.CharField(max_length=255, blank=True, verbose_name=_("Адрес"))
     city = models.CharField(max_length=120, blank=True, verbose_name=_("Град"))

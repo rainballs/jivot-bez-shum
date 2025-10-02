@@ -1634,22 +1634,331 @@ h3 {
     .hero.hero-split .hero-grid {
         grid-template-columns: 1fr;
     }
-    .hero.hero-split::after{
+
+    .hero.hero-split::after {
         display: none;
     }
+
     .section.quote-slab::before, .section.quote-slab::after {
         display: none;
     }
+
     .author-copy {
         padding-bottom: 5vw;
     }
+
     .mobile {
         display: none;
     }
+
     .brand {
         display: none;
     }
-    .site-header{
+
+    .site-header {
         display: none;
     }
+}
+
+/* two-column checkout */
+.checkout-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 32px;
+    align-items: start;
+}
+
+/* stack on small screens */
+@media (max-width: 900px) {
+    .checkout-grid-2col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* cards / summary */
+.summary-card {
+    padding: 16px;
+    border: 1px solid rgba(0, 0, 0, .08);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.summary-head {
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.summary-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.summary-item .thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+}
+
+.price-row {
+    display: flex;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.pill {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f3f3f3;
+    font-size: .9rem;
+}
+
+.small.muted {
+    color: #6b7280;
+    font-size: .9rem;
+}
+
+.qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.qty-row input.qty-input {
+    width: 88px;
+    text-align: center;
+}
+
+.total-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    font-weight: 600;
+}
+
+.actions-right {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.field-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 16px;
+}
+
+.field-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (max-width: 600px) {
+    .field-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* === Checkout inputs: consistent size, radius, focus ring === */
+.checkout-main input[type="text"],
+.checkout-main input[type="email"],
+.checkout-main input[type="tel"],
+.checkout-main input[type="number"],
+.checkout-main input[type="search"],
+.checkout-main input[type="password"],
+.checkout-main select,
+.checkout-summary .qty-row input {
+    width: 100%;
+    height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #D7DBE0; /* light grey border */
+    border-radius: 8px;
+    background: #fff;
+    font-size: 16px;
+    line-height: 1.2;
+    color: #111827; /* near-black text */
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+/* Placeholder color */
+.checkout-main ::placeholder,
+.checkout-summary ::placeholder {
+    color: #9AA4B2;
+}
+
+/* Hover */
+.checkout-main input:hover,
+.checkout-main select:hover,
+.checkout-summary .qty-row input:hover {
+    border-color: #C8CED6;
+}
+
+/* Focus ring (matches your red primary but subtle) */
+.checkout-main input:focus,
+.checkout-main select:focus,
+.checkout-summary .qty-row input:focus {
+    outline: none;
+    border-color: #D14B3B; /* your button red */
+    box-shadow: 0 0 0 3px rgba(209, 75, 59, 0.15); /* soft red glow */
+}
+
+/* Disabled look (if you ever disable) */
+.checkout-main input:disabled,
+.checkout-main select:disabled {
+    background: #F3F4F6;
+    color: #9AA4B2;
+    cursor: not-allowed;
+}
+
+/* Number input: remove spinners (Chrome/Edge/Safari) */
+.checkout-main input[type="number"]::-webkit-outer-spin-button,
+.checkout-main input[type="number"]::-webkit-inner-spin-button,
+.checkout-summary .qty-row input[type="number"]::-webkit-outer-spin-button,
+.checkout-summary .qty-row input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Number input: remove spinners (Firefox) */
+.checkout-main input[type="number"],
+.checkout-summary .qty-row input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* Quantity input in the summary: smaller, centered */
+.checkout-summary .qty-row input.qty-input {
+    max-width: 120px;
+    text-align: center;
+}
+
+/* Pretty select with custom caret */
+.checkout-main select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 38px; /* room for arrow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%239AA4B2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+}
+
+/* Error list from Django (shows below the field’s label) */
+.field-grid .errorlist {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+}
+
+.field-grid .errorlist li {
+    color: #B00020; /* accessible red */
+    font-size: 13px;
+}
+
+/* If you render field errors with a class, you can add red border: */
+input.is-invalid, select.is-invalid {
+    border-color: #B00020 !important;
+    box-shadow: 0 0 0 3px rgba(176, 0, 32, 0.12);
+}
+
+
+/* ===== About / features ===== */
+.section-toc .features-grid {
+    display: grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap: 48px 56px;
+    align-items: start;
+}
+
+.section-toc .feature {
+    text-align: center;
+    padding: 0 12px;
+}
+
+.section-toc .feature-icon {
+    display: block;
+    margin: 0 auto 14px;
+    width: 44px;
+    height: 44px;
+}
+
+/* Headline style like the reference (bold red, tight leading) */
+.section-toc .feature h3 {
+    margin: 6px 0 10px;
+    font-weight: 800;
+    font-size: 22px; /* tweak to match your typographic scale */
+    line-height: 1.25;
+    color: #C5342E; /* your brand red */
+}
+
+/* Body text under each card */
+.section-toc .feature p {
+    margin: 0;
+    color: #2F3747; /* softer black */
+    line-height: 1.6;
+}
+
+/* Mobile stack */
+@media (max-width: 900px) {
+    .section-toc .features-grid {
+        grid-template-columns:1fr;
+        gap: 28px;
+    }
+}
+
+/* Base layout reused by both 3-up sections */
+.section-toc .features-grid {
+    display: grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap: 48px 56px;
+    align-items: start;
+}
+
+.section-toc .feature {
+    text-align: center;
+    padding: 0 12px;
+}
+
+.section-toc .feature-icon {
+    display: block;
+    margin: 0 auto 12px;
+    width: 40px;
+    height: 40px;
+}
+
+.section-toc .feature h3 {
+    margin: 6px 0 10px;
+    font-weight: 800;
+    font-size: 22px;
+    line-height: 1.25;
+    color: #C5342E; /* brand red */
+}
+
+.section-toc .feature p {
+    margin: 0;
+    color: #2F3747;
+    line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+    .section-toc .features-grid {
+        grid-template-columns:1fr;
+        gap: 28px;
+    }
+}
+
+/* Slight spacing tune for the TOP features row */
+.section-toc .features-top .feature-icon {
+    margin-bottom: 8px;
+}
+
+.section-toc .features-top .feature h3 {
+    font-size: 20px;
 }
