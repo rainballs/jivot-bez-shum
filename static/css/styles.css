@@ -15,6 +15,10 @@
     box-sizing: border-box
 }
 
+.p25 {
+    font-size: 25px;
+}
+
 html, body {
     margin: 0;
     padding: 0
@@ -182,7 +186,7 @@ h3 {
 /* ========== SECTIONS ========== */
 .section {
     padding: 70px 0;
-    border-bottom: 1px solid var(--border)
+    /*border-bottom: 1px solid var(--border)*/
 }
 
 .section.alt {
@@ -1073,7 +1077,7 @@ h3 {
 
 /* Tweak spacing now that the diagonal is gone */
 .section.author-split.is-flat {
-    padding-bottom: 0px;
+    /*padding-bottom: 0px;*/
 }
 
 /* Stronger bottom blend into the grey background (works with SVGs) */
@@ -1647,10 +1651,9 @@ h3 {
         display: none;
     }
 
-    .section.quote-slab::before, .section.quote-slab::after {
-        display: none;
-    }
-
+    /*.section.quote-slab::before, .section.quote-slab::after {*/
+    /*    display: none;*/
+    /*}*/
     .author-copy {
         padding-bottom: 5vw;
     }
@@ -2162,7 +2165,7 @@ input.is-invalid, select.is-invalid {
 
     /* hamburger button */
     .mobile-toggle {
-        margin-left: 8px;
+        /*margin-left: 8px;*/
         width: 38px;
         height: 38px;
         display: grid;
@@ -2407,8 +2410,9 @@ input.is-invalid, select.is-invalid {
     height: 36px;
     border-radius: 8px;
     border: 0;
-    background: #fff;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .08);
+    background: none;
+    color: #fff;
+    /*box-shadow: 0 0 0 1px rgba(0, 0, 0, .08);*/
     font-size: 18px;
     line-height: 1;
     cursor: pointer
@@ -2486,5 +2490,137 @@ input.is-invalid, select.is-invalid {
     /* Optional: a tad less top padding on the black hero so spacing feels tight */
     .hero.hero-split {
         padding-top: 48px;
+    }
+}
+
+@media (max-width: 440px) {
+    .hero-title {
+        font-size: clamp(44px, 6vw, 78px);
+        text-align: center;
+    }
+
+    .hero-lead {
+        font-size: clamp(18px, 2.1vw, 22px);
+        text-align: center;
+        line-height: 36px;
+    }
+
+    h1 {
+        font-size: 50px;
+    }
+
+    h2 {
+        font-size: 35px;
+    }
+
+    h3 {
+        font-size: 25px;
+    }
+
+    .p25 {
+        font-size: 20px;
+    }
+
+    .section.quote-slab blockquote {
+        font-size: 25px;
+    }
+
+    /*.portrait-wrap.fade-right::before {*/
+    /*    display: block;*/
+    /*}*/
+    /*.portrait-wrap.fade-right::after {*/
+    /*    display: block;*/
+    /*}*/
+    .author-portrait {
+        display: block;
+    }
+
+    /*.author-portrait > img {*/
+    /*    display: block;*/
+    /*    margin-left: auto;*/
+    /*    margin-right: auto*/
+    /*}*/
+    .bleed-left {
+        position: relative;
+        margin-left: calc((100vw - 50%) / -2);
+        margin-right: calc((100vw - 50%) / -2);
+        /*margin-top: -350px;*/
+    }
+
+    /* ===== MOBILE AUTHOR PORTRAIT CARD — EXACT LOOK ===== */
+    /* Section sits right under the black quote slab, overlapping slightly */
+    .section.quote-slab + .author-split.is-attached {
+        margin-top: -9vw;
+    }
+
+    /* Two columns collapse to a single column on mobile */
+    .author-split .two-col {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+        align-items: center;
+    }
+
+    /* The grey tilted card */
+    .author-split .portrait-wrap {
+        position: relative;
+        /*width: 100%;*/
+        aspect-ratio: 3 / 4; /* fixed card proportion */
+        /*background: #e7e7ea; !* light grey, matches ref *!*/
+        border-radius: 0; /* sharp corners like the mockup */
+        /*overflow: hidden;*/
+        /*box-shadow: 0 20px 40px rgba(0, 0, 0, .18);*/
+        /*transform: rotate(-8deg); !* exact tilt of the card *!*/
+        /*backface-visibility: hidden;*/
+        /*transform-origin: 50% 50%;*/
+    }
+
+    /*!* subtle top sheen (printed-card feel) *!*/
+    /*.author-split .portrait-wrap::before {*/
+    /*    content: "";*/
+    /*    position: absolute;*/
+    /*    inset: 0;*/
+    /*    pointer-events: none;*/
+    /*    background: linear-gradient(to bottom, rgba(255, 255, 255, .36), rgba(255, 255, 255, 0) 120px);*/
+    /*    mix-blend-mode: screen;*/
+    /*}*/
+
+    /* The portrait inside the tilted card */
+    .author-portrait {
+        position: absolute;
+        /* bleed beyond edges so no gaps when rotated */
+        top: -6%;
+        right: -8%;
+        bottom: -12%;
+        left: -8%;
+        width: 116%;
+        height: auto;
+        object-fit: cover;
+        /*transform: rotate(8deg) translateY(2%); !* counter the wrapper tilt *!*/
+        transform-origin: 50% 50%;
+        image-rendering: auto;
+        /* bottom fade to transparent like the reference */
+        /*-webkit-mask-image: linear-gradient(to bottom, #000 78%, rgba(0, 0, 0, 0) 100%);*/
+        mask-image: linear-gradient(to bottom, #000 78%, rgba(0, 0, 0, 0) 100%);
+        backface-visibility: hidden;
+    }
+
+    /* Fallback for browsers without mask-image: add a gradient overlay */
+    @supports not ((-webkit-mask-image: linear-gradient(#000,#000)) or (mask-image: linear-gradient(#000,#000))) {
+        .author-split .portrait-wrap::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 28%;
+            background: linear-gradient(to bottom, rgba(231, 231, 234, 0), #e7e7ea 90%);
+            pointer-events: none;
+        }
+    }
+
+    /* Copy column text tweaks to match spacing/feel */
+    .author-split .author-copy {
+        text-wrap: balance;
     }
 }
