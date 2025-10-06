@@ -9,20 +9,24 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap"
-          rel="stylesheet">
-
+{#    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap"#}
+{#          rel="stylesheet">#}
+    <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Playfair+Display"/>
+    <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Nunito"/>
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body>
-<header class="site-header">
+<header class="site-header split">
     <div class="container nav">
         <a class="brand" href="/">Живот без шум</a>
+
         <nav class="nav-links">
-            <a class="mobile" href="/#about">За книгата</a>
-            <a class="mobile" href="/#author">Автор</a>
-            <a class="mobile" href="/#toc">Съдържание</a>
-            <a class="btn btn-primary" href="{% url 'checkout_info' %}">Купи</a>
+            <a class="nav-link mobile" href="/#about">За книгата</a>
+            <a class="nav-link mobile" href="/#author">За Автора</a>
+            <a class="nav-link mobile" href="/#toc">Откъс</a>
+            <a class="nav-link mobile" href="/#target">За кого е</a>
+            <a class="nav-link mobile" href="/#usefull">Полезно</a>
+            <a class="btn buy" href="{% url 'checkout_info' %}">Купи</a>
         </nav>
     </div>
 </header>

@@ -21,7 +21,7 @@ html, body {
 }
 
 body {
-    font: 16px/1.6 Inter, system-ui, Segoe UI, Roboto, Arial;
+    font: 16px/1.6 Nunito;
     color: var(--ink);
     background: var(--bg);
 }
@@ -40,8 +40,9 @@ a {
 .container {
     max-width: 1160px;
     margin: 0 auto;
-    padding: 0 24px
+    padding: 0 24px;
 }
+
 
 /* ========== HEADER ========== */
 .site-header {
@@ -73,7 +74,7 @@ a {
 }
 
 .nav-links a {
-    color: var(--ink);
+    /*color: var(--ink);*/
     opacity: .85
 }
 
@@ -111,7 +112,7 @@ a {
 
 /* ========== TYPOGRAPHY ========== */
 h1, h2, h3 {
-    font-family: Merriweather, Georgia, serif;
+    font-family: "Playfair Display";
     color: var(--ink);
     margin: 0 0 10px
 }
@@ -122,17 +123,18 @@ h1 {
 }
 
 h2 {
-    font-size: 30px
+    font-size: 54px
 }
 
 h3 {
-    font-size: 20px
+    font-size: 35px
 }
 
 .lead {
     color: #333;
     opacity: .85
 }
+
 
 /* ========== HOME: HERO ========== */
 .hero {
@@ -485,7 +487,8 @@ h3 {
 
     .btn {
         width: 100%;
-        text-align: center
+        text-align: center;
+        height: 45px;
     }
 
     .actions {
@@ -689,7 +692,8 @@ h3 {
 .hero.hero-split .btn-primary {
     background: var(--red);
     border-color: var(--red);
-    color: #fff
+    color: #fff;
+    margin-top: 5vw;
 }
 
 /* book art shadow stronger on light side */
@@ -874,7 +878,7 @@ h3 {
 }
 
 .quote-inner {
-    min-height: 240px;
+    min-height: 640px;
     display: flex;
     align-items: center;
     justify-content: center
@@ -883,13 +887,14 @@ h3 {
 .section.quote-slab blockquote {
     max-width: 940px;
     text-align: center;
-    font-family: Merriweather, Georgia, serif;
+    font-family: "Playfair Display";
     font-style: italic;
-    font-weight: 700;
-    font-size: 22px;
-    line-height: 1.9;
+    font-weight: 100;
+    /*font-size: 26px;*/
+    font-size: 39px;
+    /*line-height: 1.9;*/
     color: #f1f1f1;
-    letter-spacing: .2px;
+    /*letter-spacing: .2px;*/
     margin: 0;
 }
 
@@ -1129,7 +1134,7 @@ h3 {
 .portrait-wrap.blend::after {
     left: -16%;
     right: -16%;
-    bottom: -42px; /* tuck under the section edge */
+    bottom: -170px; /* tuck under the section edge */
     height: 35%; /* longer fade for a softer blend */
     background: linear-gradient(
             to bottom,
@@ -1228,9 +1233,9 @@ h3 {
 }
 
 .acc h3 {
-    font-size: 18px;
+    font-size: 25px;
     margin: 0;
-    font-family: Merriweather, Georgia, serif;
+    font-family: "Playfair Display"
 }
 
 /* small chevron */
@@ -1249,11 +1254,13 @@ h3 {
 
 /* link under accordions */
 .chapters-more {
-    display: inline-block;
+    display: flex;
+    justify-content: end;
     margin-top: 10px;
     color: #c7392f;
     font-weight: 600;
-    border-bottom: 1px dashed rgba(199, 57, 47, .35);
+    text-decoration: underline 1px;
+    /*border-bottom: 1px dashed rgba(199, 57, 47, .35);*/
 }
 
 /* book art */
@@ -1331,6 +1338,7 @@ h3 {
 /* Optional: a bit of padding inside dropdown content */
 .acc-body {
     padding: 0 18px 14px;
+    font-size: 25px;
 }
 
 /* Chevron reuse (if you already styled .chev, this is not needed) */
@@ -1439,7 +1447,7 @@ h3 {
 }
 
 .cta-book-inner h2 {
-    font-family: Merriweather, Georgia, serif;
+    font-family: "Playfair Display";
     font-size: 34px;
     line-height: 1.25;
     margin: 8px 0 10px;
@@ -1961,4 +1969,152 @@ input.is-invalid, select.is-invalid {
 
 .section-toc .features-top .feature h3 {
     font-size: 20px;
+}
+
+/* Split sticky header */
+.site-header.split {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 15%);
+}
+
+.site-header .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 14px 24px;
+}
+
+.site-header .brand {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: .2px;
+}
+
+/* Right side */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+/* Style layer for your existing links */
+.nav-link {
+    position: relative;
+    color: #ffffff; /* dark text on light side */
+    text-decoration: none;
+    font-weight: 500;
+    line-height: 1;
+    padding: 4px 0;
+}
+
+/* underline on hover/active */
+.nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -8px;
+    height: 2px;
+    background: currentColor;
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity .18s ease, transform .18s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.is-active::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Buy button */
+.btn.buy {
+    background: #c33833;
+    color: #fff;
+    border: 0;
+    border-radius: 26px;
+    padding: 10px 22px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform .12s ease, filter .12s ease;
+}
+
+.btn.buy:hover {
+    transform: translateY(-1px);
+    filter: brightness(.98);
+}
+
+.btn.buy:active {
+    transform: translateY(0);
+}
+
+/* Responsive tweaks (does NOT touch your `.mobile` logic) */
+@media (max-width: 960px) {
+    .site-header .nav {
+        padding: 12px 16px;
+    }
+
+    .nav-links {
+        gap: 18px;
+    }
+
+    .site-header .brand {
+        font-size: 22px;
+    }
+}
+
+/* Nav underline — hover only */
+.nav-links .nav-link {
+    position: relative;
+    padding: 8px 10px;
+    text-decoration: none;
+}
+
+/* draw underline with ::after */
+.nav-links .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    height: 2px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .2s ease;
+    opacity: 0.9;
+}
+
+/* show on hover/focus */
+.nav-links .nav-link:hover::after,
+.nav-links .nav-link:focus-visible::after {
+    transform: scaleX(1);
+}
+
+/* if some CSS elsewhere forces an "active" underline, cancel it */
+.nav-links .nav-link.is-active::after {
+    transform: scaleX(0); /* no persistent underline */
+}
+
+
+.hero-title {
+    font-family: "Playfair Display";
+    font-weight: 800;
+    line-height: 1.05;
+    /*font-size: clamp(44px, 6vw, 78px);*/
+    font-size: 88px;
+    letter-spacing: 0.5px;
+    margin: 0 0 18px;
+}
+
+.hero-lead {
+    /*font-size: clamp(18px, 2.1vw, 22px);*/
+    font-size: 25px;
+    line-height: 1.55;
+    margin: 0;
 }

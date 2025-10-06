@@ -8,23 +8,30 @@
     <section class="hero hero-split">
         <div class="container hero-grid">
             <div class="hero-copy">
-                <h1>Живот без шум</h1>
-                <p class="lead">Излекувах се от шум в ушите – и промених живота си. Книгата „Живот без шум“ показва пътя
-                    към изцеление при хронични заболявания като тинитус, тревожност и паник атаки – там, където
-                    медицината често мълчи. С надежда, която започва отвътре.</p>
-                <div class="price-row">
-                    {% if product %}
-                        <div class="price-card">
-                            <div class="price">{{ product.price_bgn }} лв</div>
-                            <div class="meta">вкл. ДДС</div>
-                        </div>
-                        <div class="price-card">
-                            <div class="price">€ {{ product.price_eur }}</div>
-                            <div class="meta">EEA цена</div>
-                        </div>
-                    {% endif %}
-                </div>
-                <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Поръчай сега</a>
+                <h1 class="hero-title"><span>Живот</span><br><span>без шум</span></h1>
+
+                <p class="hero-lead">
+                    <strong>Излекувах се от шум в ушите –</strong><br>
+                    <strong>и промених живота си.</strong><br>
+                    Книгата „Живот без шум“ показва пътя към<br>
+                    изцеление при хронични заболявания като<br>
+                    тинитус, тревожност и паник атаки – там,<br>
+                    където медицината често мълчи.<br>
+                    <strong>С надежда, която започва отвътре.</strong>
+                </p>
+                {#                <div class="price-row">#}
+                {#                    {% if product %}#}
+                {#                        <div class="price-card">#}
+                {#                            <div class="price">{{ product.price_bgn }} лв</div>#}
+                {#                            <div class="meta">вкл. ДДС</div>#}
+                {#                        </div>#}
+                {#                        <div class="price-card">#}
+                {#                            <div class="price">€ {{ product.price_eur }}</div>#}
+                {#                            <div class="meta">EEA цена</div>#}
+                {#                        </div>#}
+                {#                    {% endif %}#}
+                {#                </div>#}
+                <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Купи сега</a>
             </div>
             <div class="hero-art">
                 <img src="{% static 'images/book.svg' %}" alt="Книга Живот без шум">
@@ -34,10 +41,11 @@
 
     {# ===== ABOUT band (white) ===== #}
     <section id="about" class="section section-toc">
-        <div class="container">
-            <h2>Защо да прочетеш „Живот без шум“
-                Mоята лична история как се преборих с шума в ушите</h2>
-            <p>Тези които страдат от шум в ушите или или други хронични състояния като паник атаки, тревожност,
+        <div class="container" style="text-align: center">
+            <h2>Защо да прочетеш „Живот без шум“</h2>
+            <h3>Mоята лична история как се преборих с шума в ушите</h3>
+            <p style="font-size: 25px">Тези които страдат от шум в ушите или или други хронични състояния като паник
+                атаки, тревожност,
                 безсъние и др., знаят колко изтощаващо може да е то. В тази книга ще откриеш моята истинска история
                 – какво опитах, кое не проработи и кои стъпки доведоха до промяната. Споделям личния си опит с
                 лечение и премахване на шум в ушите, както и вътрешната трансформация, която отвори пътя към трайно
@@ -94,8 +102,9 @@
             </div>
             <div class="author-copy">
                 <h2>Моят път: От шума в ушите до “Живот без шум”</h2>
-                <p>Излекувах се от шум в ушите.</p>
-                <p class="small muted">Дълго време живях в капана на тинитуса. Опитвах десетки решения, търсех тишина,
+                <h3 style="font-weight: 100">Излекувах се от шум в ушите.</h3>
+                <p style="font-size: 25px;">Дълго време живях в капана на тинитуса. Опитвах десетки решения, търсех
+                    тишина,
                     която никога не идваше. Днес споделям моята история в книгата "Живот без шум".</p>
                 <p class="small muted" style="color: #0b0b0d">Филип Стоянов</p>
                 <p class="small muted" style="color: #0b0b0d">Автор</p>
@@ -107,9 +116,9 @@
 
     {# ===== TOC (white) – pill cards ===== #}
     <section id="target" class="section section-toc">
-        <div class="container">
+        <div class="container" style="text-align: center">
             <h2>Книгата „Живот без шум“ е за теб, ако страдаш от шум в ушите</h2>
-            <p>Тази книга е написана за хора, които живеят с хронични заболявания като шум в ушите  и търсят надежда. В
+            <p style="font-size: 25px">Тази книга е написана за хора, които живеят с хронични заболявания като шум в ушите и търсят надежда. В
                 нея ще откриеш подкрепа и личен опит от човек, който е преминал по същия път.</p>
             <div class="features-grid">
                 <div class="feature">
@@ -259,7 +268,7 @@
         <div class="container cta-book-inner">
             <h2 style="color: #ffffff">“Живот без шум”</h2>
 
-{#            <div class="cta-book-old">75,50 лв | 40,00 €</div>#}
+            {#            <div class="cta-book-old">75,50 лв | 40,00 €</div>#}
             <div class="cta-book-price">{{ product.price_bgn }} лв | {{ product.price_eur }} €</div>
 
             <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-pill cta-book-btn">Купи сега</a>
