@@ -3,7 +3,14 @@
 {% block title %}Живот без шум — Официален сайт{% endblock %}
 
 {% block content %}
-
+    {# ===== MOBILE-ONLY HERO (book on light grey) ===== #}
+    <section class="mobile-hero" aria-hidden="true">
+        <div class="container mobile-hero__wrap">
+            <img src="{% static 'images/book.svg' %}"
+                 alt="Живот без шум — книга"
+                 class="mobile-hero__img">
+        </div>
+    </section>
     {# ===== HERO: black/white split with book ===== #}
     <section class="hero hero-split">
         <div class="container hero-grid">
@@ -118,7 +125,8 @@
     <section id="target" class="section section-toc">
         <div class="container" style="text-align: center">
             <h2>Книгата „Живот без шум“ е за теб, ако страдаш от шум в ушите</h2>
-            <p style="font-size: 25px">Тази книга е написана за хора, които живеят с хронични заболявания като шум в ушите и търсят надежда. В
+            <p style="font-size: 25px">Тази книга е написана за хора, които живеят с хронични заболявания като шум в
+                ушите и търсят надежда. В
                 нея ще откриеш подкрепа и личен опит от човек, който е преминал по същия път.</p>
             <div class="features-grid">
                 <div class="feature">
