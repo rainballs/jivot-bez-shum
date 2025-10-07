@@ -1077,7 +1077,7 @@ h3 {
 
 /* Tweak spacing now that the diagonal is gone */
 .section.author-split.is-flat {
-    /*padding-bottom: 0px;*/
+    padding-bottom: 0;
 }
 
 /* Stronger bottom blend into the grey background (works with SVGs) */
@@ -2584,7 +2584,6 @@ input.is-invalid, select.is-invalid {
     /*    background: linear-gradient(to bottom, rgba(255, 255, 255, .36), rgba(255, 255, 255, 0) 120px);*/
     /*    mix-blend-mode: screen;*/
     /*}*/
-
     /* The portrait inside the tilted card */
     .author-portrait {
         position: absolute;
