@@ -6,61 +6,58 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
 
     {# Safe fallbacks if request is missing in prod #}
-    {% with
-    scheme=request.scheme|default:"https"
-    host=request.get_host|default:"example.com"
-    %}
+    {% with scheme=request.scheme|default:"https" host=request.get_host|default:"example.com" %}
 
-    {# === Primary SEO === #}
-    <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
-        Стоянов{% endblock %}</title>
-    <meta name="description"
-          content="{% block meta_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
-    <meta name="keywords"
-          content="{% block meta_keywords %}излекувах се от шум в ушите, премахване на шум в ушите, шум в ушите лечение, шум в ушите причини, как се лекува шум в ушите{% endblock %}">
-    <link rel="canonical"
-          href="{% block meta_canonical %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
+        {# === Primary SEO === #}
+        <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
+            Стоянов{% endblock %}</title>
+        <meta name="description"
+              content="{% block meta_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+        <meta name="keywords"
+              content="{% block meta_keywords %}излекувах се от шум в ушите, премахване на шум в ушите, шум в ушите лечение, шум в ушите причини, как се лекува шум в ушите{% endblock %}">
+        <link rel="canonical"
+              href="{% block meta_canonical %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
 
-    {# === Open Graph === #}
-    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
-    <meta property="og:site_name" content="Живот без шум">
-    <meta property="og:title"
-          content="{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
-    <meta property="og:description"
-          content="{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
-    <meta property="og:url"
-          content="{% block og_url %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
-    <meta property="og:image"
-          content="{% block og_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
-    <meta property="og:locale" content="bg_BG">
+        {# === Open Graph === #}
+        <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+        <meta property="og:site_name" content="Живот без шум">
+        <meta property="og:title"
+              content="{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
+        <meta property="og:description"
+              content="{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+        <meta property="og:url"
+              content="{% block og_url %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
+        <meta property="og:image"
+              content="{% block og_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
+        <meta property="og:locale" content="bg_BG">
 
-    {# === Twitter === #}
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title"
-          content="{% block twitter_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
-    <meta name="twitter:description"
-          content="{% block twitter_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
-    <meta name="twitter:image" content="
+        {# === Twitter === #}
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title"
+              content="{% block twitter_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
+        <meta name="twitter:description"
+              content="{% block twitter_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+        <meta name="twitter:image" content="
             {% block twitter_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
 
-    {# === Minimal favicon (no pack needed yet) === #}
-    <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
+        {# === Minimal favicon (no pack needed yet) === #}
+        <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
 
-    {# === JSON-LD (Book) === #}
-    <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Book",
-          "name": "Живот без шум",
-          "alternateName": "Излекувах се от шум в ушите",
-          "author": { "@type": "Person", "name": "Филип Стоянов" },
-          "inLanguage": "bg",
-          "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
-          "image": ["{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}"],
+        {# === JSON-LD (Book) === #}
+        <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "Book",
+              "name": "Живот без шум",
+              "alternateName": "Излекувах се от шум в ушите",
+              "author": { "@type": "Person", "name": "Филип Стоянов" },
+              "inLanguage": "bg",
+              "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
+              "image": ["{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}"],
     "url": "{{ scheme }}://{{ host }}{{ request.path|default:'/' }}",
     "publisher": { "@type": "Organization", "name": 'Живот без шум' }
   }
-    </script>
+        </script>
 
     {% endwith %}
 
