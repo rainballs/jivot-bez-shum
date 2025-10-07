@@ -85,7 +85,9 @@ DATABASES = {
         "PORT": env.int("DB_PORT", default=5433),
     }
 }
-
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "django.template.context_processors.request",
+]
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

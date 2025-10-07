@@ -5,25 +5,33 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
 
-    {# === Primary SEO (independent blocks; no nesting) === #}
+    {# Safe fallbacks if request is missing in prod #}
+    {% with
+    scheme=request.scheme|default:"https"
+    host=request.get_host|default:"example.com"
+    %}
+
+    {# === Primary SEO === #}
     <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
         Стоянов{% endblock %}</title>
     <meta name="description"
           content="{% block meta_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
     <meta name="keywords"
           content="{% block meta_keywords %}излекувах се от шум в ушите, премахване на шум в ушите, шум в ушите лечение, шум в ушите причини, как се лекува шум в ушите{% endblock %}">
-    <link rel="canonical" href="{% block meta_canonical %}{{ request.build_absolute_uri }}{% endblock %}">
+    <link rel="canonical"
+          href="{% block meta_canonical %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
 
-    {# === Open Graph / Facebook === #}
+    {# === Open Graph === #}
     <meta property="og:type" content="{% block og_type %}website{% endblock %}">
     <meta property="og:site_name" content="Живот без шум">
     <meta property="og:title"
           content="{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
     <meta property="og:description"
           content="{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
-    <meta property="og:url" content="{% block og_url %}{{ request.build_absolute_uri }}{% endblock %}">
-    <meta property="og:image" content="
-            {% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}{% endblock %}">
+    <meta property="og:url"
+          content="{% block og_url %}{{ scheme }}://{{ host }}{{ request.path|default:"/" }}{% endblock %}">
+    <meta property="og:image"
+          content="{% block og_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
     <meta property="og:locale" content="bg_BG">
 
     {# === Twitter === #}
@@ -33,14 +41,10 @@
     <meta name="twitter:description"
           content="{% block twitter_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
     <meta name="twitter:image" content="
-            {% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}{% endblock %}">
+            {% block twitter_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
 
-    {# === Favicons (optional) === #}
-    <link rel="icon" href="{% static 'favicons/favicon.ico' %}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicons/apple-touch-icon.png' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicons/favicon-32x32.png' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicons/favicon-16x16.png' %}">
-    <link rel="manifest" href="{% static 'favicons/site.webmanifest' %}">
+    {# === Minimal favicon (no pack needed yet) === #}
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
 
     {# === JSON-LD (Book) === #}
     <script type="application/ld+json">
@@ -52,11 +56,13 @@
           "author": { "@type": "Person", "name": "Филип Стоянов" },
           "inLanguage": "bg",
           "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
-          "image": ["{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}"],
-      "url": "{{ request.build_absolute_uri }}",
-      "publisher": { "@type": "Organization", "name": "Живот без шум" }
-    }
+          "image": ["{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}"],
+    "url": "{{ scheme }}://{{ host }}{{ request.path|default:'/' }}",
+    "publisher": { "@type": "Organization", "name": 'Живот без шум' }
+  }
     </script>
+
+    {% endwith %}
 
     {# === Fonts & CSS (yours) === #}
     <link rel="preconnect" href="https://fonts.googleapis.com">
