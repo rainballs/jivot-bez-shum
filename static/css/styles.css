@@ -2590,7 +2590,7 @@ input.is-invalid, select.is-invalid {
     /*}*/
     /* The portrait inside the tilted card */
     .author-portrait {
-        position: absolute;
+        /*position: absolute;*/
         /* bleed beyond edges so no gaps when rotated */
         top: -6%;
         right: -8%;
