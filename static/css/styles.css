@@ -1237,7 +1237,7 @@ h3 {
 }
 
 .acc h3 {
-    font-size: 25px;
+    font-size: 22px;
     margin: 0;
     font-family: "Playfair Display"
 }
@@ -1342,7 +1342,7 @@ h3 {
 /* Optional: a bit of padding inside dropdown content */
 .acc-body {
     padding: 0 18px 14px;
-    font-size: 25px;
+    font-size: 22px;
 }
 
 /* Chevron reuse (if you already styled .chev, this is not needed) */
@@ -2506,11 +2506,11 @@ input.is-invalid, select.is-invalid {
     }
 
     h1 {
-        font-size: 48px;
+        font-size: 47px;
     }
 
     h2 {
-        font-size: 33px;
+        font-size: 32px;
     }
 
     h3 {
