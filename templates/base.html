@@ -4,17 +4,66 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>{% block title %}Живот без шум{% endblock %}</title>
 
-    <!-- Fonts -->
+    {# === Primary SEO (independent blocks; no nesting) === #}
+    <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
+        Стоянов{% endblock %}</title>
+    <meta name="description"
+          content="{% block meta_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+    <meta name="keywords"
+          content="{% block meta_keywords %}излекувах се от шум в ушите, премахване на шум в ушите, шум в ушите лечение, шум в ушите причини, как се лекува шум в ушите{% endblock %}">
+    <link rel="canonical" href="{% block meta_canonical %}{{ request.build_absolute_uri }}{% endblock %}">
+
+    {# === Open Graph / Facebook === #}
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:site_name" content="Живот без шум">
+    <meta property="og:title"
+          content="{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
+    <meta property="og:description"
+          content="{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ request.build_absolute_uri }}{% endblock %}">
+    <meta property="og:image" content="
+            {% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}{% endblock %}">
+    <meta property="og:locale" content="bg_BG">
+
+    {# === Twitter === #}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title"
+          content="{% block twitter_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
+    <meta name="twitter:description"
+          content="{% block twitter_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+    <meta name="twitter:image" content="
+            {% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}{% endblock %}">
+
+    {# === Favicons (optional) === #}
+    <link rel="icon" href="{% static 'favicons/favicon.ico' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicons/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicons/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicons/favicon-16x16.png' %}">
+    <link rel="manifest" href="{% static 'favicons/site.webmanifest' %}">
+
+    {# === JSON-LD (Book) === #}
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Book",
+          "name": "Живот без шум",
+          "alternateName": "Излекувах се от шум в ушите",
+          "author": { "@type": "Person", "name": "Филип Стоянов" },
+          "inLanguage": "bg",
+          "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
+          "image": ["{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-default.jpg' %}"],
+      "url": "{{ request.build_absolute_uri }}",
+      "publisher": { "@type": "Organization", "name": "Живот без шум" }
+    }
+    </script>
+
+    {# === Fonts & CSS (yours) === #}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Playfair+Display">
     <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Nunito">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-
-    <!-- Small safety styles for mobile header (do not change your main CSS) -->
-
 </head>
 <body>
 
@@ -22,16 +71,10 @@
 <header class="mobile-header" aria-label="Мобилна навигация">
     <div class="container mobile-bar">
         <a class="brand" href="/">Живот без шум</a>
-
-        <!-- centered buy button (reuses your .btn.buy) -->
         <a class="btn buy" href="{% url 'checkout_info' %}">Купи</a>
-
-        <!-- hamburger (hidden on desktop via media query) -->
         <button class="mobile-toggle" aria-expanded="false" aria-controls="mobile-drawer" aria-label="Отвори меню">☰
         </button>
     </div>
-
-    <!-- slide-down drawer; links keep your .nav-link + .mobile classes -->
     <nav id="mobile-drawer" class="mobile-drawer" hidden>
         <a class="nav-link mobile" href="/#about">За книгата</a>
         <a class="nav-link mobile" href="/#author">За Автора</a>
@@ -41,11 +84,10 @@
     </nav>
 </header>
 
-<!-- ===== Desktop header (your existing one; your CSS already hides it on phones) ===== -->
+<!-- ===== Desktop header (your existing one) ===== -->
 <header class="site-header split">
     <div class="container nav">
         <a class="brand" href="/">Живот без шум</a>
-
         <nav class="nav-links">
             <a class="nav-link mobile" href="/#about">За книгата</a>
             <a class="nav-link mobile" href="/#author">За Автора</a>
@@ -147,16 +189,15 @@
             drawer.hidden = false;
             btn.setAttribute('aria-expanded', 'true');
             btn.setAttribute('aria-label', 'Затвори меню');
-            btn.textContent = '✕';              // <- X icon
+            btn.textContent = '✕';
             document.body.style.overflow = 'hidden';
         };
 
         const close = () => {
             btn.setAttribute('aria-expanded', 'false');
             btn.setAttribute('aria-label', 'Отвори меню');
-            btn.textContent = '☰';              // <- hamburger
+            btn.textContent = '☰';
             document.body.style.overflow = '';
-            // short delay not needed because we don’t animate here
             drawer.hidden = true;
         };
 
@@ -165,12 +206,10 @@
             (btn.getAttribute('aria-expanded') === 'true') ? close() : open();
         });
 
-        // ESC to close
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') close();
         });
 
-        // Close after clicking a link
         drawer.addEventListener('click', (e) => {
             if (e.target.tagName === 'A') close();
         });
