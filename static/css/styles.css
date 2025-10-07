@@ -2494,13 +2494,19 @@ input.is-invalid, select.is-invalid {
 }
 
 @media (max-width: 440px) {
+    .section.quote-slab {
+        padding: 0
+    }
+    .section.section-toc {
+        padding: 0;
+    }
     .hero-title {
-        font-size: clamp(44px, 6vw, 78px);
+        font-size: clamp(41px, 6vw, 78px);
         text-align: center;
     }
 
     .hero-lead {
-        font-size: clamp(18px, 2.1vw, 22px);
+        font-size: clamp(15px, 2.1vw, 22px);
         text-align: center;
         line-height: 36px;
     }
