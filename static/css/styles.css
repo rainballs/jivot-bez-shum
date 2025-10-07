@@ -2521,7 +2521,7 @@ input.is-invalid, select.is-invalid {
         font-size: 20px;
     }
 
-    .footer-legal a {
+    .footer-nav a .footer-legal a {
         font-size: 11px;
     }
 
