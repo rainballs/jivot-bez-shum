@@ -2521,6 +2521,10 @@ input.is-invalid, select.is-invalid {
         font-size: 20px;
     }
 
+    .footer-legal a {
+        font-size: 11px;
+    }
+
     .section.quote-slab blockquote {
         font-size: 25px;
     }
