@@ -1,0 +1,90 @@
+{% load static %}
+{% with scheme=request.scheme|default:"https" host=request.get_host|default:"example.com" absimg=scheme|stringformat:"://"|add:host|add:static('images/og-default.jpg') absurl=scheme|stringformat:"://"|add:host|add:request.path|default_if_none:"/" %}
+
+    {# ==== Primary SEO ==== #}
+    <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
+        Стоянов{% endblock %}</title>
+
+    <meta name="description"
+          content="{% block meta_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+    {# Keywords are ignored by modern engines; keep commented if you want #}
+    {# <meta name="keywords" content="{% block meta_keywords %}{% endblock %}"> #}
+
+    <link rel="canonical" href="{% block meta_canonical %}{{ absurl }}{% endblock %}">
+    <meta name="robots"
+          content="{% block meta_robots %}index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1{% endblock %}">
+
+    {# ==== Open Graph ==== #}
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:site_name" content="Живот без шум">
+    <meta property="og:title"
+          content="{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
+    <meta property="og:description"
+          content="{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ absurl }}{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ absimg }}{% endblock %}">
+    <meta property="og:image:width" content="{% block og_image_w %}1200{% endblock %}">
+    <meta property="og:image:height" content="{% block og_image_h %}630{% endblock %}">
+    <meta property="og:locale" content="bg_BG">
+
+    {# ==== Twitter ==== #}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="
+            {% block twitter_title %}{% block og_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}{% endblock %}">
+    <meta name="twitter:description" content="
+            {% block twitter_description %}{% block og_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}{% endblock %}">
+    <meta name="twitter:image"
+          content="{% block twitter_image %}{% block og_image %}{{ absimg }}{% endblock %}{% endblock %}">
+
+    {# ==== JSON-LD ==== #}
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Book",
+          "name": "Живот без шум",
+          "alternateName": "Излекувах се от шум в ушите",
+          "author": { "@type": "Person", "name": "Филип Стоянов" },
+          "inLanguage": "bg",
+          "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
+          "image": ["{{ absimg }}"],
+  "url": "{{ absurl }}",
+  "publisher": { "@type": "Organization", "name": "Живот без шум" }
+}
+    </script>
+
+    {# Site-level entities to help Knowledge Panel + sitelinks #}
+    <script type="application/ld+json">
+        {
+          "@context":"https://schema.org",
+          "@type":"Organization",
+          "name":"Живот без шум",
+          "url":"{{ scheme }}://{{ host }}/",
+  "logo":"{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}",
+  "sameAs":[
+    "https://www.youtube.com/@filyaka7065",
+    "https://www.instagram.com/filyaka/?hl=bg",
+    "https://www.facebook.com/Philip.Filyaka.Stoyanov/?locale=bg_BG",
+    "https://www.linkedin.com/in/philip-stoyanov-a0a0a0a1/"
+  ]
+}
+    </script>
+
+    <script type="application/ld+json">
+        {
+          "@context":"https://schema.org",
+          "@type":"WebSite",
+          "name":"Живот без шум",
+          "url":"{{ scheme }}://{{ host }}/",
+  "potentialAction":{
+    "@type":"SearchAction",
+    "target":"{{ scheme }}://{{ host }}/search?q={query}",
+    "query-input":"required name=query"
+  }
+}
+    </script>
+
+    {# Optional: hreflang baseline; add more when you launch translations #}
+    <link rel="alternate" href="{{ absurl }}" hreflang="bg-BG">
+    <link rel="alternate" href="{{ absurl }}" hreflang="x-default">
+
+{% endwith %}

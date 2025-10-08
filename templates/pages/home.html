@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Живот без шум — Официален сайт{% endblock %}
+{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}
+{% block meta_description %}Автобиографична книга с работещи подходи за лечение и премахване на шум в ушите. Поръчай
+    онлайн.{% endblock %}
+{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-home.jpg' %}{% endblock %}
 
 {% block content %}
     {# ===== MOBILE-ONLY HERO (book on light grey) ===== #}
