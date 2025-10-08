@@ -4,11 +4,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-{#    {% include "partials/seo.html" %}#}
-    Safe fallbacks
+
+    {# Safe fallbacks #}
     {% with scheme=request.scheme|default:"https" host=request.get_host|default:"example.com" %}
 
-        === Primary SEO ===
+        {# === Primary SEO === #}
         <title>{% block meta_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип
             Стоянов{% endblock %}</title>
         <meta name="description"
@@ -18,7 +18,7 @@
         <link rel="canonical"
               href="{% block meta_canonical %}{{ scheme }}://{{ host }}{{ request.path|default:'/' }}{% endblock %}">
 
-        === Open Graph ===
+        {# === Open Graph === #}
         <meta property="og:type" content="{% block og_type %}website{% endblock %}">
         <meta property="og:site_name" content="Живот без шум">
         <meta property="og:title"
@@ -31,21 +31,20 @@
               content="{% block og_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
         <meta property="og:locale" content="bg_BG">
 
-        === Twitter ===
+        {# === Twitter === #}
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title"
               content="{% block twitter_title %}Излекувах се от шум в ушите | Книга „Живот без шум“ – Филип Стоянов{% endblock %}">
         <meta name="twitter:description"
               content="{% block twitter_description %}Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.{% endblock %}">
         <meta name="twitter:image" content="
-
                 {% block twitter_image %}{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}{% endblock %}">
 
 
-        === Minimal favicon (no pack needed yet) ===
-        <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
+        {# === Minimal favicon (no pack needed yet) === #}
+{#        <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">#}
 
-        === JSON-LD (Book) ===
+        {# === JSON-LD (Book) === #}
         <script type="application/ld+json">
             {
               "@context": "https://schema.org",
@@ -56,9 +55,9 @@
               "inLanguage": "bg",
               "description": "Автобиографичната книга „Живот без шум“ от Филип Стоянов – лична история, решения и надежда за лечение и премахване на шума в ушите.",
               "image": ["{{ scheme }}://{{ host }}{% static 'images/og-default.jpg' %}"],
-        "url": "{{ scheme }}://{{ host }}{{ request.path|default:'/' }}",
-        "publisher": { "@type": "Organization", "name": "Живот без шум" }
-      }
+    "url": "{{ scheme }}://{{ host }}{{ request.path|default:'/' }}",
+    "publisher": { "@type": "Organization", "name": "Живот без шум" }
+  }
         </script>
 
     {% endwith %}
