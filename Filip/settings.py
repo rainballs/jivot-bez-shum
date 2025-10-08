@@ -114,21 +114,21 @@ TIME_ZONE = "Europe/Sofia"
 USE_I18N = True
 USE_TZ = True
 
-# Static / media
-STATIC_URL = "static/"
+# Static
+STATIC_URL = "/static/"  # make it absolute
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# Whitenoise compression/manifest
+
 STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-        # (optional) you can pass location, but FileSystemStorage will use MEDIA_ROOT anyway
-        # "OPTIONS": {"location": MEDIA_ROOT},
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+
+# Templates – add these two processors
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "django.template.context_processors.static",
+    "Filip.context_processors.static_build_hash",
+]
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

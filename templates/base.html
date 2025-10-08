@@ -68,6 +68,8 @@
     <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Playfair+Display">
     <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Nunito">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/styles.css?v={{ STATIC_BUILD_HASH }}">
+    <link rel="icon" type="image/svg+xml" href="{{ STATIC_URL }}favicons/favicon.svg?v={{ STATIC_BUILD_HASH }}">
 </head>
 <body>
 
