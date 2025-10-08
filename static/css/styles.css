@@ -21,7 +21,8 @@
 
 html, body {
     margin: 0;
-    padding: 0
+    padding: 0;
+    overflow-x: hidden;
 }
 
 body {
@@ -305,7 +306,7 @@ h3 {
 .checkout-summary::before {
     content: "";
     position: absolute;
-    inset: -40px -9999px -40px -40px;
+    /*inset: -40px -9999px -40px -40px;*/
     background: #ffffff;
     transform: skewY(-4deg);
     z-index: -1;
@@ -1991,6 +1992,7 @@ input.is-invalid, select.is-invalid {
 }
 
 .site-header .brand {
+    font-family: "Playfair Display";
     color: #fff;
     text-decoration: none;
     font-weight: 700;
@@ -2497,9 +2499,11 @@ input.is-invalid, select.is-invalid {
     .section.quote-slab {
         padding: 0
     }
+
     .section.section-toc {
         padding: 0;
     }
+
     .hero-title {
         font-size: clamp(41px, 6vw, 78px);
         text-align: center;
