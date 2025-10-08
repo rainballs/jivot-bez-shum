@@ -1040,7 +1040,8 @@ h3 {
 /* Make the portrait large enough to read when it’s full-bleed */
 .author-portrait {
     display: block;
-    max-width: 620px; /* adjust to your taste */
+    /*max-width: 620px; !* adjust to your taste *!*/
+    max-width: 100%;
     width: 100%;
     filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .15));
 }
@@ -2608,6 +2609,7 @@ input.is-invalid, select.is-invalid {
         bottom: -12%;
         left: -8%;
         /*width: 116%;*/
+        max-width: 520px;
         height: auto;
         object-fit: cover;
         /*transform: rotate(8deg) translateY(2%); !* counter the wrapper tilt *!*/
