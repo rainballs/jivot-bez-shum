@@ -2150,6 +2150,7 @@ input.is-invalid, select.is-invalid {
     }
 
     .mobile-header .brand {
+        font-family: "Playfair Display";
         font-weight: 800;
         font-size: 22px;
         color: #ffffff;
@@ -2606,7 +2607,7 @@ input.is-invalid, select.is-invalid {
         right: -8%;
         bottom: -12%;
         left: -8%;
-        width: 116%;
+        /*width: 116%;*/
         height: auto;
         object-fit: cover;
         /*transform: rotate(8deg) translateY(2%); !* counter the wrapper tilt *!*/
