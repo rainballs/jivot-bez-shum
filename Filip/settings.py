@@ -114,8 +114,8 @@ TIME_ZONE = "Europe/Sofia"
 USE_I18N = True
 USE_TZ = True
 
-# Static
-STATIC_URL = "/static/"  # make it absolute
+# Static / media
+STATIC_URL = "/static/"  # <-- ensure leading slash
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
