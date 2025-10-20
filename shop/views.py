@@ -13,7 +13,7 @@ from .utils import send_order_notification
 import stripe
 
 from .forms import CheckoutInfoForm, PaymentMethodForm
-from .models import Order, OrderItem, PaymentMethod, Product
+from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
 
 # Configure Stripe once (safe even if keys are empty; we check before use)
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -43,10 +43,18 @@ def _to_minor_units(amount: Decimal) -> int:
     return int((amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100))
 
 
+def _ship_bgn_for(order) -> Decimal:
+    # 9.00 лв for "address", else 7.00 лв
+    try:
+        return Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
+    except Exception:
+        # fall back safely
+        return Decimal("7.00")
+
+
 def stripe_checkout_line_items(order: Order, product: Product):
     unit_cents = _to_minor_units(product.price_bgn)
-    ship_bgn = Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
-    ship_cents = _to_minor_units(ship_bgn)
+    ship_cents = _to_minor_units(_ship_bgn_for(order))
     return [
         {
             "price_data": {
@@ -188,7 +196,7 @@ def stripe_create_checkout_session(request):
     try:
         session = stripe.checkout.Session.create(
             mode="payment",
-            payment_method_types=["card"],  # Payment Request API enables Apple/Google Pay automatically
+            payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
             metadata={"order_id": str(order.id)},
             success_url=stripe_success_url(request),
@@ -197,8 +205,9 @@ def stripe_create_checkout_session(request):
             customer_email=order.email or None,
         )
     except Exception as e:
+        # surfaces the real reason instead of a silent 500
         messages.error(request, f"Грешка при свързване със Stripe: {e}")
-        return redirect("checkout_payment")
+        return redirect("checkout_info")
 
     request.session["stripe_session_id"] = session.id
     return HttpResponseRedirect(session.url)
