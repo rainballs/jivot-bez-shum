@@ -42,7 +42,7 @@
                     </div>
                 </div>
 
-                <!-- RIGHT: summary, quantity and submit -->
+                <!-- RIGHT: summary, quantity, payment and submit -->
                 <aside class="checkout-summary">
                     <div class="card summary-card">
                         <div class="summary-head">Резюме</div>
@@ -54,7 +54,7 @@
                                 {% if product %}
                                     <div class="price-row">
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
-                                        <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
+                                        <span class="pill">€ <span data-price-eur">{{ product.price_eur }}</span></span>
                                     </div>
                                     <div class="small muted">Доставка: 5 лв / € 2.50</div>
                                 {% endif %}
@@ -66,11 +66,19 @@
                             {{ form.quantity }}
                         </div>
 
+                        <!-- NEW: payment method radios (from pay_form) -->
+                        <div class="pay-method">
+                            <label style="font-weight:700; display:block; margin:10px 0 6px;">Метод на плащане</label>
+                            <div class="pay-tiles">
+                                {{ pay_form.payment_method }}
+                            </div>
+                        </div>
+
                         <div class="total-row">
                             <div>Крайна сума:</div>
                             <div class="total">
                                 <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / €
-                                <span data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
+                                <span data-total-eur">{{ product.price_eur|floatformat:2 }}</span>
                             </div>
                         </div>
 

@@ -85,14 +85,20 @@ def checkout_info(request):
         return redirect("home")
 
     if request.method == "POST":
-        form = CheckoutInfoForm(request.POST)
-        if form.is_valid():
-            qty = form.cleaned_data["quantity"]
-            order = form.save(commit=False)
+        info_form = CheckoutInfoForm(request.POST)
+        pay_form = PaymentMethodForm(request.POST)
+
+        if info_form.is_valid() and pay_form.is_valid():
+            qty = info_form.cleaned_data["quantity"]
+
+            # Create order
+            order = info_form.save(commit=False)
             order.quantity = qty
             order.paid = False
+            order.payment_method = pay_form.cleaned_data["payment_method"]
             order.save()
 
+            # One line item
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -100,22 +106,35 @@ def checkout_info(request):
                 unit_price_bgn=product.price_bgn,
                 unit_price_eur=product.price_eur,
             )
+
+            # totals
             order.recompute_totals()
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
-                "total_bgn", "total_eur", "paid"
+                "total_bgn", "total_eur", "paid", "payment_method"
             ])
 
             send_order_notification(order, event="created")
-
             request.session["current_order_id"] = order.id
-            return redirect("checkout_payment")  # ← go pick payment method
-        else:
-            messages.error(request, "Моля, коригирайте грешките във формата.")
-    else:
-        form = CheckoutInfoForm(initial={"quantity": 1})
 
-    return render(request, "checkout/info.html", {"product": product, "form": form})
+            # Branch by payment method
+            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
+                # will redirect to Stripe
+                return redirect("stripe_create_session")
+            else:
+                # COD
+                return redirect("thank_you")
+
+        messages.error(request, "Моля, коригирайте грешките във формата.")
+    else:
+        info_form = CheckoutInfoForm(initial={"quantity": 1})
+        pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.CARD})
+
+    return render(
+        request,
+        "checkout/info.html",
+        {"product": product, "form": info_form, "pay_form": pay_form},
+    )
 
 
 @transaction.atomic

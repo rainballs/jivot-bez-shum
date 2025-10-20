@@ -65,13 +65,6 @@ class CheckoutInfoForm(forms.ModelForm):
 
 
 class PaymentMethodForm(forms.ModelForm):
-    # force required -> no empty "---------" choice
-    payment_method = forms.ChoiceField(
-        choices=PaymentMethod.choices,
-        widget=forms.RadioSelect,
-        required=True,
-    )
-
     class Meta:
         model = Order
         fields = ["payment_method"]
