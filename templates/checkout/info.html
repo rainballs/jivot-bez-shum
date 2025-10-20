@@ -56,13 +56,7 @@
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                         <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
                                     </div>
-                                    <div class="small muted" data-ship-line>
-                                        {% if form.delivery_method.value == "address" %}
-                                            Доставка: 9.00 лв / € 4.60
-                                        {% else %}
-                                            Доставка: 7.00 лв / € 3.58
-                                        {% endif %}
-                                    </div>
+                                    <div class="small muted" data-ship-line></div>
                                 {% endif %}
                             </div>
                         </div>
@@ -100,29 +94,11 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // Toggle address vs office
-            const sel = document.querySelector('select[name="delivery_method"]');
+            const sel = document.querySelector('#id_delivery_method') || document.querySelector('select[name="delivery_method"]');
             const address = document.querySelector("[data-address]");
             const office = document.querySelector("[data-office]");
 
-            function applyDelivery() {
-                if (!sel || !address || !office) return;
-                if (sel.value === "address") {
-                    address.style.display = "grid";
-                    office.style.display = "none";
-                } else {
-                    address.style.display = "none";
-                    office.style.display = "grid";
-                }
-                recalc(); // shipping depends on delivery method
-            }
-
-            if (sel) {
-                applyDelivery();
-                sel.addEventListener("change", applyDelivery);
-            }
-
-            // Live totals
+            // Helpers
             function toNum(s) {
                 return parseFloat(String(s).replace(",", ".").trim()) || 0;
             }
@@ -139,8 +115,9 @@
             const shipLine = document.querySelector("[data-ship-line]");
 
             function shipBGN() {
-                // 9.00 лв to address, else 7.00 лв
-                return sel && sel.value === "address" ? 9.00 : 7.00;
+                // value is "address" (до адрес) or "office" (офис/АПС)
+                const v = sel?.value;
+                return v === "address" ? 9.00 : 7.00;
             }
 
             function shipEUR() {
@@ -156,8 +133,35 @@
                 if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
             }
 
+            function applyDelivery() {
+                if (!sel || !address || !office) {
+                    recalc();
+                    return;
+                }
+                if (sel.value === "address") {
+                    address.style.display = "grid";
+                    office.style.display = "none";
+                } else {
+                    address.style.display = "none";
+                    office.style.display = "grid";
+                }
+                recalc();
+            }
+
+            // Attach multiple listeners for robustness (some custom selects only fire 'input')
+            if (sel) {
+                sel.addEventListener("change", applyDelivery);
+                sel.addEventListener("input", applyDelivery);
+            }
             if (qty) qty.addEventListener("input", recalc);
-            recalc(); // initial fill (sets shipping text + totals)
+
+            // Safety net: if any form control inside the container changes, recalc.
+            document.querySelector(".checkout-grid-2col")?.addEventListener("change", function (e) {
+                if (e.target === sel) applyDelivery();
+            });
+
+            // Final: init once on load
+            applyDelivery();
         });
     </script>
 {% endblock %}
