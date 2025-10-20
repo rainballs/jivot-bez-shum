@@ -35,7 +35,7 @@ def stripe_success_url(request):
 
 
 def stripe_cancel_url(request):
-    return _site_url(request) + reverse("checkout_payment")
+    return _site_url(request) + reverse("checkout_info")
 
 
 def _to_minor_units(amount: Decimal) -> int:
@@ -128,7 +128,7 @@ def checkout_info(request):
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
         info_form = CheckoutInfoForm(initial={"quantity": 1})
-        pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.CARD})
+        pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.COD})
 
     return render(
         request,

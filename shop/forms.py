@@ -64,6 +64,9 @@ class CheckoutInfoForm(forms.ModelForm):
         return cleaned
 
 
+from django import forms
+from .models import Order, PaymentMethod
+
 class PaymentMethodForm(forms.ModelForm):
     class Meta:
         model = Order
@@ -72,3 +75,15 @@ class PaymentMethodForm(forms.ModelForm):
             "payment_method": forms.RadioSelect(choices=PaymentMethod.choices)
         }
         labels = {"payment_method": ""}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        f = self.fields["payment_method"]
+        f.required = True
+        # Robustly remove any empty ("") choice even if model has blank=True
+        f.choices = [(v, l) for (v, l) in f.choices if v]   # drop the empty one
+        # Optional: if you want to show only Card + COD:
+        f.choices = [
+          (PaymentMethod.CARD, "Плащане с карта"),
+          (PaymentMethod.COD,  "Наложен платеж"),
+        ]
