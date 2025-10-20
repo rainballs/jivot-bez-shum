@@ -75,3 +75,7 @@ class PaymentMethodForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ["payment_method"]
+        widgets = {
+            "payment_method": forms.RadioSelect(choices=PaymentMethod.choices)
+        }
+        labels = {"payment_method": ""}

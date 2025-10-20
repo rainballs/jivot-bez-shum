@@ -90,6 +90,7 @@ def checkout_info(request):
             qty = form.cleaned_data["quantity"]
             order = form.save(commit=False)
             order.quantity = qty
+            order.paid = False
             order.save()
 
             OrderItem.objects.create(
@@ -100,9 +101,6 @@ def checkout_info(request):
                 unit_price_eur=product.price_eur,
             )
             order.recompute_totals()
-
-            # Don't set payment method here; choose in next step
-            order.paid = False
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
                 "total_bgn", "total_eur", "paid"
@@ -111,7 +109,7 @@ def checkout_info(request):
             send_order_notification(order, event="created")
 
             request.session["current_order_id"] = order.id
-            return redirect("checkout_payment")  # ← your existing URL name
+            return redirect("checkout_payment")  # ← go pick payment method
         else:
             messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
@@ -132,24 +130,29 @@ def checkout_payment(request):
         if form.is_valid():
             order = form.save()
 
-            # Card / Apple Pay / Google Pay -> Stripe Checkout
+            # Anything that's not COD goes to Stripe
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 if not settings.STRIPE_PUBLIC_KEY or not settings.STRIPE_SECRET_KEY:
                     messages.error(request, "Stripe не е конфигуриран (липсват STRIPE_PUBLIC_KEY / STRIPE_SECRET_KEY).")
                     return redirect("checkout_payment")
                 return redirect("stripe_create_session")
 
-            # COD -> finish locally
+            # COD → finish locally
             order.paid = False
             order.save(update_fields=["paid"])
             return redirect("thank_you")
+
         messages.error(request, "Моля, изберете метод на плащане.")
     else:
-        # Preselect Card so there is always a value
+        # Default to CARD if nothing chosen yet
         initial = {"payment_method": order.payment_method or PaymentMethod.CARD}
         form = PaymentMethodForm(instance=order, initial=initial)
 
-    return render(request, "checkout/payment.html", {"product": product, "order": order, "form": form})
+    return render(request, "checkout/payment.html", {
+        "product": product,
+        "order": order,
+        "form": form
+    })
 
 
 # ---------- Stripe integration ----------

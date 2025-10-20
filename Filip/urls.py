@@ -9,7 +9,7 @@ urlpatterns = [
     path("r3gUp7g5b8xjOw8Eu2E8lONZyxHPectd/", admin.site.urls),
     path("", views.home, name="home"),
     path("checkout/", views.checkout_info, name="checkout_info"),
-    # path("checkout/payment/", views.checkout_payment, name="checkout_payment"),  # hidden for now
+    path("checkout/payment/", views.checkout_payment, name="checkout_payment"),  # hidden for now
     path("checkout/thank-you/", views.thank_you, name="thank_you"),
 
     # Stripe (disabled for now)
