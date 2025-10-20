@@ -8,11 +8,37 @@
             <div class="checkout-main">
                 <h2>Избери начин на плащане</h2>
 
+                {% if messages %}
+                    <div class="alerts">
+                        {% for m in messages %}
+                            <div class="alert">{{ m }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+
                 <form method="post" class="form">
                     {% csrf_token %}
-                    <div class="pay-tiles">
-                        {# Rendered by RadioSelect - we’ll style it as tiles #}
-                        {{ form.payment_method }}
+
+                    {# Render radio choices as clickable tiles #}
+                    <div class="pay-tiles" data-pay-tiles>
+                        {% for opt in form.payment_method %}
+                            {# opt.tag renders the <input type="radio"> with correct 'checked' #}
+                            <label class="pay-tile{% if opt.data.selected %} is-selected{% endif %}">
+                                {{ opt.tag }}
+                                <span class="title">{{ opt.choice_label }}</span>
+
+                                {% if opt.data.value == "card" %}
+                                    <span class="sub">Visa / Mastercard • Apple Pay / Google Pay</span>
+                                    <span class="logos">
+                  <img src="{% static 'images/payments/visa.svg' %}" alt="Visa">
+                  <img src="{% static 'images/payments/mastercard.svg' %}" alt="Mastercard">
+                  <img src="{% static 'images/payments/applepay.svg' %}" alt="Apple Pay">
+                  <img src="{% static 'images/payments/googlepay.svg' %}" alt="Google Pay">
+                </span>
+                                {% elif opt.data.value == "cod" %}
+                                    <span class="sub">Наложен платеж при доставка</span>
+                                {% endif %}
+                            </label>
+                        {% endfor %}
                     </div>
 
                     <div class="actions">
@@ -45,4 +71,71 @@
             </aside>
         </div>
     </section>
+
+    <script>
+        // Toggle selected style when user clicks a radio
+        document.addEventListener('DOMContentLoaded', function () {
+            const wrap = document.querySelector('[data-pay-tiles]');
+            if (!wrap) return;
+            wrap.addEventListener('change', function (e) {
+                if (e.target && e.target.type === 'radio') {
+                    wrap.querySelectorAll('.pay-tile').forEach(el => el.classList.remove('is-selected'));
+                    const current = e.target.closest('.pay-tile');
+                    if (current) current.classList.add('is-selected');
+                }
+            });
+        });
+    </script>
+
+    <style>
+        /* Minimal, self-contained tile styling */
+        .pay-tiles {
+            display: grid;
+            gap: 12px;
+        }
+
+        .pay-tile {
+            display: grid;
+            gap: 4px;
+            padding: 14px 16px;
+            border: 1px solid #e5e5e9;
+            border-radius: 14px;
+            cursor: pointer;
+            align-items: start;
+            grid-template-columns: 18px 1fr;
+        }
+
+        .pay-tile input[type="radio"] {
+            margin: 2px 10px 0 0;
+            width: 18px;
+            height: 18px;
+        }
+
+        .pay-tile .title {
+            font-weight: 700;
+        }
+
+        .pay-tile .sub {
+            font-size: 0.9rem;
+            color: #6f6f75;
+        }
+
+        .pay-tile .logos {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px;
+        }
+
+        .pay-tile .logos img {
+            height: 16px;
+            width: auto;
+            display: inline-block;
+        }
+
+        .pay-tile.is-selected {
+            border-color: #c7392f;
+            box-shadow: 0 0 0 3px rgba(199, 57, 47, 0.12);
+        }
+    </style>
 {% endblock %}

@@ -13,8 +13,8 @@ urlpatterns = [
     path("checkout/thank-you/", views.thank_you, name="thank_you"),
 
     # Stripe (disabled for now)
-    # path("pay/stripe/create-session/", views.stripe_create_checkout_session, name="stripe_create_session"),
-    # path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
+    path("pay/stripe/create-session/", views.stripe_create_checkout_session, name="stripe_create_session"),
+    path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

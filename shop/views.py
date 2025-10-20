@@ -100,18 +100,18 @@ def checkout_info(request):
                 unit_price_eur=product.price_eur,
             )
             order.recompute_totals()
-            # Make it COD-only
-            order.payment_method = PaymentMethod.COD
+
+            # Don't set payment method here; choose in next step
             order.paid = False
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
-                "total_bgn", "total_eur", "payment_method", "paid"
+                "total_bgn", "total_eur", "paid"
             ])
 
             send_order_notification(order, event="created")
 
             request.session["current_order_id"] = order.id
-            return redirect("thank_you")
+            return redirect("checkout_payment")  # ← your existing URL name
         else:
             messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
