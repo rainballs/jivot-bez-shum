@@ -56,7 +56,7 @@
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                         <span class="pill">€ <span data-price-eur">{{ product.price_eur }}</span></span>
                                     </div>
-                                    <div class="small muted">Доставка: 5 лв / € 2.50</div>
+                                    <div class="small muted" data-ship-line>Доставка: 5 лв / € 2.50</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -141,6 +141,66 @@
                 qty.addEventListener("input", recalc);
                 recalc();
             }
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Toggle address vs office
+            const sel = document.querySelector('select[name="delivery_method"]');
+            const address = document.querySelector("[data-address]");
+            const office = document.querySelector("[data-office]");
+
+            function applyDelivery() {
+                if (!sel || !address || !office) return;
+                if (sel.value === "address") {
+                    address.style.display = "grid";
+                    office.style.display = "none";
+                } else {
+                    address.style.display = "none";
+                    office.style.display = "grid";
+                }
+                recalc(); // ← shipping changes with delivery method
+            }
+
+            if (sel) {
+                applyDelivery();
+                sel.addEventListener("change", applyDelivery);
+            }
+
+            // Live totals
+            function toNum(s) {
+                return parseFloat(String(s).replace(",", ".").trim()) || 0;
+            }
+
+            function fmt(n) {
+                return (Math.round(n * 100) / 100).toFixed(2);
+            }
+
+            const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
+            const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
+            const outBGN = document.querySelector("[data-total-bgn]");
+            const outEUR = document.querySelector("[data-total-eur]");
+            const qty = document.querySelector('input[name="quantity"]');
+            const shipLine = document.querySelector("[data-ship-line]");
+
+            function shipBGN() {
+                return sel && sel.value === "address" ? 9.00 : 7.00;
+            }
+
+            function shipEUR() {
+                const BGN_PER_EUR = 1.95583;
+                return shipBGN() / BGN_PER_EUR;
+            }
+
+            function recalc() {
+                const q = toNum(qty?.value || 1);
+                const sBGN = shipBGN(), sEUR = shipEUR();
+                if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
+                if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
+                if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
+            }
+
+            if (qty) qty.addEventListener("input", recalc);
+            recalc();
         });
     </script>
 {% endblock %}

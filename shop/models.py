@@ -3,7 +3,9 @@ from django.db import models
 # Create your models here.
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+
+BGN_PER_EUR = Decimal("1.95583")
 
 
 class Product(models.Model):
@@ -36,6 +38,10 @@ class PaymentMethod(models.TextChoices):
     APPLE_PAY = "apple_pay", _("Apple Pay")
     GOOGLE_PAY = "google_pay", _("Google Pay")
     COD = "cod", _("Наложен платеж")
+
+
+def _bgn_to_eur(amount_bgn: Decimal) -> Decimal:
+    return (amount_bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class Order(models.Model):
@@ -73,8 +79,13 @@ class Order(models.Model):
         return f"Order #{self.id or '—'} — {self.full_name}"
 
     def set_shipping_flat(self):
-        self.shipping_bgn = Decimal("5.00")
-        self.shipping_eur = Decimal("2.50")
+        """9.00 лв for delivery to address, else 7.00 лв. EUR auto-converted."""
+        if self.delivery_method == DeliveryMethod.TO_ADDRESS:
+            ship_bgn = Decimal("9.00")
+        else:
+            ship_bgn = Decimal("7.00")
+        self.shipping_bgn = ship_bgn
+        self.shipping_eur = _bgn_to_eur(ship_bgn)
 
     def recompute_totals(self):
         items = list(self.items.all())
@@ -82,7 +93,7 @@ class Order(models.Model):
         seur = sum((i.unit_price_eur * i.quantity for i in items), start=Decimal("0"))
         self.subtotal_bgn = sbgn
         self.subtotal_eur = seur
-        self.set_shipping_flat()
+        self.set_shipping_flat()  # ← uses delivery_method
         self.total_bgn = sbgn + self.shipping_bgn
         self.total_eur = seur + self.shipping_eur
 

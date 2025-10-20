@@ -45,7 +45,8 @@ def _to_minor_units(amount: Decimal) -> int:
 
 def stripe_checkout_line_items(order: Order, product: Product):
     unit_cents = _to_minor_units(product.price_bgn)
-    ship_cents = _to_minor_units(Decimal("5.00"))
+    ship_bgn = Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
+    ship_cents = _to_minor_units(ship_bgn)
     return [
         {
             "price_data": {
