@@ -15,20 +15,22 @@
                         </div>
                     {% endif %}
 
-                    <form method="post" action="{% url 'econt_submit' %}" id="econt-form" class="form">
+                    <form method="post" action="{% url 'econt_submit' %}" id="econt-form" class="form" novalidate>
                         {% csrf_token %}
 
                         <div class="field-grid">
                             <label>Име и фамилия
-                                <input type="text" name="full_name" value="{{ order.full_name }}" required>
+                                <input type="text" name="full_name" value="{{ order.full_name }}" required
+                                       autocomplete="name">
                             </label>
 
                             <label>Телефон
-                                <input type="text" name="phone" value="{{ order.phone }}" required>
+                                <input type="text" name="phone" value="{{ order.phone }}" required autocomplete="tel">
                             </label>
 
                             <label>Град
-                                <input type="text" name="city" value="{{ order.city }}" required>
+                                <input type="text" name="city" value="{{ order.city }}" required
+                                       autocomplete="shipping address-level2">
                             </label>
                         </div>
 
@@ -46,19 +48,24 @@
                                 </label>
                             </div>
 
+                            <!-- Address -->
                             <div id="addr-wrap" class="mt">
                                 <label>Адрес
-                                    <input type="text" name="address" placeholder="ул., №, вх., ет., ап."
-                                           value="{{ order.address|default:'' }}">
+                                    <input type="text" name="address" id="address"
+                                           placeholder="ул., №, вх., ет., ап."
+                                           value="{{ order.address|default:'' }}"
+                                           autocomplete="shipping address-line1">
                                 </label>
                                 <p class="small muted">Въведете пълен адрес (ул., №, вх., ет., ап.).</p>
                             </div>
 
+                            <!-- Office -->
                             <div id="office-wrap" class="mt">
                                 <label>Код на офис
-                                    <input type="text" name="office_code"
+                                    <input type="text" name="office_code" id="office_code"
                                            value="{{ order.econt_office_code|default:'' }}"
-                                           placeholder="напр. 1501" pattern="\\d+" inputmode="numeric">
+                                           placeholder="напр. 1501"
+                                           pattern="[0-9]*" inputmode="numeric" autocomplete="off">
                                 </label>
                                 <p class="small muted">Кодът трябва да е числов и да е от същия град.</p>
                             </div>
@@ -96,7 +103,7 @@
 
         .field-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns:1fr 1fr 1fr;
             gap: 1rem;
         }
 
@@ -126,7 +133,7 @@
 
         @media (max-width: 800px) {
             .field-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns:1fr;
             }
         }
     </style>
@@ -138,13 +145,47 @@
             const toOff = form.querySelector('input[name="to_office"][value="1"]');
             const addrW = document.getElementById('addr-wrap');
             const offW = document.getElementById('office-wrap');
+            const addr = document.getElementById('address');
+            const office = document.getElementById('office_code');
+
+            function enable(el) {
+                el.disabled = false;
+            }
+
+            function disable(el) {
+                el.disabled = true;
+            }
+
+            function req(el, on) {
+                el.toggleAttribute('required', !!on);
+            }
 
             function sync() {
-                addrW.style.display = toAddr.checked ? '' : 'none';
-                offW.style.display = toOff.checked ? '' : 'none';
+                const officeSelected = toOff.checked;
+
+                if (officeSelected) {
+                    // show office, hide address
+                    offW.style.display = '';
+                    addrW.style.display = 'none';
+                    enable(office);
+                    req(office, true);
+                    disable(addr);
+                    req(addr, false);
+                    addr.value = ''; // clear hidden field to avoid hidden-invalid
+                } else {
+                    // show address, hide office
+                    addrW.style.display = '';
+                    offW.style.display = 'none';
+                    enable(addr);
+                    req(addr, true);
+                    disable(office);
+                    req(office, false);
+                    office.value = ''; // clear hidden field to avoid hidden-invalid
+                }
             }
 
             form.addEventListener('change', sync);
+            // run once on load
             sync();
         })();
     </script>
