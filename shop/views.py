@@ -134,7 +134,7 @@ def checkout_info(request):
             else:
                 # COD
                 _ = create_econt_label(order)  # ignore failure here or surface a message if you prefer
-                return redirect("thank_you")
+                return redirect("econt_collect")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
@@ -170,7 +170,7 @@ def checkout_payment(request):
             # COD → finish locally
             order.paid = False
             order.save(update_fields=["paid"])
-            return redirect("thank_you")
+            return redirect("econt_collect")
 
         messages.error(request, "Моля, изберете метод на плащане.")
     else:
@@ -201,7 +201,7 @@ def stripe_create_checkout_session(request):
             payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
             metadata={"order_id": str(order.id)},
-            success_url=_site_url(request) + reverse("econt_collect") + "?from=stripe=1",
+            success_url=_site_url(request) + reverse("econt_collect"),
             cancel_url=stripe_cancel_url(request),
             currency="bgn",
             customer_email=order.email or None,

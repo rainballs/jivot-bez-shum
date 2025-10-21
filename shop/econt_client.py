@@ -19,8 +19,11 @@ class EcontClient:
     def _post_xml(self, url: str, xml_bytes: bytes):
         log.info("ECONT POST %s\n%s", url, xml_bytes.decode("utf-8", errors="ignore"))
         r = requests.post(url, data=xml_bytes, headers=self.headers, auth=self.auth, timeout=30)
-        log.info("ECONT RESP %s %s\n%s", url, r.status_code, r.text[:3000])
+        log.info("ECONT RESP %s %s\n%s", url, r.status_code, (r.text or "")[:3000])
         r.raise_for_status()
+        if not r.text.strip():
+            # Make the failure explicit (this is what you saw)
+            raise RuntimeError("Empty response from Econt (check office code / required fields).")
         return r.text
 
 

@@ -47,14 +47,28 @@ def econt_submit(request):
     order.city = request.POST.get("city", order.city)
     order.address = request.POST.get("address", getattr(order, "address", ""))  # or address_line field
     to_office = request.POST.get("to_office") == "1"
+    office_code = (request.POST.get("office_code") or "").strip()
     order.econt_office_code = request.POST.get("office_code", "") if to_office else ""
+
+    if to_office:
+        if not office_code.isdigit():
+            messages.error(request, "Кодът на офиса трябва да е числов (напр. 1501).")
+            return redirect("econt_collect")
+        order.econt_office_code = office_code
+        # shipping to office → address not required
+    else:
+        order.econt_office_code = ""
 
     order.save()
 
     # Now create the label (paid card → COD=0, COD → we’ll send total)
     result = create_econt_label(order)
     if not result.get("ok"):
-        messages.error(request, f"Грешка при Еконт: {result.get('error') or 'неуспешно създаване'}")
+        msg = result.get("error") or "Неуспешно създаване на товарителница."
+        # Common cause hint:
+        if "Invalid XML" in msg or "Empty response" in msg:
+            msg += " (вероятно невалиден код на офис или липсващо поле)"
+        messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect("econt_collect")
 
     messages.success(request, "Товарителницата е създадена успешно.")

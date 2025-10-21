@@ -1,9 +1,10 @@
+{# templates/econt/collect.html #}
 {% extends "base.html" %}
 {% block title %}Доставка с Еконт{% endblock %}
 {% block content %}
     <section class="section">
         <div class="container" style="max-width:720px">
-            <h2>Доставка с Еконт</h2>
+            <h1>Доставка с Еконт</h1>
 
             {% if messages %}
                 <div class="alerts">
@@ -12,50 +13,71 @@
                 </div>
             {% endif %}
 
-            <form method="post" action="{% url 'econt_submit' %}">
+            <form method="post" action="{% url 'econt_submit' %}" id="econt-form">
                 {% csrf_token %}
 
-                <div class="field">
-                    <label>Име и фамилия</label>
+                <label>Име и фамилия
                     <input type="text" name="full_name" value="{{ order.full_name }}" required>
-                </div>
+                </label>
 
-                <div class="field">
-                    <label>Телефон</label>
+                <label>Телефон
                     <input type="text" name="phone" value="{{ order.phone }}" required>
-                </div>
+                </label>
 
-                <div class="field">
-                    <label>Град</label>
+                <label>Град
                     <input type="text" name="city" value="{{ order.city }}" required>
-                </div>
+                </label>
 
-                <div class="field">
-                    <label>Адрес (за доставка до адрес)</label>
-                    <input type="text" name="address" value="{{ order.address }}" placeholder="ул., №, вх., ет., ап.">
-                </div>
+                <fieldset style="border:0;padding:0;margin:1rem 0">
+                    <label style="display:block;margin:.5rem 0">
+                        <input type="radio" name="to_office" value="0"
+                               {% if not order.econt_office_code %}checked{% endif %}>
+                        Доставка до адрес
+                    </label>
+                    <div id="addr-wrap">
+                        <label>Адрес
+                            <input type="text" name="address" value="{{ order.address|default:'' }}"
+                                   placeholder="ул., №, вх., ет., ап.">
+                        </label>
+                    </div>
 
-                <div class="field">
-                    <label>
-                        <input type="checkbox" name="to_office" value="1"
+                    <label style="display:block;margin:.5rem 0">
+                        <input type="radio" name="to_office" value="1"
                                {% if order.econt_office_code %}checked{% endif %}>
                         Доставка до офис на Еконт
                     </label>
-                    <div class="muted small">Ако изберете офис, попълнете кода на офиса.</div>
-                </div>
-
-                <div class="field">
-                    <label>Код на офис (ако е до офис)</label>
-                    <input type="text" name="office_code" value="{{ order.econt_office_code|default:'' }}"
-                           placeholder="напр. 1501">
-                </div>
+                    <div id="office-wrap">
+                        <label>Код на офис
+                            <input type="text" name="office_code"
+                                   value="{{ order.econt_office_code|default:'' }}"
+                                   placeholder="напр. 1501"
+                                   pattern="\\d+"
+                                   inputmode="numeric">
+                        </label>
+                        <p class="small muted">Ползвайте **числовия код на офиса**, не името.</p>
+                    </div>
+                </fieldset>
 
                 <button type="submit" class="btn btn-primary">Създай товарителница</button>
             </form>
-
-            <p class="small muted" style="margin-top:1rem">
-                След създаване на товарителницата ще видите линк за печат на етикета на „Благодарим“ страницата.
-            </p>
         </div>
     </section>
+
+    <script>
+        (function () {
+            const form = document.getElementById('econt-form');
+            const toAddr = form.querySelector('input[name="to_office"][value="0"]');
+            const toOff = form.querySelector('input[name="to_office"][value="1"]');
+            const addrW = document.getElementById('addr-wrap');
+            const offW = document.getElementById('office-wrap');
+
+            function sync() {
+                addrW.style.display = toAddr.checked ? '' : 'none';
+                offW.style.display = toOff.checked ? '' : 'none';
+            }
+
+            form.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
 {% endblock %}
