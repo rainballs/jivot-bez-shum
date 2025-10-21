@@ -156,3 +156,16 @@ ORDER_NOTIFY_EMAIL = env("ORDER_NOTIFY_EMAIL", default="admin@example.com")
 
 # For links inside emails (e.g., admin link)
 SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
+
+ECONT = {
+    "BASE_URL": os.getenv("ECONT_BASE_URL", "https://demo.econt.com/ee/services"),
+    "USER": os.getenv("ECONT_USERNAME", ""),
+    "PASS": os.getenv("ECONT_PASSWORD", ""),
+    "DEFAULTS": {
+        "sender_name": os.getenv("ECONT_SENDER_NAME", ""),
+        "sender_phone": os.getenv("ECONT_SENDER_PHONE", ""),
+        "sender_city": os.getenv("ECONT_SENDER_CITY", ""),
+        "sender_address": os.getenv("ECONT_SENDER_ADDRESS", ""),
+        "sender_office": os.getenv("ECONT_SENDER_OFFICE_CODE", ""),
+    }
+}

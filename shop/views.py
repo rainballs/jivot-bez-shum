@@ -9,6 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from .utils import send_order_notification
+from .econt_service import create_econt_label
 
 import stripe
 
@@ -132,6 +133,7 @@ def checkout_info(request):
                 return redirect("stripe_create_session")
             else:
                 # COD
+                _ = create_econt_label(order)  # ignore failure here or surface a message if you prefer
                 return redirect("thank_you")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
@@ -237,6 +239,8 @@ def stripe_webhook(request):
 
                 from .utils import send_order_notification
                 send_order_notification(order, event="paid")
+                # Card paid → no COD
+                _ = create_econt_label(order)
             except Order.DoesNotExist:
                 pass
 

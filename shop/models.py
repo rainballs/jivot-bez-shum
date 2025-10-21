@@ -65,6 +65,13 @@ class Order(models.Model):
     total_bgn = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_eur = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    econt_shipment_num = models.CharField(max_length=64, blank=True, null=True)
+    econt_label_pdf = models.FileField(upload_to="econt_labels/", blank=True, null=True)
+    econt_status = models.CharField(max_length=64, blank=True, null=True)
+    econt_errors = models.TextField(blank=True, null=True)
+    # optional, if you let user pick office:
+    econt_office_code = models.CharField(max_length=16, blank=True, null=True)
+
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, blank=True)
     paid = models.BooleanField(default=False)
 
