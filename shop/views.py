@@ -201,7 +201,7 @@ def stripe_create_checkout_session(request):
             payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
             metadata={"order_id": str(order.id)},
-            success_url=stripe_success_url(request),
+            success_url=_site_url(request) + reverse("econt_collect") + "?from=stripe=1",
             cancel_url=stripe_cancel_url(request),
             currency="bgn",
             customer_email=order.email or None,
@@ -209,7 +209,7 @@ def stripe_create_checkout_session(request):
     except Exception as e:
         # surfaces the real reason instead of a silent 500
         messages.error(request, f"Грешка при свързване със Stripe: {e}")
-        return redirect("checkout_info")
+        return redirect("econt_collect")
 
     request.session["stripe_session_id"] = session.id
     return HttpResponseRedirect(session.url)

@@ -10,6 +10,11 @@
                 <p>Статус: {% if order.paid %}<strong>Платена</strong>{% else %}Чака плащане{% endif %}</p>
                 <p>Крайна сума: <strong>{{ order.total_bgn }} лв</strong> / <strong>€ {{ order.total_eur }}</strong></p>
                 <p>Ще се свържем с вас на {{ order.email }}.</p>
+                {% if order and order.econt_label_pdf %}
+                    <p><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">
+                        Принтирай товарителница (Econt)
+                    </a></p>
+                {% endif %}
             {% else %}
                 <p>Поръчката е завършена.</p>
             {% endif %}

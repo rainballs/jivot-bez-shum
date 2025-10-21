@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Доставка с Еконт{% endblock %}
+{% block content %}
+    <section class="section">
+        <div class="container" style="max-width:720px">
+            <h2>Доставка с Еконт</h2>
+
+            {% if messages %}
+                <div class="alerts">
+                    {% for m in messages %}
+                        <div class="alert">{{ m }}</div>{% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'econt_submit' %}">
+                {% csrf_token %}
+
+                <div class="field">
+                    <label>Име и фамилия</label>
+                    <input type="text" name="full_name" value="{{ order.full_name }}" required>
+                </div>
+
+                <div class="field">
+                    <label>Телефон</label>
+                    <input type="text" name="phone" value="{{ order.phone }}" required>
+                </div>
+
+                <div class="field">
+                    <label>Град</label>
+                    <input type="text" name="city" value="{{ order.city }}" required>
+                </div>
+
+                <div class="field">
+                    <label>Адрес (за доставка до адрес)</label>
+                    <input type="text" name="address" value="{{ order.address }}" placeholder="ул., №, вх., ет., ап.">
+                </div>
+
+                <div class="field">
+                    <label>
+                        <input type="checkbox" name="to_office" value="1"
+                               {% if order.econt_office_code %}checked{% endif %}>
+                        Доставка до офис на Еконт
+                    </label>
+                    <div class="muted small">Ако изберете офис, попълнете кода на офиса.</div>
+                </div>
+
+                <div class="field">
+                    <label>Код на офис (ако е до офис)</label>
+                    <input type="text" name="office_code" value="{{ order.econt_office_code|default:'' }}"
+                           placeholder="напр. 1501">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Създай товарителница</button>
+            </form>
+
+            <p class="small muted" style="margin-top:1rem">
+                След създаване на товарителницата ще видите линк за печат на етикета на „Благодарим“ страницата.
+            </p>
+        </div>
+    </section>
+{% endblock %}

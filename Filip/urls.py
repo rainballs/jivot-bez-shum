@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path
-from shop import views
+from shop import views, econt_views
 
 from django.conf import settings
 from django.conf.urls.static import static
@@ -15,6 +15,10 @@ urlpatterns = [
     # Stripe (disabled for now)
     path("pay/stripe/create-session/", views.stripe_create_checkout_session, name="stripe_create_session"),
     path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
+
+    # ECONT
+    path("econt/collect/", econt_views.econt_collect, name="econt_collect"),
+    path("econt/submit/", econt_views.econt_submit, name="econt_submit"),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
