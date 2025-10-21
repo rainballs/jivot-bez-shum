@@ -1,67 +1,135 @@
-{# templates/econt/collect.html #}
 {% extends "base.html" %}
 {% block title %}Доставка с Еконт{% endblock %}
+
 {% block content %}
     <section class="section">
-        <div class="container" style="max-width:720px">
-            <h1>Доставка с Еконт</h1>
+        <div class="container">
+            <div class="checkout-grid-2col">
+                <div class="checkout-main">
+                    <h2>Доставка с Еконт</h2>
 
-            {% if messages %}
-                <div class="alerts">
-                    {% for m in messages %}
-                        <div class="alert">{{ m }}</div>{% endfor %}
+                    {% if messages %}
+                        <div class="alerts">
+                            {% for m in messages %}
+                                <div class="alert">{{ m }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" action="{% url 'econt_submit' %}" id="econt-form" class="form">
+                        {% csrf_token %}
+
+                        <div class="field-grid">
+                            <label>Име и фамилия
+                                <input type="text" name="full_name" value="{{ order.full_name }}" required>
+                            </label>
+
+                            <label>Телефон
+                                <input type="text" name="phone" value="{{ order.phone }}" required>
+                            </label>
+
+                            <label>Град
+                                <input type="text" name="city" value="{{ order.city }}" required>
+                            </label>
+                        </div>
+
+                        <div class="card soft p">
+                            <div class="radio-row">
+                                <label class="radio">
+                                    <input type="radio" name="to_office" value="0"
+                                           {% if not order.econt_office_code %}checked{% endif %}>
+                                    <span>Доставка до адрес</span>
+                                </label>
+                                <label class="radio">
+                                    <input type="radio" name="to_office" value="1"
+                                           {% if order.econt_office_code %}checked{% endif %}>
+                                    <span>Доставка до офис на Еконт</span>
+                                </label>
+                            </div>
+
+                            <div id="addr-wrap" class="mt">
+                                <label>Адрес
+                                    <input type="text" name="address" placeholder="ул., №, вх., ет., ап."
+                                           value="{{ order.address|default:'' }}">
+                                </label>
+                                <p class="small muted">Въведете пълен адрес (ул., №, вх., ет., ап.).</p>
+                            </div>
+
+                            <div id="office-wrap" class="mt">
+                                <label>Код на офис
+                                    <input type="text" name="office_code"
+                                           value="{{ order.econt_office_code|default:'' }}"
+                                           placeholder="напр. 1501" pattern="\\d+" inputmode="numeric">
+                                </label>
+                                <p class="small muted">Кодът трябва да е числов и да е от същия град.</p>
+                            </div>
+                        </div>
+
+                        <div class="actions mt">
+                            <button type="submit" class="btn btn-primary">Създай товарителница</button>
+                        </div>
+                    </form>
                 </div>
-            {% endif %}
 
-            <form method="post" action="{% url 'econt_submit' %}" id="econt-form">
-                {% csrf_token %}
-
-                <label>Име и фамилия
-                    <input type="text" name="full_name" value="{{ order.full_name }}" required>
-                </label>
-
-                <label>Телефон
-                    <input type="text" name="phone" value="{{ order.phone }}" required>
-                </label>
-
-                <label>Град
-                    <input type="text" name="city" value="{{ order.city }}" required>
-                </label>
-
-                <fieldset style="border:0;padding:0;margin:1rem 0">
-                    <label style="display:block;margin:.5rem 0">
-                        <input type="radio" name="to_office" value="0"
-                               {% if not order.econt_office_code %}checked{% endif %}>
-                        Доставка до адрес
-                    </label>
-                    <div id="addr-wrap">
-                        <label>Адрес
-                            <input type="text" name="address" value="{{ order.address|default:'' }}"
-                                   placeholder="ул., №, вх., ет., ап.">
-                        </label>
+                <aside class="checkout-aside">
+                    <div class="card soft">
+                        <h3 class="mb-0">Съвет</h3>
+                        <p class="small muted">Ако избирате офис, уверете се, че кодът е за град „{{ order.city }}“.</p>
+                        {% if order and order.econt_label_pdf %}
+                            <p class="mt">
+                                <a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">
+                                    Принтирай товарителница
+                                </a>
+                            </p>
+                        {% endif %}
                     </div>
-
-                    <label style="display:block;margin:.5rem 0">
-                        <input type="radio" name="to_office" value="1"
-                               {% if order.econt_office_code %}checked{% endif %}>
-                        Доставка до офис на Еконт
-                    </label>
-                    <div id="office-wrap">
-                        <label>Код на офис
-                            <input type="text" name="office_code"
-                                   value="{{ order.econt_office_code|default:'' }}"
-                                   placeholder="напр. 1501"
-                                   pattern="\\d+"
-                                   inputmode="numeric">
-                        </label>
-                        <p class="small muted">Ползвайте **числовия код на офиса**, не името.</p>
-                    </div>
-                </fieldset>
-
-                <button type="submit" class="btn btn-primary">Създай товарителница</button>
-            </form>
+                </aside>
+            </div>
         </div>
     </section>
+
+    <style>
+        /* reuse your layout tokens */
+        .form label {
+            display: block;
+            margin: .5rem 0;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .card.soft {
+            background: var(--soft, #f6f6f7);
+            border-radius: 16px;
+            padding: 1rem;
+        }
+
+        .radio-row {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .mt {
+            margin-top: 1rem;
+        }
+
+        .p {
+            padding: 1rem;
+        }
+
+        .actions {
+            text-align: left;
+        }
+
+        @media (max-width: 800px) {
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 
     <script>
         (function () {
