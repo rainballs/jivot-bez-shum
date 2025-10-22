@@ -6,39 +6,62 @@ import requests
 from django.conf import settings
 from lxml import etree
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("econt")
 
 
 class EcontClient:
     def __init__(self):
         base = settings.ECONT["BASE_URL"].rstrip("/")
-        # primary
-        self.create_label_url = f"{base}/createLabel"
-        # fallback (older naming)
-        self.create_label_url_alt = f"{base}/ShipmentsService.createLabel"
-        self.headers = {"Content-Type": "application/xml; charset=utf-8"}
+        # Common variants seen in tenants
+        self.endpoints = [
+            f"{base}/createLabel",
+            f"{base}/ShipmentsService.createLabel",
+        ]
+        self.headers_xml = {"Content-Type": "application/xml; charset=utf-8"}
+        self.headers_form = {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}
         self.auth = (settings.ECONT["USER"], settings.ECONT["PASS"])
 
-    def _post_xml(self, url: str, xml_bytes: bytes):
-        try:
-            xml_preview = xml_bytes.decode("utf-8", errors="ignore")
-        except Exception:
-            xml_preview = "<cannot-decode>"
-        log.error("ECONT ▶ POST %s\n%s", url, textwrap.shorten(xml_preview, width=4000, placeholder="…"))
+    def _post_xml(self, xml_bytes: bytes):
+        """
+        Try posting XML in the two most common ways:
+          1) form-encoded: xml=<xmlstring>
+          2) raw xml body
+        Try both endpoint path variants too.
+        Return first non-empty response; raise otherwise.
+        """
+        xml_str = xml_bytes.decode("utf-8", errors="ignore")
 
-        try:
-            r = requests.post(url, data=xml_bytes, headers=self.headers, auth=self.auth, timeout=30)
-        except Exception as exc:
-            log.error("ECONT ◀ EXC %s", exc, exc_info=True)
-            raise
+        last_err = None
+        for url in self.endpoints:
+            # 1) form-encoded
+            try:
+                log.error("ECONT ▶ FORM %s\n%s", url, textwrap.shorten(xml_str, 4000, "…"))
+                r = requests.post(url, data={"xml": xml_str}, headers=self.headers_form,
+                                  auth=self.auth, timeout=30)
+                log.error("ECONT ◀ %s %s (form)\n%s", r.status_code, r.reason,
+                          textwrap.shorten(r.text or "", 4000, "…"))
+                r.raise_for_status()
+                if (r.text or "").strip():
+                    return r.text
+                last_err = RuntimeError("Empty body on form post")
+            except Exception as e:
+                last_err = e
 
-        body = (r.text or "")
-        log.error("ECONT ◀ %s %s\n%s", r.status_code, r.reason, textwrap.shorten(body, width=4000, placeholder="…"))
-        r.raise_for_status()
-        if not body.strip():
-            # make it obvious in UI + logs
-            raise RuntimeError("Empty response from Econt (likely wrong endpoint or missing required fields).")
-        return body
+            # 2) raw xml
+            try:
+                log.error("ECONT ▶ RAW  %s\n%s", url, textwrap.shorten(xml_str, 4000, "…"))
+                r = requests.post(url, data=xml_bytes, headers=self.headers_xml,
+                                  auth=self.auth, timeout=30)
+                log.error("ECONT ◀ %s %s (raw)\n%s", r.status_code, r.reason,
+                          textwrap.shorten(r.text or "", 4000, "…"))
+                r.raise_for_status()
+                if (r.text or "").strip():
+                    return r.text
+                last_err = RuntimeError("Empty body on raw post")
+            except Exception as e:
+                last_err = e
+
+        raise RuntimeError(f"Econt createLabel failed on all attempts: {last_err}")
 
 
 def build_create_label_xml(*,
