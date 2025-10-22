@@ -95,6 +95,34 @@ class EcontClient:
 
         return resp.get("label") or resp
 
+    def find_city(self, name: str, country_code: str = "BG") -> dict | None:
+        """Return the best city object for a human name like 'Бургас' or 'София'."""
+        url = settings.ECONT["BASE_URL"].rstrip("/") + "/Nomenclatures/NomenclaturesService.getCities.json"
+        resp = self._post_json(url, {"countryCode": country_code, "name": name})
+        items = resp.get("cities") or resp.get("items") or []
+
+        # 1) exact match
+        exact = [c for c in items if c.get("name") == name]
+        if exact:
+            return exact[0]
+
+        # 2) plain (no parentheses), contains name
+        plain = [
+            c for c in items
+            if "(" not in (c.get("name") or "") and name in (c.get("name") or "")
+        ]
+
+        # prefer ones with expressCityDeliveries True (actual cities)
+        plain_sorted = sorted(
+            plain,
+            key=lambda c: (not c.get("expressCityDeliveries", False), len(c.get("name", "")))
+        )
+        if plain_sorted:
+            return plain_sorted[0]
+
+        # 3) fallback: first item
+        return items[0] if items else None
+
 
 def build_create_label_json(
         *,
