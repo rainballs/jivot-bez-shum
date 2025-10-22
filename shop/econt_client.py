@@ -31,19 +31,33 @@ def build_create_label_xml(*,
                            sender_name: str, sender_phone: str, sender_city: str,
                            sender_address: str = "", sender_office_code: str = "",
                            receiver_name: str, receiver_phone: str, receiver_city: str,
-                           receiver_address: str = "", receiver_office_code: str = "",
+                           # to-office (if set, structured address is ignored)
+                           receiver_office_code: str = "",
+                           # to-door (structured)
+                           receiver_street: str = "", receiver_num: str = "",
+                           receiver_postcode: str = "",
+                           receiver_entrance: str = "", receiver_floor: str = "",
+                           receiver_apartment: str = "",
+                           # shipment
                            weight_kg: float = 0.8, parcels: int = 1,
                            cod_bgn: float = 0.0, declared_value_bgn: float = 0.0,
                            payer: str = "receiver"):
     """
-    Works for /ee/services/createLabel on demo in most cases.
-    Adds countryCode=BG and label/format=10x9 (matches your Econt panel).
+    Econt /ee/services/createLabel request:
+    - if receiver_office_code is provided => to office
+    - else => to door with structured address fields
     """
     root = etree.Element("createLabelRequest")
 
+    # sender
     s = etree.SubElement(root, "sender")
     etree.SubElement(s, "name").text = sender_name
-    etree.SubElement(s, "phone").text = receiver_phone_fmt(sender_phone)
+    # reuse your helper to normalize phone -> +359XXXXXXXXX
+    try:
+        phone_norm = receiver_phone_fmt(sender_phone)  # imported in this module
+    except NameError:
+        phone_norm = sender_phone
+    etree.SubElement(s, "phone").text = phone_norm
     etree.SubElement(s, "countryCode").text = "BG"
     etree.SubElement(s, "city").text = sender_city
     if sender_office_code:
@@ -51,18 +65,35 @@ def build_create_label_xml(*,
     if sender_address:
         etree.SubElement(s, "address").text = sender_address
 
+    # receiver
     r = etree.SubElement(root, "receiver")
     etree.SubElement(r, "name").text = receiver_name
-    etree.SubElement(r, "phone").text = receiver_phone_fmt(receiver_phone)
+    try:
+        r_phone_norm = receiver_phone_fmt(receiver_phone)
+    except NameError:
+        r_phone_norm = receiver_phone
+    etree.SubElement(r, "phone").text = r_phone_norm
     etree.SubElement(r, "countryCode").text = "BG"
     etree.SubElement(r, "city").text = receiver_city
+
     if receiver_office_code:
         etree.SubElement(r, "officeCode").text = receiver_office_code
-    if receiver_address:
-        etree.SubElement(r, "address").text = receiver_address
+    else:
+        addr = etree.SubElement(r, "address")
+        if receiver_street:   etree.SubElement(addr, "street").text = receiver_street
+        if receiver_num:      etree.SubElement(addr, "num").text = receiver_num
+        if receiver_postcode: etree.SubElement(addr, "postCode").text = receiver_postcode
+        # optional detail in a single field
+        extras = []
+        if receiver_entrance:  extras.append(f"вх. {receiver_entrance}")
+        if receiver_floor:     extras.append(f"ет. {receiver_floor}")
+        if receiver_apartment: extras.append(f"ап. {receiver_apartment}")
+        if extras:
+            etree.SubElement(addr, "other").text = ", ".join(extras)
 
+    # shipment
     sh = etree.SubElement(root, "shipment")
-    etree.SubElement(sh, "type").text = "PACK"  # common default
+    etree.SubElement(sh, "type").text = "PACK"
     etree.SubElement(sh, "weight").text = f"{float(weight_kg):.3f}"
     etree.SubElement(sh, "parcels").text = str(parcels)
     etree.SubElement(sh, "payer").text = payer
@@ -70,7 +101,7 @@ def build_create_label_xml(*,
     if float(cod_bgn) > 0:
         etree.SubElement(sh, "cod").text = f"{float(cod_bgn):.2f}"
 
-    # Label preferences
+    # label prefs (matches your panel)
     lbl = etree.SubElement(root, "label")
     etree.SubElement(lbl, "format").text = "10x9"
 
@@ -78,15 +109,14 @@ def build_create_label_xml(*,
 
 
 def receiver_phone_fmt(phone: str) -> str:
-    """Return +359XXXXXXXXX (digits only), tolerant to input."""
     if not phone:
         return ""
-    digits = "".join(ch for ch in phone if ch.isdigit())
-    if digits.startswith("359"):
-        digits = digits[3:]
-    elif digits.startswith("0"):
-        digits = digits[1:]
-    return "+359" + digits
+    d = "".join(ch for ch in phone if ch.isdigit())
+    if d.startswith("359"):
+        d = d[3:]
+    elif d.startswith("0"):
+        d = d[1:]
+    return "+359" + d
 
 
 def parse_label_response(xml_text: str) -> Tuple[Optional[str], Optional[bytes], Optional[str]]:
