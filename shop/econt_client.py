@@ -12,7 +12,7 @@ log = logging.getLogger("econt")
 class EcontClient:
     def __init__(self):
         base = settings.ECONT["BASE_URL"].rstrip("/")
-        # Common variants seen in tenants
+        # try both common variants
         self.endpoints = [
             f"{base}/createLabel",
             f"{base}/ShipmentsService.createLabel",
@@ -23,23 +23,33 @@ class EcontClient:
 
     def _post_xml(self, xml_bytes: bytes):
         """
-        Try posting XML in the two most common ways:
-          1) form-encoded: xml=<xmlstring>
-          2) raw xml body
-        Try both endpoint path variants too.
+        Try both post styles (form xml=<payload> and raw XML) against both endpoints.
         Return first non-empty response; raise otherwise.
         """
         xml_str = xml_bytes.decode("utf-8", errors="ignore")
-
         last_err = None
+
         for url in self.endpoints:
             # 1) form-encoded
             try:
-                log.error("ECONT ▶ FORM %s\n%s", url, textwrap.shorten(xml_str, 4000, "…"))
-                r = requests.post(url, data={"xml": xml_str}, headers=self.headers_form,
-                                  auth=self.auth, timeout=30)
-                log.error("ECONT ◀ %s %s (form)\n%s", r.status_code, r.reason,
-                          textwrap.shorten(r.text or "", 4000, "…"))
+                log.error(
+                    "ECONT ▶ FORM %s\n%s",
+                    url,
+                    textwrap.shorten(xml_str, width=4000, placeholder="…"),
+                )
+                r = requests.post(
+                    url,
+                    data={"xml": xml_str},
+                    headers=self.headers_form,
+                    auth=self.auth,
+                    timeout=30,
+                )
+                log.error(
+                    "ECONT ◀ %s %s (form)\n%s",
+                    r.status_code,
+                    r.reason,
+                    textwrap.shorten((r.text or ""), width=4000, placeholder="…"),
+                )
                 r.raise_for_status()
                 if (r.text or "").strip():
                     return r.text
@@ -49,11 +59,24 @@ class EcontClient:
 
             # 2) raw xml
             try:
-                log.error("ECONT ▶ RAW  %s\n%s", url, textwrap.shorten(xml_str, 4000, "…"))
-                r = requests.post(url, data=xml_bytes, headers=self.headers_xml,
-                                  auth=self.auth, timeout=30)
-                log.error("ECONT ◀ %s %s (raw)\n%s", r.status_code, r.reason,
-                          textwrap.shorten(r.text or "", 4000, "…"))
+                log.error(
+                    "ECONT ▶ RAW  %s\n%s",
+                    url,
+                    textwrap.shorten(xml_str, width=4000, placeholder="…"),
+                )
+                r = requests.post(
+                    url,
+                    data=xml_bytes,
+                    headers=self.headers_xml,
+                    auth=self.auth,
+                    timeout=30,
+                )
+                log.error(
+                    "ECONT ◀ %s %s (raw)\n%s",
+                    r.status_code,
+                    r.reason,
+                    textwrap.shorten((r.text or ""), width=4000, placeholder="…"),
+                )
                 r.raise_for_status()
                 if (r.text or "").strip():
                     return r.text

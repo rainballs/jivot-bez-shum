@@ -40,7 +40,7 @@ class Command(BaseCommand):
             )
 
         try:
-            body = c._post_xml(c.create_label_url, xml)
+            body = c._post_xml(xml)
         except Exception as e1:
             self.stderr.write(self.style.ERROR(f"Primary endpoint failed: {e1}"))
             # try alt (if you added it earlier)
