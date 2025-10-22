@@ -103,49 +103,47 @@ def build_create_label_json(
         sender_city: str,
         sender_address: str | None,
         sender_office_code: str | None,
-
         receiver_name: str,
         receiver_phone: str,
         receiver_city: str,
-
-        receiver_office_code: str | None = None,  # to-office OR:
-        receiver_street: str | None = None,  # to-door structured
+        receiver_office_code: str | None = None,
+        receiver_street: str | None = None,
         receiver_num: str | None = None,
         receiver_postcode: str | None = None,
         receiver_entrance: str | None = None,
         receiver_floor: str | None = None,
         receiver_apartment: str | None = None,
-
         weight_kg: float = 0.8,
         parcels: int = 1,
         cod_bgn: float = 0.0,
         declared_value_bgn: float = 0.0,
-        payer: str = "receiver",  # 'receiver' or 'sender'
+        payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    """
-    Build the JSON payload Econt expects.
-    """
     payload = {
-        "senderClient": {"name": sender_name, "phones": [receiver_phone_fmt(sender_phone)]},
-        "senderAddress": {"countryCode": "BG", "city": sender_city},
-        "receiverClient": {"name": receiver_name, "phones": [receiver_phone_fmt(receiver_phone)]},
-        "receiverAddress": {"countryCode": "BG", "city": receiver_city},
+        "shipmentType": "PACK",  # ← REQUIRED for JSON API
         "service": None,  # set below
         "shipmentPackCount": int(parcels),
         "shipmentPackWeight": float(weight_kg),
-        "payer": payer.upper(),  # RECEIVER / SENDER
+        "payer": (payer or "receiver").upper(),  # "RECEIVER" or "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
+
+        "senderClient": {"name": sender_name, "phones": [sender_phone]},
+        "senderAddress": {"countryCode": "BG", "city": sender_city},
+
+        "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
+        "receiverAddress": {"countryCode": "BG", "city": receiver_city},
     }
 
-    # Sender from address or office
+    # Sender: office OR address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
+        # Econt accepts a free-form street when needed; if you have split fields, map them here.
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # Route
+    # Route: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -164,6 +162,7 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
+    # COD (optional)
     if cod_bgn and float(cod_bgn) > 0:
         payload["cdAmount"] = float(cod_bgn)
 

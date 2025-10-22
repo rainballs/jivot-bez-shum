@@ -166,8 +166,9 @@ ECONT = {
         "sender_phone": os.getenv("ECONT_SENDER_PHONE", ""),
         "sender_city": os.getenv("ECONT_SENDER_CITY", ""),
         "sender_address": os.getenv("ECONT_SENDER_ADDRESS", ""),
-        "sender_office": os.getenv("ECONT_SENDER_OFFICE_CODE", ""),
-    }
+        "sender_office": os.getenv("ECONT_SENDER_OFFICE_CODE", "") or None,
+        "label_format": "10x9",
+    },
 }
 
 LOGGING = {
