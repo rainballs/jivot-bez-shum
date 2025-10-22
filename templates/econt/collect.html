@@ -52,30 +52,32 @@
                             <div id="addr-wrap" class="mt">
                                 <div class="field-grid">
                                     <label>Улица / булевард
-                                        <input type="text" name="street" id="street"
-                                               placeholder="напр. ул. Александър Велики"
-                                               value="">
+                                        <input type="text" name="receiver_street" id="receiver_street"
+                                               placeholder="напр. ул. Александър Велики" value="">
                                     </label>
                                     <label>№
-                                        <input type="text" name="street_num" id="street_num"
-                                               placeholder="напр. 12"
-                                               value="" inputmode="numeric" pattern="[0-9A-Za-z\-]+">
+                                        <input type="text" name="receiver_num" id="receiver_num"
+                                               placeholder="напр. 12" value="" inputmode="numeric"
+                                               pattern="[0-9A-Za-z\-]+">
                                     </label>
                                     <label>Пощ. код (по желание)
-                                        <input type="text" name="post_code" id="post_code"
+                                        <input type="text" name="receiver_postcode" id="receiver_postcode"
                                                placeholder="напр. 8000" inputmode="numeric" pattern="[0-9]+">
                                     </label>
                                 </div>
 
                                 <div class="field-grid">
                                     <label>Вход (по желание)
-                                        <input type="text" name="entrance" id="entrance" placeholder="напр. Б">
+                                        <input type="text" name="receiver_entrance" id="receiver_entrance"
+                                               placeholder="напр. Б">
                                     </label>
                                     <label>Етаж (по желание)
-                                        <input type="text" name="floor" id="floor" placeholder="напр. 3">
+                                        <input type="text" name="receiver_floor" id="receiver_floor"
+                                               placeholder="напр. 3">
                                     </label>
                                     <label>Апартамент (по желание)
-                                        <input type="text" name="apartment" id="apartment" placeholder="напр. 8">
+                                        <input type="text" name="receiver_apartment" id="receiver_apartment"
+                                               placeholder="напр. 8">
                                     </label>
                                 </div>
 
@@ -85,10 +87,10 @@
                             <!-- Office -->
                             <div id="office-wrap" class="mt">
                                 <label>Код на офис
-                                    <input type="text" name="office_code" id="office_code"
+                                    <input type="text" name="receiver_office_code" id="receiver_office_code"
                                            value="{{ order.econt_office_code|default:'' }}"
-                                           placeholder="напр. 1501"
-                                           pattern="[0-9]*" inputmode="numeric" autocomplete="off">
+                                           placeholder="напр. 1501" pattern="[0-9]*" inputmode="numeric"
+                                           autocomplete="off">
                                 </label>
                                 <p class="small muted">Кодът трябва да е числов и да е от същия град.</p>
                             </div>
@@ -105,11 +107,8 @@
                         <h3 class="mb-0">Съвет</h3>
                         <p class="small muted">Ако избирате офис, уверете се, че кодът е за град „{{ order.city }}“.</p>
                         {% if order and order.econt_label_pdf %}
-                            <p class="mt">
-                                <a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">
-                                    Принтирай товарителница
-                                </a>
-                            </p>
+                            <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
+                                товарителница</a></p>
                         {% endif %}
                     </div>
                 </aside>
@@ -118,97 +117,102 @@
     </section>
 
     <style>
-        /* reuse your layout tokens */
         .form label {
             display: block;
-            margin: .5rem 0;
+            margin: .5rem 0
         }
 
         .field-grid {
             display: grid;
             grid-template-columns:1fr 1fr 1fr;
-            gap: 1rem;
+            gap: 1rem
         }
 
         .card.soft {
             background: var(--soft, #f6f6f7);
             border-radius: 16px;
-            padding: 1rem;
+            padding: 1rem
         }
 
         .radio-row {
             display: flex;
             gap: 1.5rem;
-            align-items: center;
+            align-items: center
         }
 
         .mt {
-            margin-top: 1rem;
+            margin-top: 1rem
         }
 
         .p {
-            padding: 1rem;
+            padding: 1rem
         }
 
         .actions {
-            text-align: left;
+            text-align: left
         }
 
         @media (max-width: 800px) {
             .field-grid {
-                grid-template-columns:1fr;
+                grid-template-columns:1fr
             }
         }
     </style>
 
     <script>
-        (function () {
-            const form = document.getElementById('econt-form');
-            const toAddr = form.querySelector('input[name="to_office"][value="0"]');
-            const toOff = form.querySelector('input[name="to_office"][value="1"]');
-            const addrW = document.getElementById('addr-wrap');
-            const offW = document.getElementById('office-wrap');
-            const addr = document.getElementById('address');
-            const office = document.getElementById('office_code');
+        (() => {
+            const $ = s => document.querySelector(s);
+            const form = $('#econt-form');
+            if (!form) return;
 
-            function enable(el) {
-                el.disabled = false;
-            }
+            const rAddr = form.querySelector('input[name="to_office"][value="0"]');
+            const rOffice = form.querySelector('input[name="to_office"][value="1"]');
 
-            function disable(el) {
-                el.disabled = true;
-            }
+            // Address fields
+            const fStreet = $('#receiver_street');
+            const fNum = $('#receiver_num');
+            const fPostcode = $('#receiver_postcode');
+            const fEntrance = $('#receiver_entrance');
+            const fFloor = $('#receiver_floor');
+            const fApt = $('#receiver_apartment');
+            const addrWrap = $('#addr-wrap');
 
-            function req(el, on) {
-                el.toggleAttribute('required', !!on);
-            }
+            // Office field
+            const fOffice = $('#receiver_office_code');
+            const officeWrap = $('#office-wrap');
+
+            const setDis = (el, v) => {
+                if (el) el.disabled = v;
+            };
+            const setReq = (el, v) => {
+                if (el) el.required = v;
+            };
+            const show = (el, v) => {
+                if (el) el.style.display = v ? '' : 'none';
+            };
 
             function sync() {
-                const officeSelected = toOff.checked;
+                const toOffice = rOffice && rOffice.checked;
 
-                if (officeSelected) {
-                    // show office, hide address
-                    offW.style.display = '';
-                    addrW.style.display = 'none';
-                    enable(office);
-                    req(office, true);
-                    disable(addr);
-                    req(addr, false);
-                    addr.value = ''; // clear hidden field to avoid hidden-invalid
-                } else {
-                    // show address, hide office
-                    addrW.style.display = '';
-                    offW.style.display = 'none';
-                    enable(addr);
-                    req(addr, true);
-                    disable(office);
-                    req(office, false);
-                    office.value = ''; // clear hidden field to avoid hidden-invalid
-                }
+                // address group
+                show(addrWrap, !toOffice);
+                setDis(fStreet, toOffice);
+                setDis(fNum, toOffice);
+                setDis(fPostcode, toOffice);
+                setDis(fEntrance, toOffice);
+                setDis(fFloor, toOffice);
+                setDis(fApt, toOffice);
+                setReq(fStreet, !toOffice);
+                setReq(fNum, !toOffice);
+
+                // office group
+                show(officeWrap, toOffice);
+                setDis(fOffice, !toOffice);
+                setReq(fOffice, toOffice);
             }
 
             form.addEventListener('change', sync);
-            // run once on load
+            document.addEventListener('DOMContentLoaded', sync);
             sync();
         })();
     </script>
