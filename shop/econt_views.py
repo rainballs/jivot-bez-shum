@@ -40,15 +40,23 @@ def econt_submit(request):
         messages.error(request, "Няма активна поръчка.")
         return redirect("checkout_info")
 
-    # Save basic edits
+    # Basic fields
     order.full_name = request.POST.get("full_name", order.full_name).strip()
     order.phone = request.POST.get("phone", order.phone).strip()
     order.city = request.POST.get("city", order.city).strip()
-    address_in = (request.POST.get("address") or "").strip()
+
     to_office = request.POST.get("to_office") == "1"
     office_code = (request.POST.get("office_code") or "").strip()
 
-    # Validate
+    # Structured address fields (to-door)
+    street = (request.POST.get("street") or "").strip()
+    street_num = (request.POST.get("street_num") or "").strip()
+    post_code = (request.POST.get("post_code") or "").strip()
+    entrance = (request.POST.get("entrance") or "").strip()
+    floor = (request.POST.get("floor") or "").strip()
+    apartment = (request.POST.get("apartment") or "").strip()
+
+    # Minimal sanity checks
     if not order.full_name:
         messages.error(request, "Моля, въведете име и фамилия.")
         return redirect("econt_collect")
@@ -59,29 +67,42 @@ def econt_submit(request):
         messages.error(request, "Моля, въведете град.")
         return redirect("econt_collect")
 
+    overrides = {}
     if to_office:
         if not office_code.isdigit():
             messages.error(request, "Кодът на офиса трябва да е числов (напр. 1501).")
             return redirect("econt_collect")
-        # Important: city must match the office city; add a hint:
-        messages.info(request, "Уверете се, че кодът на офиса е от същия град: " + escape(order.city))
         order.econt_office_code = office_code
-        order.address = ""  # not needed for office delivery
+        # clear address string for clarity
+        order.address = ""
     else:
-        if not _looks_like_address(address_in):
-            messages.error(request, "Въведете валиден адрес (напр. „ул. Александър Велики 12, ет. 3“).")
+        # require at least street + number
+        if not street or not street_num:
+            messages.error(request, "За доставка до адрес попълнете „Улица“ и „№“.")
             return redirect("econt_collect")
-        order.address = address_in
         order.econt_office_code = ""
+        # keep a human-readable address string in your order
+        order.address = f"{street} {street_num}".strip()
+        # hand structured parts to the service (no DB fields needed)
+        overrides.update({
+            "receiver_street": street,
+            "receiver_num": street_num,
+            "receiver_postcode": post_code,
+            "receiver_entrance": entrance,
+            "receiver_floor": floor,
+            "receiver_apartment": apartment,
+        })
 
     order.save()
 
-    # Create label
-    result = create_econt_label(order)
+    # Create label (pass overrides for structured address)
+    from .econt_service import create_econt_label
+    result = create_econt_label(order, overrides=overrides)
+
     if not result.get("ok"):
         msg = result.get("error") or "Неуспешно създаване на товарителница."
         if "Empty response" in msg:
-            msg += " (проверете съвпадението град ↔ офис и че адресът е пълен)."
+            msg += " (проверете съвпадението град ↔ офис или попълнете улица и №)."
         messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect("econt_collect")
 

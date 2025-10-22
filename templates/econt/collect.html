@@ -48,15 +48,38 @@
                                 </label>
                             </div>
 
-                            <!-- Address -->
+                            <!-- Address (structured) -->
                             <div id="addr-wrap" class="mt">
-                                <label>Адрес
-                                    <input type="text" name="address" id="address"
-                                           placeholder="ул., №, вх., ет., ап."
-                                           value="{{ order.address|default:'' }}"
-                                           autocomplete="shipping address-line1">
-                                </label>
-                                <p class="small muted">Въведете пълен адрес (ул., №, вх., ет., ап.).</p>
+                                <div class="field-grid">
+                                    <label>Улица / булевард
+                                        <input type="text" name="street" id="street"
+                                               placeholder="напр. ул. Александър Велики"
+                                               value="">
+                                    </label>
+                                    <label>№
+                                        <input type="text" name="street_num" id="street_num"
+                                               placeholder="напр. 12"
+                                               value="" inputmode="numeric" pattern="[0-9A-Za-z\-]+">
+                                    </label>
+                                    <label>Пощ. код (по желание)
+                                        <input type="text" name="post_code" id="post_code"
+                                               placeholder="напр. 8000" inputmode="numeric" pattern="[0-9]+">
+                                    </label>
+                                </div>
+
+                                <div class="field-grid">
+                                    <label>Вход (по желание)
+                                        <input type="text" name="entrance" id="entrance" placeholder="напр. Б">
+                                    </label>
+                                    <label>Етаж (по желание)
+                                        <input type="text" name="floor" id="floor" placeholder="напр. 3">
+                                    </label>
+                                    <label>Апартамент (по желание)
+                                        <input type="text" name="apartment" id="apartment" placeholder="напр. 8">
+                                    </label>
+                                </div>
+
+                                <p class="small muted">Попълнете поне „Улица“ и „№“. Останалото е по желание.</p>
                             </div>
 
                             <!-- Office -->
