@@ -12,7 +12,10 @@ log = logging.getLogger(__name__)
 class EcontClient:
     def __init__(self):
         base = settings.ECONT["BASE_URL"].rstrip("/")
+        # primary
         self.create_label_url = f"{base}/createLabel"
+        # fallback (older naming)
+        self.create_label_url_alt = f"{base}/ShipmentsService.createLabel"
         self.headers = {"Content-Type": "application/xml; charset=utf-8"}
         self.auth = (settings.ECONT["USER"], settings.ECONT["PASS"])
 
@@ -21,8 +24,7 @@ class EcontClient:
         r = requests.post(url, data=xml_bytes, headers=self.headers, auth=self.auth, timeout=30)
         log.info("ECONT RESP %s %s\n%s", url, r.status_code, (r.text or "")[:3000])
         r.raise_for_status()
-        if not r.text.strip():
-            # Make the failure explicit (this is what you saw)
+        if not (r.text or "").strip():
             raise RuntimeError("Empty response from Econt (check office code / required fields).")
         return r.text
 
@@ -43,18 +45,23 @@ def build_create_label_xml(*,
                            cod_bgn: float = 0.0, declared_value_bgn: float = 0.0,
                            payer: str = "receiver"):
     """
-    Econt /ee/services/createLabel request:
-    - if receiver_office_code is provided => to office
-    - else => to door with structured address fields
+    Econt /ee/services/createLabel:
+    - service MUST be present: toOffice | toDoor
+    - payer is often required uppercase: SENDER | RECEIVER
     """
+    # Normalize enums
+    payer_up = (payer or "").strip().upper()
+    if payer_up not in {"SENDER", "RECEIVER", "THIRD_PARTY"}:
+        payer_up = "RECEIVER"  # safe default
+    service = "toOffice" if receiver_office_code else "toDoor"
+
     root = etree.Element("createLabelRequest")
 
     # sender
     s = etree.SubElement(root, "sender")
     etree.SubElement(s, "name").text = sender_name
-    # reuse your helper to normalize phone -> +359XXXXXXXXX
     try:
-        phone_norm = receiver_phone_fmt(sender_phone)  # imported in this module
+        phone_norm = receiver_phone_fmt(sender_phone)
     except NameError:
         phone_norm = sender_phone
     etree.SubElement(s, "phone").text = phone_norm
@@ -83,7 +90,6 @@ def build_create_label_xml(*,
         if receiver_street:   etree.SubElement(addr, "street").text = receiver_street
         if receiver_num:      etree.SubElement(addr, "num").text = receiver_num
         if receiver_postcode: etree.SubElement(addr, "postCode").text = receiver_postcode
-        # optional detail in a single field
         extras = []
         if receiver_entrance:  extras.append(f"вх. {receiver_entrance}")
         if receiver_floor:     extras.append(f"ет. {receiver_floor}")
@@ -94,14 +100,14 @@ def build_create_label_xml(*,
     # shipment
     sh = etree.SubElement(root, "shipment")
     etree.SubElement(sh, "type").text = "PACK"
+    etree.SubElement(sh, "service").text = service  # <-- REQUIRED by many tenants
     etree.SubElement(sh, "weight").text = f"{float(weight_kg):.3f}"
     etree.SubElement(sh, "parcels").text = str(parcels)
-    etree.SubElement(sh, "payer").text = payer
+    etree.SubElement(sh, "payer").text = payer_up  # <-- uppercase
     etree.SubElement(sh, "declaredValue").text = f"{float(declared_value_bgn):.2f}"
     if float(cod_bgn) > 0:
         etree.SubElement(sh, "cod").text = f"{float(cod_bgn):.2f}"
 
-    # label prefs (matches your panel)
     lbl = etree.SubElement(root, "label")
     etree.SubElement(lbl, "format").text = "10x9"
 

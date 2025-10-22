@@ -72,26 +72,16 @@ def econt_submit(request):
         if not office_code.isdigit():
             messages.error(request, "Кодът на офиса трябва да е числов (напр. 1501).")
             return redirect("econt_collect")
-        order.econt_office_code = office_code
-        # clear address string for clarity
-        order.address = ""
+        # sanity: city must not be empty
+        if not order.city:
+            messages.error(request, "Моля, въведете град.")
+            return redirect("econt_collect")
+
+    # to door
     else:
-        # require at least street + number
         if not street or not street_num:
             messages.error(request, "За доставка до адрес попълнете „Улица“ и „№“.")
             return redirect("econt_collect")
-        order.econt_office_code = ""
-        # keep a human-readable address string in your order
-        order.address = f"{street} {street_num}".strip()
-        # hand structured parts to the service (no DB fields needed)
-        overrides.update({
-            "receiver_street": street,
-            "receiver_num": street_num,
-            "receiver_postcode": post_code,
-            "receiver_entrance": entrance,
-            "receiver_floor": floor,
-            "receiver_apartment": apartment,
-        })
 
     order.save()
 
