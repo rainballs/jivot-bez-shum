@@ -45,16 +45,19 @@ def econt_submit(request):
     order.phone = request.POST.get("phone", order.phone).strip()
     order.city = request.POST.get("city", order.city).strip()
 
+    # which route?
     to_office = request.POST.get("to_office") == "1"
-    office_code = (request.POST.get("office_code") or "").strip()
 
-    # Structured address fields (to-door)
-    street = (request.POST.get("street") or "").strip()
-    street_num = (request.POST.get("street_num") or "").strip()
-    post_code = (request.POST.get("post_code") or "").strip()
-    entrance = (request.POST.get("entrance") or "").strip()
-    floor = (request.POST.get("floor") or "").strip()
-    apartment = (request.POST.get("apartment") or "").strip()
+    # office (new name)
+    office_code = (request.POST.get("receiver_office_code") or "").strip()
+
+    # structured address (new names)
+    r_street = (request.POST.get("receiver_street") or "").strip()
+    r_num = (request.POST.get("receiver_num") or "").strip()
+    r_postcode = (request.POST.get("receiver_postcode") or "").strip()
+    r_entrance = (request.POST.get("receiver_entrance") or "").strip()
+    r_floor = (request.POST.get("receiver_floor") or "").strip()
+    r_apartment = (request.POST.get("receiver_apartment") or "").strip()
 
     # Minimal sanity checks
     if not order.full_name:
@@ -68,25 +71,31 @@ def econt_submit(request):
         return redirect("econt_collect")
 
     overrides = {}
+
     if to_office:
         if not office_code.isdigit():
             messages.error(request, "Кодът на офиса трябва да е числов (напр. 1501).")
             return redirect("econt_collect")
-        # sanity: city must not be empty
-        if not order.city:
-            messages.error(request, "Моля, въведете град.")
-            return redirect("econt_collect")
-
-    # to door
+        overrides["receiver_office_code"] = office_code
+        # keep it on the order for convenience
+        order.econt_office_code = office_code
     else:
-        if not street or not street_num:
+        if not r_street or not r_num:
             messages.error(request, "За доставка до адрес попълнете „Улица“ и „№“.")
             return redirect("econt_collect")
+        overrides.update({
+            "receiver_street": r_street,
+            "receiver_num": r_num,
+            "receiver_postcode": r_postcode or None,
+            "receiver_entrance": r_entrance or None,
+            "receiver_floor": r_floor or None,
+            "receiver_apartment": r_apartment or None,
+        })
+        # clear any office selection stored on the order
+        order.econt_office_code = ""
 
     order.save()
 
-    # Create label (pass overrides for structured address)
-    from .econt_service import create_econt_label
     result = create_econt_label(order, overrides=overrides)
 
     if not result.get("ok"):
