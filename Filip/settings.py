@@ -169,3 +169,14 @@ ECONT = {
         "sender_office": os.getenv("ECONT_SENDER_OFFICE_CODE", ""),
     }
 }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "econt": {"handlers": ["console"], "level": "ERROR"},  # we use .error to force-print
+    },
+}

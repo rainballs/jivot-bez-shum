@@ -1,6 +1,6 @@
 # shop/econt_client.py
 import base64
-import logging
+import logging, textwrap, requests
 from typing import Optional, Tuple
 import requests
 from django.conf import settings
@@ -20,13 +20,25 @@ class EcontClient:
         self.auth = (settings.ECONT["USER"], settings.ECONT["PASS"])
 
     def _post_xml(self, url: str, xml_bytes: bytes):
-        log.info("ECONT POST %s\n%s", url, xml_bytes.decode("utf-8", errors="ignore"))
-        r = requests.post(url, data=xml_bytes, headers=self.headers, auth=self.auth, timeout=30)
-        log.info("ECONT RESP %s %s\n%s", url, r.status_code, (r.text or "")[:3000])
+        try:
+            xml_preview = xml_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            xml_preview = "<cannot-decode>"
+        log.error("ECONT ▶ POST %s\n%s", url, textwrap.shorten(xml_preview, width=4000, placeholder="…"))
+
+        try:
+            r = requests.post(url, data=xml_bytes, headers=self.headers, auth=self.auth, timeout=30)
+        except Exception as exc:
+            log.error("ECONT ◀ EXC %s", exc, exc_info=True)
+            raise
+
+        body = (r.text or "")
+        log.error("ECONT ◀ %s %s\n%s", r.status_code, r.reason, textwrap.shorten(body, width=4000, placeholder="…"))
         r.raise_for_status()
-        if not (r.text or "").strip():
-            raise RuntimeError("Empty response from Econt (check office code / required fields).")
-        return r.text
+        if not body.strip():
+            # make it obvious in UI + logs
+            raise RuntimeError("Empty response from Econt (likely wrong endpoint or missing required fields).")
+        return body
 
 
 def build_create_label_xml(*,
