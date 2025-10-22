@@ -76,11 +76,7 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
 
     client = EcontClient()
     try:
-        try:
-            xml_resp = client._post_xml(xml_payload)
-        except RuntimeError as e1:
-            # Retry on the alt path if body was empty
-            xml_resp = client._post_xml(client.create_label_url_alt, xml_payload)
+        xml_resp = client._post_xml(xml_payload)
     except Exception as e:
         err = str(e)
         order.econt_errors = err
