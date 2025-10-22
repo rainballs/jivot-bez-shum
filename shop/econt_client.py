@@ -95,6 +95,21 @@ class EcontClient:
 
         return resp.get("label") or resp
 
+    def _post_json(self, url: str, payload: dict) -> dict:
+        """POST JSON to Econt and return parsed JSON or raise EcontError."""
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        log.error("ECONT ▶ POST %s\n%s", url, data.decode("utf-8"))
+        r = self.sess.post(url, data=data, timeout=self.timeout)
+        log.error("ECONT ◀ %s %s\n%s", r.status_code, r.reason, r.text[:2000])
+
+        if r.status_code != 200:
+            raise EcontError(f"HTTP {r.status_code} {r.reason}")
+
+        try:
+            return r.json()
+        except Exception:
+            raise EcontError("Non-JSON response from Econt")
+
     def find_city(self, name: str, country_code: str = "BG") -> dict | None:
         """Return the best city object for a human name like 'Бургас' or 'София'."""
         url = settings.ECONT["BASE_URL"].rstrip("/") + "/Nomenclatures/NomenclaturesService.getCities.json"
