@@ -232,8 +232,8 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        logger.info("✅ Stripe event received: %s", event["type"])
-        logger.debug("Full payload: %s", json.dumps(event, indent=2))
+        logger.error("✅ Stripe event received: %s", event["type"])
+        logger.error("Full payload: %s", json.dumps(event, indent=2))
     except ValueError as e:
         logger.error("Invalid payload: %s", e)
         return HttpResponse(status=400)
