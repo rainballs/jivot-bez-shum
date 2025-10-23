@@ -8,7 +8,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedire
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from .utils import send_order_notification
+from .utils import send_order_notification, log
 from .econt_service import create_econt_label
 
 import stripe
@@ -226,7 +226,7 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=secret)
-        print(event)
+        log.error("%s\n", event)
     except Exception as e:
         return HttpResponseBadRequest(str(e))
 
