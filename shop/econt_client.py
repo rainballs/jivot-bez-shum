@@ -173,7 +173,7 @@ def build_create_label_json(
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
-        "senderAgent": "Филип Стоянов",
+        "senderAgent": {"name":"Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
             "city": {
                 "country": {
