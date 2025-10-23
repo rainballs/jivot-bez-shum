@@ -1,4 +1,5 @@
 # shop/views.py
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
@@ -8,10 +9,12 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedire
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from .utils import send_order_notification, log
+from .utils import send_order_notification
 from .econt_service import create_econt_label
 
 import stripe
+
+log = logging.getLogger("econt")
 
 from .forms import CheckoutInfoForm, PaymentMethodForm
 from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
