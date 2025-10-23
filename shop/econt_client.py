@@ -167,7 +167,8 @@ def build_create_label_json(
         "shipmentType": "PACK",  # ← REQUIRED for JSON API
         "service": None,  # set below
         "shipmentPackCount": int(parcels),
-        "shipmentPackWeight": float(weight_kg),
+        "weight": float(weight_kg),
+        "shipmentDescription": "Книга",
         "payer": (payer or "receiver").upper(),  # "RECEIVER" or "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
