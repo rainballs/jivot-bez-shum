@@ -15,7 +15,7 @@ from .econt_service import create_econt_label
 
 import stripe
 
-log = logging.getLogger("econt")
+logger = logging.getLogger("stripe")
 
 from .forms import CheckoutInfoForm, PaymentMethodForm
 from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
@@ -229,11 +229,22 @@ def stripe_webhook(request):
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=secret)
-        data = json.dumps(event, ensure_ascii=False).encode("utf-8")
-        log.error("%s\n", data.decode("utf-8"))
-    except Exception as e:
-        return HttpResponseBadRequest(str(e))
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+        logger.info("✅ Stripe event received: %s", event["type"])
+        logger.debug("Full payload: %s", json.dumps(event, indent=2))
+    except ValueError as e:
+        logger.error("Invalid payload: %s", e)
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        logger.error("Signature verification failed: %s", e)
+        return HttpResponse(status=400)
+
+        # Process successful payment
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        logger.info("💰 Payment completed for session %s", session.get("id"))
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]

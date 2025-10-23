@@ -176,8 +176,15 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {
         "console": {"class": "logging.StreamHandler"},
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": "/srv/yourapp/logs/stripe.log",
+            "formatter": "verbose",
+        },
     },
     "loggers": {
         "econt": {"handlers": ["console"], "level": "ERROR"},  # we use .error to force-print
+        "stripe": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": False},  # test stripe logging responce
+
     },
 }
