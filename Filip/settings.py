@@ -179,7 +179,7 @@ LOGGING = {
     },
     "loggers": {
         "econt": {"handlers": ["console"], "level": "ERROR"},  # we use .error to force-print
-        "stripe": {"handlers": ["console"], "level": "DEBUG"},
+        "stripe": {"handlers": ["console"], "level": "INFO"},
         # test stripe logging response
 
     },
