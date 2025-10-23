@@ -1,4 +1,5 @@
 # shop/views.py
+import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -229,7 +230,8 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=secret)
-        log.error("%s\n", event)
+        data = json.dumps(event, ensure_ascii=False).encode("utf-8")
+        log.error("%s\n", event.decode("utf-8"))
     except Exception as e:
         return HttpResponseBadRequest(str(e))
 
