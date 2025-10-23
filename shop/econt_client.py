@@ -172,7 +172,8 @@ def build_create_label_json(
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
-        "senderClient": {"name": sender_name,"sender_agent": "Филип Стоянов", "phones": [sender_phone]},
+        "senderClient": {"name": sender_name, "phones": [sender_phone]},
+        "senderAgent": "Филип Стоянов",
         "senderAddress": {
             "city": {
                 "country": {
