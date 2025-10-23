@@ -225,7 +225,7 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
-    logger.info("logging...")
+    print("logging...")
 
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
