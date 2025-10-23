@@ -178,7 +178,7 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler"},
         "file": {
             "class": "logging.FileHandler",
-            "filename": "/srv/logs/stripe.log",
+            "filename": "/srv/jivot-bez-shum/app/logs",
             "formatter": "verbose",
         },
     },
