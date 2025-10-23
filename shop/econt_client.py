@@ -10,6 +10,8 @@ import requests
 from django.conf import settings
 from lxml import etree
 
+from shop.models import Order
+
 log = logging.getLogger("econt")
 
 
@@ -110,7 +112,7 @@ class EcontClient:
         except Exception:
             raise EcontError("Non-JSON response from Econt")
 
-    def find_city(self, name: str, country_code: str = "BG") -> dict | None:
+    def find_city(self, name: str, country_code: str = "BGR") -> dict | None:
         """Return the best city object for a human name like 'Бургас' or 'София'."""
         url = settings.ECONT["BASE_URL"].rstrip("/") + "/Nomenclatures/NomenclaturesService.getCities.json"
         resp = self._post_json(url, {"countryCode": country_code, "name": name})
@@ -163,6 +165,10 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
+
+    if not Order.paid:
+        declared_value_bgn = Order.total_bgn
+
     payload = {
         "shipmentType": "PACK",  # ← REQUIRED for JSON API
         "service": None,  # set below
@@ -174,7 +180,7 @@ def build_create_label_json(
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
-        "senderAgent": {"name":"Филип Стоянов", "phones": [sender_phone]},
+        "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
             "city": {
                 "country": {
