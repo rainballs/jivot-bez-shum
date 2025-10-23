@@ -225,6 +225,8 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
+    logger.debug("logging...")
+
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
 
@@ -232,8 +234,8 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        logger.error("✅ Stripe event received: %s", event["type"])
-        logger.error("Full payload: %s", json.dumps(event, indent=2))
+        logger.debug("✅ Stripe event received: %s", event["type"])
+        logger.debug("Full payload: %s", json.dumps(event, indent=2))
     except ValueError as e:
         logger.error("Invalid payload: %s", e)
         return HttpResponse(status=400)
