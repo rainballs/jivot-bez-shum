@@ -15,7 +15,7 @@ from .econt_service import create_econt_label
 
 import stripe
 
-logger = logging.getLogger("stripe")
+logger = logging.getLogger('gunicorn.error')
 
 from .forms import CheckoutInfoForm, PaymentMethodForm
 from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
@@ -225,7 +225,7 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
-    print("logging...")
+    logger.warning("logging...")
 
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
@@ -234,8 +234,8 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        logger.info("✅ Stripe event received: %s", event["type"])
-        logger.info("Full payload: %s", json.dumps(event, indent=4))
+        logger.warning("✅ Stripe event received: %s", event["type"])
+        logger.warning("Full payload: %s", json.dumps(event, indent=4))
     except ValueError as e:
         logger.error("Invalid payload: %s", e)
         return HttpResponse(status=400)
