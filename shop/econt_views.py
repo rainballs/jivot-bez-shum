@@ -73,9 +73,6 @@ def econt_submit(request):
     overrides = {}
 
     if to_office:
-        if not office_code.isdigit():
-            messages.error(request, "Кодът на офиса трябва да е числов (напр. 1501).")
-            return redirect("econt_collect")
         overrides["receiver_office_code"] = office_code
         # keep it on the order for convenience
         order.econt_office_code = office_code
