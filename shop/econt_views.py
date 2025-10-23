@@ -42,7 +42,7 @@ def econt_submit(request):
 
     # Basic fields
     order.full_name = request.POST.get("full_name", order.full_name).strip()
-    order.phones = list(request.POST.get("phone", order.phone).strip())
+    order.phones = request.POST.get("phone", order.phone).strip()
     order.city = request.POST.get("city", order.city).strip()
 
     # which route?

@@ -173,10 +173,25 @@ def build_create_label_json(
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
-        "senderAddress": {"countryCode": "BG", "city": sender_city},
-
+        "senderAddress": {
+            "city": {
+                "country": {
+                    "code3": "BGR"
+                },
+                "name": sender_city,
+                "postCode": "8000"
+            }
+        },
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
-        "receiverAddress": {"countryCode": "BG", "city": receiver_city},
+        "receiverAddress": {
+            "city": {
+                "country": {
+                    "code3": "BGR"
+                },
+                "name": receiver_city,
+                "postCode": receiver_postcode
+            },
+        }
     }
 
     # Sender: office OR address
