@@ -176,15 +176,11 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {
         "console": {"class": "logging.StreamHandler"},
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": "/srv/jivot-bez-shum/app/logs",
-            "formatter": "verbose",
-        },
     },
     "loggers": {
         "econt": {"handlers": ["console"], "level": "ERROR"},  # we use .error to force-print
-        "stripe": {"handlers": ["console", "file"], "level": "DEBUG", "propagate": False},  # test stripe logging responce
+        "stripe": {"handlers": ["console"], "level": "ERROR"},
+        # test stripe logging responce
 
     },
 }
