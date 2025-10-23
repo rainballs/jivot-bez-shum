@@ -220,11 +220,13 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
+
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
 
     try:
         event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=secret)
+        print(event)
     except Exception as e:
         return HttpResponseBadRequest(str(e))
 
