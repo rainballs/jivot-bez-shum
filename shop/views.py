@@ -225,7 +225,7 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
-    logger.warning("logging...")
+    logger.error("logging...")
 
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
@@ -234,8 +234,8 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-        logger.warning("✅ Stripe event received: %s", event["type"])
-        logger.warning("Full payload: %s", json.dumps(event, indent=4))
+        logger.error("✅ Stripe event received: %s", event["type"])
+        logger.error("Full payload: %s", json.dumps(event, indent=4))
     except ValueError as e:
         logger.error("Invalid payload: %s", e)
         return HttpResponse(status=400)
@@ -252,17 +252,14 @@ def stripe_webhook(request):
         session = event["data"]["object"]
         order_id = (session.get("metadata") or {}).get("order_id")
         if order_id:
-            try:
-                order = Order.objects.get(pk=order_id)
-                order.paid = True
-                order.save(update_fields=["paid"])
+            order = Order.objects.get(pk=order_id)
+            order.paid = True
+            order.save(update_fields=["paid"])
 
-                from .utils import send_order_notification
-                send_order_notification(order, event="paid")
-                # Card paid → no COD
-                _ = create_econt_label(order)
-            except Order.DoesNotExist:
-                pass
+            from .utils import send_order_notification
+            send_order_notification(order, event="paid")
+            # Card paid → no COD
+            _ = create_econt_label(order)
 
     return HttpResponse(status=200)
 
