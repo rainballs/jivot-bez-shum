@@ -92,7 +92,7 @@ def econt_collect(request):
             logger.error("create_econt_label failed for order %s: %s", order.pk, e)
 
     # At this point order is paid; show a thank-you or redirect
-    return redirect("order_thank_you")  # or render a success page
+    return redirect("thank_you")  # or render a success page
 
 
 @require_http_methods(["POST"])
