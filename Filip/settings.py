@@ -178,7 +178,7 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler"},
         "file": {
             "class": "logging.FileHandler",
-            "filename": "/srv/yourapp/logs/stripe.log",
+            "filename": "/srv/logs/stripe.log",
             "formatter": "verbose",
         },
     },
