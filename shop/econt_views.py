@@ -1,10 +1,16 @@
 # shop/econt_views.py
 from django.contrib import messages
+from django.conf import settings
 from django.shortcuts import redirect, render
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_http_methods
 from django.utils.html import escape
 from .models import Order
 from .econt_service import create_econt_label
+import json
+from django.views.decorators.http import require_http_methods
+import logging
+import stripe
 
 
 def _get_current_order(request):
@@ -22,15 +28,71 @@ def _looks_like_address(s: str) -> bool:
     return has_letter and has_digit and len(s) >= 6
 
 
+logger = logging.getLogger("stripe")
+
+
 @require_http_methods(["GET"])
 def econt_collect(request):
-    order = _get_current_order(request)
-    if not order:
-        messages.error(request, "Няма активна поръчка.")
+    """Stripe success redirect. Verify payment server-side and mark Order.paid."""
+    session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
+    if not session_id:
+        messages.error(request, "Липсва session_id от Stripe. Моля, свържете се с нас.")
+        logger.error("Stripe success redirect without session_id.")
         return redirect("checkout_info")
-    if order.econt_shipment_num:
-        return redirect("thank_you")
-    return render(request, "econt/collect.html", {"order": order})
+
+    try:
+        # Retrieve and expand for convenience
+        sess = stripe.checkout.Session.retrieve(
+            session_id,
+            expand=["payment_intent", "line_items"],
+            api_key=settings.STRIPE_SECRET_KEY,
+        )
+        logger.info("✅ Success redirect: session %s, status=%s, payment_status=%s",
+                    sess.id, sess.get("status"), sess.get("payment_status"))
+        logger.debug("Full session: %s", json.dumps(sess, indent=2, default=str))
+    except Exception as e:
+        logger.error("Stripe retrieve failed for %s: %s", session_id, e)
+        messages.error(request, "Грешка при потвърждение на плащане.")
+        return redirect("checkout_info")
+
+    # Only treat as paid if Stripe says so
+    if sess.get("payment_status") != "paid":
+        messages.warning(request, "Плащането все още не е потвърдено от Stripe.")
+        return redirect("checkout_info")
+
+    # Get order id from metadata and flip paid idempotently
+    order_id = (sess.get("metadata") or {}).get("order_id")
+    if not order_id:
+        logger.error("Stripe session %s has no metadata.order_id", sess.id)
+        messages.error(request, "Липсва информация за поръчката.")
+        return redirect("checkout_info")
+
+    try:
+        order = Order.objects.get(pk=order_id)
+    except Order.DoesNotExist:
+        logger.error("Order %s not found for Stripe session %s", order_id, sess.id)
+        messages.error(request, "Поръчката не беше намерена.")
+        return redirect("checkout_info")
+
+    if not order.paid:
+        order.paid = True
+        order.save(update_fields=["paid"])
+        logger.info("💰 Marked order %s as PAID from success redirect.", order.pk)
+
+        # Optional: trigger your post-payment actions (safe to do here too)
+        try:
+            from .utils import send_order_notification
+            send_order_notification(order, event="paid")
+        except Exception as e:
+            logger.error("send_order_notification failed for order %s: %s", order.pk, e)
+
+        try:
+            _ = create_econt_label(order)  # if you want immediate label creation
+        except Exception as e:
+            logger.error("create_econt_label failed for order %s: %s", order.pk, e)
+
+    # At this point order is paid; show a thank-you or redirect
+    return redirect("order_thank_you")  # or render a success page
 
 
 @require_http_methods(["POST"])

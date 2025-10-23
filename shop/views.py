@@ -200,12 +200,14 @@ def stripe_create_checkout_session(request):
         return redirect("home")
 
     try:
+        # in stripe_create_checkout_session(...)
         session = stripe.checkout.Session.create(
             mode="payment",
             payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
             metadata={"order_id": str(order.id)},
-            success_url=_site_url(request) + reverse("econt_collect"),
+            # ⬇️ IMPORTANT: send the session id back to your app
+            success_url=_site_url(request) + reverse("econt_collect") + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=stripe_cancel_url(request),
             currency="bgn",
             customer_email=order.email or None,
@@ -252,14 +254,17 @@ def stripe_webhook(request):
         session = event["data"]["object"]
         order_id = (session.get("metadata") or {}).get("order_id")
         if order_id:
-            order = Order.objects.get(pk=order_id)
-            order.paid = True
-            order.save(update_fields=["paid"])
+            try:
+                order = Order.objects.get(pk=order_id)
+                order.paid = True
+                order.save(update_fields=["paid"])
 
-            from .utils import send_order_notification
-            send_order_notification(order, event="paid")
-            # Card paid → no COD
-            _ = create_econt_label(order)
+                from .utils import send_order_notification
+                send_order_notification(order, event="paid")
+                # Card paid → no COD
+                _ = create_econt_label(order)
+            except Order.DoesNotExist:
+                pass
 
     return HttpResponse(status=200)
 
