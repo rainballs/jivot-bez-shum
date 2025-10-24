@@ -207,7 +207,8 @@ def build_create_label_json(
                 "name": receiver_city,
                 "postCode": receiver_postcode
             },
-        }
+        },
+        "delivery": {"date": date, "timeIntervalId": 0}
     }
 
     # Sender: office OR address
