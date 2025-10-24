@@ -90,9 +90,13 @@ def econt_collect(request):
             _ = create_econt_label(order)  # if you want immediate label creation
         except Exception as e:
             logger.error("create_econt_label failed for order %s: %s", order.pk, e)
-
+    request.session["current_order_id"] = order.pk
+    request.session["stripe_session_id"] = sess.id
     # At this point order is paid; show a thank-you or redirect
-    return redirect("thank_you")  # or render a success page
+    return render(request, "econt/collect.html", {
+        "order": order,
+        "stripe_session_id": sess.id,  # in case you want to show/track it
+    })  # or render a success page
 
 
 @require_http_methods(["POST"])
