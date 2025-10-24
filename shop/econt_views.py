@@ -94,7 +94,7 @@ def econt_collect(request):
     request.session["stripe_session_id"] = sess.id  # harmless to refresh
 
     # 6) Render the Econt form (let POST /econt/submit/ create the label)
-    return render(request, "econt/form.html", {
+    return render(request, "econt/collect.html", {
         "order": order,
         "stripe_session_id": sess.id,  # in case you want to show/track it
     })
