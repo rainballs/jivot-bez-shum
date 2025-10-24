@@ -12,11 +12,20 @@ from lxml import etree
 
 from shop.models import Order
 
+from datetime import date, timedelta
+
 log = logging.getLogger("econt")
 
 
 class EcontError(RuntimeError):
     pass
+
+
+def _next_workday(d: date) -> date:
+    wd = d.weekday()
+    if wd >= 4:  # Fri–Sun → Monday
+        return d + timedelta(days=7 - wd)
+    return d + timedelta(days=1)
 
 
 def _first_nonempty(*vals) -> Optional[str]:
@@ -165,7 +174,6 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-
     if not Order.paid:
         declared_value_bgn = Order.total_bgn
 
@@ -228,6 +236,8 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
+        delivery_day = _next_workday(date.today()).isoformat()
+        payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
     # COD (optional)
     if cod_bgn and float(cod_bgn) > 0:
         payload["cdAmount"] = float(cod_bgn)
