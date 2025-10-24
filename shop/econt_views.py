@@ -33,34 +33,38 @@ logger = logging.getLogger("stripe")
 
 @require_http_methods(["GET"])
 def econt_collect(request):
-    """Stripe success redirect. Verify payment server-side and mark Order.paid."""
+    """
+    Stripe success redirect. Verify payment server-side and then show the Econt form.
+    """
+    # 1) Get the session id returned by Stripe (query param) or from our session
     session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
     if not session_id:
         messages.error(request, "Липсва session_id от Stripe. Моля, свържете се с нас.")
         logger.error("Stripe success redirect without session_id.")
         return redirect("checkout_info")
 
+    # 2) Retrieve the session from Stripe and validate payment
     try:
-        # Retrieve and expand for convenience
         sess = stripe.checkout.Session.retrieve(
             session_id,
             expand=["payment_intent", "line_items"],
             api_key=settings.STRIPE_SECRET_KEY,
         )
-        logger.info("✅ Success redirect: session %s, status=%s, payment_status=%s",
-                    sess.id, sess.get("status"), sess.get("payment_status"))
+        logger.info(
+            "✅ Success redirect: session %s, status=%s, payment_status=%s",
+            sess.id, sess.get("status"), sess.get("payment_status")
+        )
         logger.debug("Full session: %s", json.dumps(sess, indent=2, default=str))
     except Exception as e:
         logger.error("Stripe retrieve failed for %s: %s", session_id, e)
         messages.error(request, "Грешка при потвърждение на плащане.")
         return redirect("checkout_info")
 
-    # Only treat as paid if Stripe says so
     if sess.get("payment_status") != "paid":
         messages.warning(request, "Плащането все още не е потвърдено от Stripe.")
         return redirect("checkout_info")
 
-    # Get order id from metadata and flip paid idempotently
+    # 3) Resolve the order from metadata
     order_id = (sess.get("metadata") or {}).get("order_id")
     if not order_id:
         logger.error("Stripe session %s has no metadata.order_id", sess.id)
@@ -74,25 +78,26 @@ def econt_collect(request):
         messages.error(request, "Поръчката не беше намерена.")
         return redirect("checkout_info")
 
+    # 4) Mark as paid idempotently
     if not order.paid:
         order.paid = True
         order.save(update_fields=["paid"])
         logger.info("💰 Marked order %s as PAID from success redirect.", order.pk)
-
-        # Optional: trigger your post-payment actions (safe to do here too)
         try:
             from .utils import send_order_notification
             send_order_notification(order, event="paid")
         except Exception as e:
             logger.error("send_order_notification failed for order %s: %s", order.pk, e)
 
-        try:
-            _ = create_econt_label(order)  # if you want immediate label creation
-        except Exception as e:
-            logger.error("create_econt_label failed for order %s: %s", order.pk, e)
+    # 5) Keep references in session for the Econt form + submit step
+    request.session["current_order_id"] = order.pk
+    request.session["stripe_session_id"] = sess.id  # harmless to refresh
 
-    # At this point order is paid; show a thank-you or redirect
-    return redirect("thank_you")  # or render a success page
+    # 6) Render the Econt form (let POST /econt/submit/ create the label)
+    return render(request, "econt/form.html", {
+        "order": order,
+        "stripe_session_id": sess.id,  # in case you want to show/track it
+    })
 
 
 @require_http_methods(["POST"])
