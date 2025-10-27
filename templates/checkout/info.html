@@ -23,10 +23,21 @@
 
                     <div class="field-grid">
                         <label>Име и фамилия {{ form.full_name }}</label>
+                        {% for e in form.full_name.errors %}
+                            <div class="error">{{ e }}</div>{% endfor %}
                         <label>Имейл {{ form.email }}</label>
+                        {% for e in form.email.errors %}
+                            <div class="error">{{ e }}</div>{% endfor %}
                         <label>Телефон {{ form.phone }}</label>
+                        {% for e in form.phone.errors %}
+                            <div class="error">{{ e }}</div>{% endfor %}
                     </div>
-
+                    {% if form.non_field_errors %}
+                        <div class="error">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    {% if pay_form.errors %}
+                        <div class="error">Проблем с избора на плащане.</div>
+                    {% endif %}
                     <p class="small muted" style="margin-top:.5rem">
                         * Доставката (адрес или офис/АПС) ще се избере и изчисли на следващата стъпка (Еконт).
                     </p>

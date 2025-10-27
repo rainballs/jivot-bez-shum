@@ -133,11 +133,9 @@ def checkout_info(request):
 
             # Branch by payment method
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
-                # will redirect to Stripe
                 return redirect("stripe_create_session")
             else:
-                # COD
-                _ = create_econt_label(order)  # ignore failure here or surface a message if you prefer
+                # COD → go choose Address/Office on the Econt page
                 return redirect("econt_collect")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
