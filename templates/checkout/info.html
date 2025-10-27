@@ -16,7 +16,8 @@
                     {% if messages %}
                         <div class="alerts">
                             {% for m in messages %}
-                                <div class="alert">{{ m }}</div>{% endfor %}
+                                <div class="alert">{{ m }}</div>
+                            {% endfor %}
                         </div>
                     {% endif %}
 
@@ -26,20 +27,9 @@
                         <label>Телефон {{ form.phone }}</label>
                     </div>
 
-                    <div class="field-grid">
-                        <label>Метод на доставка {{ form.delivery_method }}</label>
-                        <label>Куриер {{ form.courier }}</label>
-                    </div>
-
-                    <div class="field-grid" data-address>
-                        <label>Адрес {{ form.address_line }}</label>
-                        <label>Град {{ form.city }}</label>
-                        <label>Пощенски код {{ form.postal_code }}</label>
-                    </div>
-
-                    <div class="field-grid" data-office style="display:none">
-                        <label>Офис/АПС {{ form.office_text }}</label>
-                    </div>
+                    <p class="small muted" style="margin-top:.5rem">
+                        * Доставката (адрес или офис/АПС) ще се избере и изчисли на следващата стъпка (Еконт).
+                    </p>
                 </div>
 
                 <!-- RIGHT: summary, quantity, payment and submit -->
@@ -56,7 +46,7 @@
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                         <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
                                     </div>
-                                    <div class="small muted" data-ship-line></div>
+                                    {# Няма data-ship-line тук; ще бъде показано на стъпка Еконт #}
                                 {% endif %}
                             </div>
                         </div>
@@ -66,7 +56,7 @@
                             {{ form.quantity }}
                         </div>
 
-                        <!-- NEW: payment method radios (from pay_form) -->
+                        <!-- Payment method radios (from pay_form) -->
                         <div class="pay-method">
                             <label style="font-weight:700; display:block; margin:10px 0 6px;">Метод на плащане</label>
                             <div class="pay-tiles">
@@ -77,10 +67,15 @@
                         <div class="total-row">
                             <div>Крайна сума:</div>
                             <div class="total">
+                                <!-- Показваме само цената на продукта тук; скриптът ще добавя доставка само когато има UI за доставка -->
                                 <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / €
-                                <span data-total-eur">{{ product.price_eur|floatformat:2 }}</span>
+                                <span data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
                             </div>
                         </div>
+
+                        <p class="small muted" style="margin-top:6px">
+                            * Крайната сума с доставка ще се изчисли при избор на метод за доставка (Еконт).
+                        </p>
 
                         <div class="actions actions-right">
                             <a href="/" class="btn btn-secondary">Назад</a>
@@ -93,10 +88,12 @@
     </section>
 
     <script>
+        // Same script kept, but made safe when delivery UI is absent (this page).
         document.addEventListener("DOMContentLoaded", function () {
             const sel = document.querySelector('#id_delivery_method') || document.querySelector('select[name="delivery_method"]');
             const address = document.querySelector("[data-address]");
             const office = document.querySelector("[data-office]");
+            const hasDeliveryUI = !!sel && !!address && !!office;
 
             // Helpers
             function toNum(s) {
@@ -111,12 +108,12 @@
             const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
             const outBGN = document.querySelector("[data-total-bgn]");
             const outEUR = document.querySelector("[data-total-eur]");
-            const qty = document.querySelector('input[name="quantity"]');
-            const shipLine = document.querySelector("[data-ship-line]");
+            const qtyInput = document.querySelector('input[name="quantity"]');
+            const shipLine = document.querySelector("[data-ship-line]"); // not present on this page
 
             function shipBGN() {
-                // value is "address" (до адрес) or "office" (офис/АПС)
-                const v = sel?.value;
+                if (!hasDeliveryUI) return 0; // ⬅️ no shipping on this page
+                const v = sel?.value; // "address" or "office"
                 return v === "address" ? 9.00 : 7.00;
             }
 
@@ -126,15 +123,20 @@
             }
 
             function recalc() {
-                const q = toNum(qty?.value || 1);
+                const q = toNum(qtyInput?.value || 1);
                 const sBGN = shipBGN(), sEUR = shipEUR();
+
                 if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
                 if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
-                if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
+
+                if (shipLine && hasDeliveryUI) {
+                    shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
+                }
             }
 
             function applyDelivery() {
-                if (!sel || !address || !office) {
+                if (!hasDeliveryUI) {
+                    // No delivery widgets here → just recalc totals without shipping
                     recalc();
                     return;
                 }
@@ -148,21 +150,19 @@
                 recalc();
             }
 
-            // Attach multiple listeners for robustness (some custom selects only fire 'input')
+            // Listeners
             if (sel) {
                 sel.addEventListener("change", applyDelivery);
                 sel.addEventListener("input", applyDelivery);
             }
-            if (qty) qty.addEventListener("input", recalc);
+            if (qtyInput) qtyInput.addEventListener("input", recalc);
 
-            // Safety net: if any form control inside the container changes, recalc.
             document.querySelector(".checkout-grid-2col")?.addEventListener("change", function (e) {
                 if (e.target === sel) applyDelivery();
             });
 
-            // Final: init once on load
+            // Init
             applyDelivery();
         });
     </script>
 {% endblock %}
-
