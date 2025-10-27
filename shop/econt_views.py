@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_http_methods
 from django.utils.html import escape
-from .models import Order
+from .models import Order, DeliveryMethod
 from .econt_service import create_econt_label
 import json
 from django.views.decorators.http import require_http_methods
@@ -33,7 +33,10 @@ logger = logging.getLogger("stripe")
 
 @require_http_methods(["GET"])
 def econt_collect(request):
-    """Stripe success redirect. Verify payment server-side and mark Order.paid."""
+    """
+    Stripe success redirect. Verify payment server-side and mark Order.paid,
+    then route to the correct Econt page (address/office).
+    """
     session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
     if not session_id:
         messages.error(request, "Липсва session_id от Stripe. Моля, свържете се с нас.")
@@ -41,7 +44,6 @@ def econt_collect(request):
         return redirect("checkout_info")
 
     try:
-        # Retrieve and expand for convenience
         sess = stripe.checkout.Session.retrieve(
             session_id,
             expand=["payment_intent", "line_items"],
@@ -49,18 +51,15 @@ def econt_collect(request):
         )
         logger.info("✅ Success redirect: session %s, status=%s, payment_status=%s",
                     sess.id, sess.get("status"), sess.get("payment_status"))
-        logger.debug("Full session: %s", json.dumps(sess, indent=2, default=str))
     except Exception as e:
         logger.error("Stripe retrieve failed for %s: %s", session_id, e)
         messages.error(request, "Грешка при потвърждение на плащане.")
         return redirect("checkout_info")
 
-    # Only treat as paid if Stripe says so
     if sess.get("payment_status") != "paid":
         messages.warning(request, "Плащането все още не е потвърдено от Stripe.")
         return redirect("checkout_info")
 
-    # Get order id from metadata and flip paid idempotently
     order_id = (sess.get("metadata") or {}).get("order_id")
     if not order_id:
         logger.error("Stripe session %s has no metadata.order_id", sess.id)
@@ -77,26 +76,22 @@ def econt_collect(request):
     if not order.paid:
         order.paid = True
         order.save(update_fields=["paid"])
-        logger.info("💰 Marked order %s as PAID from success redirect.", order.pk)
-
-        # Optional: trigger your post-payment actions (safe to do here too)
         try:
             from .utils import send_order_notification
             send_order_notification(order, event="paid")
         except Exception as e:
             logger.error("send_order_notification failed for order %s: %s", order.pk, e)
+        # Do NOT create label here; user still needs to enter address/office details.
 
-        try:
-            _ = create_econt_label(order)  # if you want immediate label creation
-        except Exception as e:
-            logger.error("create_econt_label failed for order %s: %s", order.pk, e)
+    # keep session hints
     request.session["current_order_id"] = order.pk
     request.session["stripe_session_id"] = sess.id
-    # At this point order is paid; show a thank-you or redirect
-    return render(request, "econt/collect.html", {
-        "order": order,
-        "stripe_session_id": sess.id,  # in case you want to show/track it
-    })  # or render a success page
+
+    # Route to the correct Econt page; no collect.html!
+    if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+        return redirect("econt_collect_address")
+    else:
+        return redirect("econt_collect_office")
 
 
 @require_http_methods(["GET"])
@@ -131,13 +126,11 @@ def econt_submit(request):
     order.phones = request.POST.get("phone", order.phone).strip()
     order.city = request.POST.get("city", order.city).strip()
 
-    # which route?
+    # Mode comes from hidden input on each page
     to_office = request.POST.get("to_office") == "1"
+    back_name = "econt_collect_office" if to_office else "econt_collect_address"
 
-    # office (new name)
     office_code = (request.POST.get("receiver_office_code") or "").strip()
-
-    # structured address (new names)
     r_street = (request.POST.get("receiver_street") or "").strip()
     r_num = (request.POST.get("receiver_num") or "").strip()
     r_postcode = (request.POST.get("receiver_postcode") or "").strip()
@@ -148,24 +141,27 @@ def econt_submit(request):
     # Minimal sanity checks
     if not order.full_name:
         messages.error(request, "Моля, въведете име и фамилия.")
-        return redirect("econt_collect")
+        return redirect(back_name)
     if not order.phone:
         messages.error(request, "Моля, въведете телефон.")
-        return redirect("econt_collect")
+        return redirect(back_name)
     if not order.city:
         messages.error(request, "Моля, въведете град.")
-        return redirect("econt_collect")
+        return redirect(back_name)
 
     overrides = {}
 
     if to_office:
+        if not office_code:
+            messages.error(request, "Въведете код на офис.")
+            return redirect(back_name)
         overrides["receiver_office_code"] = office_code
-        # keep it on the order for convenience
         order.econt_office_code = office_code
+        order.delivery_method = DeliveryMethod.TO_OFFICE
     else:
         if not r_street or not r_num:
             messages.error(request, "За доставка до адрес попълнете „Улица“ и „№“.")
-            return redirect("econt_collect")
+            return redirect(back_name)
         overrides.update({
             "receiver_street": r_street,
             "receiver_num": r_num,
@@ -174,8 +170,8 @@ def econt_submit(request):
             "receiver_floor": r_floor or None,
             "receiver_apartment": r_apartment or None,
         })
-        # clear any office selection stored on the order
         order.econt_office_code = ""
+        order.delivery_method = DeliveryMethod.TO_ADDRESS
 
     order.save()
 
@@ -186,7 +182,7 @@ def econt_submit(request):
         if "Empty response" in msg:
             msg += " (проверете съвпадението град ↔ офис или попълнете улица и №)."
         messages.error(request, f"Грешка при Еконт: {msg}")
-        return redirect("econt_collect")
+        return redirect(back_name)
 
     messages.success(request, "Товарителницата е създадена успешно.")
     return redirect("thank_you")

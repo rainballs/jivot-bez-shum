@@ -185,14 +185,16 @@ def checkout_payment(request):
                     return redirect("checkout_payment")
                 return redirect("stripe_create_session")
 
-            # COD → finish locally
+            # COD → go to the proper Econt page (address/office)
             order.paid = False
             order.save(update_fields=["paid"])
-            return redirect("econt_collect")
+            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                return redirect("econt_collect_address")
+            else:
+                return redirect("econt_collect_office")
 
         messages.error(request, "Моля, изберете метод на плащане.")
     else:
-        # Default to CARD if nothing chosen yet
         initial = {"payment_method": order.payment_method or PaymentMethod.CARD}
         form = PaymentMethodForm(instance=order, initial=initial)
 
@@ -213,23 +215,25 @@ def stripe_create_checkout_session(request):
         messages.error(request, "Няма наличен продукт.")
         return redirect("home")
 
+    # Decide the success page up front based on the chosen delivery method
+    success_name = "econt_collect_address" if order.delivery_method == DeliveryMethod.TO_ADDRESS else "econt_collect_office"
+    success_url = _site_url(request) + reverse(success_name) + "?session_id={CHECKOUT_SESSION_ID}"
+
     try:
-        # in stripe_create_checkout_session(...)
         session = stripe.checkout.Session.create(
             mode="payment",
             payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
             metadata={"order_id": str(order.id)},
-            # ⬇️ IMPORTANT: send the session id back to your app
-            success_url=_site_url(request) + reverse("econt_collect") + "?session_id={CHECKOUT_SESSION_ID}",
+            success_url=success_url,  # ⬅️ go to address/office page
             cancel_url=stripe_cancel_url(request),
             currency="bgn",
             customer_email=order.email or None,
         )
     except Exception as e:
-        # surfaces the real reason instead of a silent 500
         messages.error(request, f"Грешка при свързване със Stripe: {e}")
-        return redirect("econt_collect")
+        # On error, send user to the *intended* delivery page too
+        return redirect(success_name)
 
     request.session["stripe_session_id"] = session.id
     return HttpResponseRedirect(session.url)
