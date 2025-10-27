@@ -17,6 +17,8 @@ urlpatterns = [
     path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 
     # ECONT
+    path("api/econt/cities/", econt_views.api_econt_cities, name="api_econt_cities"),
+    path("api/econt/offices/", econt_views.api_econt_offices, name="api_econt_offices"),
     path("econt/collect/", econt_views.econt_collect, name="econt_collect"),
     path("delivery/econt/address/", econt_views.econt_collect_address, name="econt_collect_address"),
     path("delivery/econt/office/", econt_views.econt_collect_office, name="econt_collect_office"),

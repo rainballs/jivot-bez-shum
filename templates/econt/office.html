@@ -13,37 +13,51 @@
                             <div class="alert">{{ m }}</div>{% endfor %}</div>
                     {% endif %}
 
-                    <form method="post" action="{% url 'econt_submit' %}" class="form" novalidate>
+                    <form method="post" action="{% url 'econt_submit' %}" class="form" id="office-form" novalidate>
                         {% csrf_token %}
-                        <input type="hidden" name="to_office" value="1"> {# <-- fixed mode #}
+                        <input type="hidden" name="to_office" value="1">
+                        <input type="hidden" name="receiver_office_code" id="office_code">
+                        <input type="hidden" id="city_id">
 
                         <div class="field-grid">
                             <label>Име и фамилия
                                 <input type="text" name="full_name" value="{{ order.full_name }}" required
                                        autocomplete="name">
                             </label>
-
                             <label>Телефон
                                 <input type="text" name="phone" value="{{ order.phone }}" required autocomplete="tel">
                             </label>
-
-                            <label>Град
-                                <input type="text" name="city" value="{{ order.city }}" required
-                                       autocomplete="shipping address-level2">
+                            <label>Град (изберете от списъка)
+                                <input type="text" id="city_input" value="{{ order.city }}"
+                                       placeholder="Започнете да пишете…"
+                                       autocomplete="off" required>
                             </label>
                         </div>
 
+                        <!-- City suggestions -->
+                        <div id="city_suggest" class="suggest-box" style="display:none"></div>
+
+                        <!-- Offices UI -->
                         <div class="card soft p" style="margin-top:1rem">
-                            <label>Код на офис
-                                <input type="text" name="receiver_office_code" id="receiver_office_code"
-                                       value="{{ order.econt_office_code|default:'' }}"
-                                       placeholder="напр. 1501" pattern="[0-9]*" inputmode="numeric" autocomplete="off">
-                            </label>
-                            <p class="small muted">Кодът трябва да е числов и да е от същия град.</p>
+                            <div class="field-grid">
+                                <label>Търсене в офисите
+                                    <input type="text" id="office_search" placeholder="име, адрес…" autocomplete="off">
+                                </label>
+                                <div></div>
+                                <div></div>
+                            </div>
+
+                            <div id="offices_list" class="offices-list">
+                                <div class="muted small">Изберете град, за да заредите офисите.</div>
+                            </div>
+
+                            <p class="small muted" id="picked_info" style="display:none; margin-top:.5rem;"></p>
                         </div>
 
                         <div class="actions mt">
-                            <button type="submit" class="btn btn-primary">Създай товарителница</button>
+                            <button type="submit" id="submit_btn" class="btn btn-primary" disabled>Създай
+                                товарителница
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -51,7 +65,8 @@
                 <aside class="checkout-aside">
                     <div class="card soft">
                         <h3 class="mb-0">Съвет</h3>
-                        <p class="small muted">Уверете се, че кодът е за град „{{ order.city }}“.</p>
+                        <p class="small muted">Изберете точно град „{{ order.city }}“ (или коригирайте) и след това
+                            посочете офис/АПС.</p>
                         {% if order and order.econt_label_pdf %}
                             <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
                                 товарителница</a></p>
@@ -80,12 +95,65 @@
             padding: 1rem
         }
 
+        .p {
+            padding: 1rem
+        }
+
         .mt {
             margin-top: 1rem
         }
 
-        .p {
-            padding: 1rem
+        .suggest-box {
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            border-radius: 12px;
+            padding: .25rem;
+            max-height: 220px;
+            overflow: auto;
+            margin-top: .5rem
+        }
+
+        .suggest-item {
+            padding: .5rem .75rem;
+            cursor: pointer
+        }
+
+        .suggest-item:hover {
+            background: #f6f6f7
+        }
+
+        .offices-list {
+            margin-top: .5rem;
+            display: grid;
+            gap: .5rem
+        }
+
+        .office-item {
+            border: 1px solid #e5e5e5;
+            border-radius: 12px;
+            padding: .75rem;
+            cursor: pointer
+        }
+
+        .office-item:hover {
+            background: #fafafa
+        }
+
+        .office-item.active {
+            border-color: #c43e2b;
+            box-shadow: 0 0 0 2px rgba(196, 62, 43, .15)
+        }
+
+        .office-name {
+            font-weight: 600
+        }
+
+        .muted {
+            color: #666
+        }
+
+        .small {
+            font-size: .9rem
         }
 
         @media (max-width: 800px) {
@@ -94,4 +162,152 @@
             }
         }
     </style>
+
+    <script>
+        (() => {
+            const $ = sel => document.querySelector(sel);
+            const cityInput = $('#city_input');
+            const cityBox = $('#city_suggest');
+            const cityIdField = $('#city_id');
+            const officeList = $('#offices_list');
+            const officeSearch = $('#office_search');
+            const officeCode = $('#office_code');
+            const submitBtn = $('#submit_btn');
+            const pickedInfo = $('#picked_info');
+
+            let cities = [];
+            let offices = [];
+            let pickedOffice = null;
+            let debounceT;
+
+            function debounced(fn, ms = 250) {
+                clearTimeout(debounceT);
+                debounceT = setTimeout(fn, ms);
+            }
+
+            function renderCitySuggest() {
+                const q = (cityInput.value || '').trim();
+                if (!q) {
+                    cityBox.style.display = 'none';
+                    return;
+                }
+                cityBox.innerHTML = cities.map(c => `
+      <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
+        ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+      </div>`).join('');
+                cityBox.style.display = cities.length ? 'block' : 'none';
+            }
+
+            function searchCities() {
+                const q = (cityInput.value || '').trim();
+                if (!q) {
+                    cities = [];
+                    renderCitySuggest();
+                    return;
+                }
+                fetch(`/api/econt/cities/?q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        cities = data.ok ? (data.items || []) : [];
+                        renderCitySuggest();
+                    })
+                    .catch(() => {
+                        cities = [];
+                        renderCitySuggest();
+                    });
+            }
+
+            function pickCity(id, name) {
+                cityIdField.value = id;
+                cityInput.value = name;
+                cityBox.style.display = 'none';
+                loadOffices(id);
+            }
+
+            function loadOffices(cityID) {
+                officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
+                fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        offices = data.ok ? (data.items || []) : [];
+                        pickedOffice = null;
+                        officeCode.value = '';
+                        submitBtn.disabled = true;
+                        pickedInfo.style.display = 'none';
+                        renderOffices();
+                    })
+                    .catch(() => {
+                        offices = [];
+                        officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
+                    });
+            }
+
+            function renderOffices() {
+                const q = (officeSearch.value || '').toLowerCase();
+                const filtered = offices.filter(o =>
+                    (o.name || '').toLowerCase().includes(q) ||
+                    (o.address || '').toLowerCase().includes(q) ||
+                    (o.code || '').toLowerCase().includes(q)
+                );
+                if (!filtered.length) {
+                    officeList.innerHTML = `<div class="small muted">Няма резултати.</div>`;
+                    return;
+                }
+                officeList.innerHTML = filtered.map(o => `
+      <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
+           data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
+        <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
+        <div class="muted small">${o.address || ''}</div>
+      </div>
+    `).join('');
+            }
+
+            function pickOffice(code, name, addr) {
+                pickedOffice = {code, name, addr};
+                officeCode.value = code;
+                submitBtn.disabled = false;
+                pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
+                pickedInfo.style.display = 'block';
+                renderOffices();
+            }
+
+            // Events
+            cityInput.addEventListener('input', () => debounced(searchCities, 250));
+            cityInput.addEventListener('focus', () => {
+                if (cities.length) cityBox.style.display = 'block';
+            });
+            document.addEventListener('click', (e) => {
+                if (!cityBox.contains(e.target) && e.target !== cityInput) cityBox.style.display = 'none';
+            });
+            cityBox.addEventListener('click', (e) => {
+                const item = e.target.closest('.suggest-item');
+                if (!item) return;
+                pickCity(item.dataset.id, item.dataset.name);
+            });
+
+            officeSearch.addEventListener('input', renderOffices);
+            officeList.addEventListener('click', (e) => {
+                const it = e.target.closest('.office-item');
+                if (!it) return;
+                pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
+            });
+
+            // Prefill: if server passed a city name, fetch suggestions then auto-pick if unique
+            document.addEventListener('DOMContentLoaded', () => {
+                const preset = (cityInput.value || '').trim();
+                if (preset) {
+                    fetch(`/api/econt/cities/?q=${encodeURIComponent(preset)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            cities = data.ok ? (data.items || []) : [];
+                            // If one exact match by name → auto pick
+                            const exact = cities.find(c => c.name === preset) || cities[0];
+                            if (exact) pickCity(exact.id, exact.name);
+                        })
+                        .catch(() => {
+                        });
+                }
+            });
+        })();
+    </script>
 {% endblock %}

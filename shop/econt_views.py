@@ -2,8 +2,8 @@
 from django.contrib import messages
 from django.conf import settings
 from django.shortcuts import redirect, render
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.views.decorators.http import require_http_methods
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.views.decorators.http import require_http_methods, require_GET
 from django.utils.html import escape
 from .models import Order, DeliveryMethod
 from .econt_service import create_econt_label
@@ -11,6 +11,10 @@ import json
 from django.views.decorators.http import require_http_methods
 import logging
 import stripe
+from .views import get_single_product
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from .econt_service import get_cities, get_offices_by_city_id
 
 
 def _get_current_order(request):
@@ -186,3 +190,32 @@ def econt_submit(request):
 
     messages.success(request, "Товарителницата е създадена успешно.")
     return redirect("thank_you")
+
+
+@require_GET
+def api_econt_cities(request):
+    """
+    GET /api/econt/cities/?q=burg
+    """
+    q = (request.GET.get("q") or "").strip()
+    try:
+        items = get_cities(country_code="BGR", name_query=q)
+        return JsonResponse({"ok": True, "items": items})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+
+@require_GET
+def api_econt_offices(request):
+    """
+    GET /api/econt/offices/?cityID=47
+    Strictly follows getOffices(countryCode=BGR, cityID=<id>)
+    """
+    city_id = request.GET.get("cityID")
+    if not city_id:
+        return JsonResponse({"ok": False, "error": "Missing cityID"}, status=400)
+    try:
+        items = get_offices_by_city_id(int(city_id), country_code="BGR")
+        return JsonResponse({"ok": True, "items": items})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
