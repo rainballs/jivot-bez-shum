@@ -99,6 +99,26 @@ def econt_collect(request):
     })  # or render a success page
 
 
+@require_http_methods(["GET"])
+def econt_collect_address(request):
+    """COD → address flow: show only the address form."""
+    order = _get_current_order(request)
+    if not order:
+        messages.error(request, "Няма активна поръчка.")
+        return redirect("checkout_info")
+    return render(request, "econt/address.html", {"order": order})
+
+
+@require_http_methods(["GET"])
+def econt_collect_office(request):
+    """COD → office/APS flow: show only the office form."""
+    order = _get_current_order(request)
+    if not order:
+        messages.error(request, "Няма активна поръчка.")
+        return redirect("checkout_info")
+    return render(request, "econt/office.html", {"order": order})
+
+
 @require_http_methods(["POST"])
 def econt_submit(request):
     order = _get_current_order(request)

@@ -18,6 +18,8 @@ urlpatterns = [
 
     # ECONT
     path("econt/collect/", econt_views.econt_collect, name="econt_collect"),
+    path("delivery/econt/address/", econt_views.econt_collect_address, name="econt_collect_address"),
+    path("delivery/econt/office/", econt_views.econt_collect_office, name="econt_collect_office"),
     path("econt/submit/", econt_views.econt_submit, name="econt_submit"),
 ]
 if settings.DEBUG:

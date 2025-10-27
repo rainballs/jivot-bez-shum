@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Доставка с Еконт — Офис/АПС{% endblock %}
+
+{% block content %}
+    <section class="section">
+        <div class="container">
+            <div class="checkout-grid-2col">
+                <div class="checkout-main">
+                    <h2>Доставка с Еконт — Офис/АПС</h2>
+
+                    {% if messages %}
+                        <div class="alerts">{% for m in messages %}
+                            <div class="alert">{{ m }}</div>{% endfor %}</div>
+                    {% endif %}
+
+                    <form method="post" action="{% url 'econt_submit' %}" class="form" novalidate>
+                        {% csrf_token %}
+                        <input type="hidden" name="to_office" value="1"> {# <-- fixed mode #}
+
+                        <div class="field-grid">
+                            <label>Име и фамилия
+                                <input type="text" name="full_name" value="{{ order.full_name }}" required
+                                       autocomplete="name">
+                            </label>
+
+                            <label>Телефон
+                                <input type="text" name="phone" value="{{ order.phone }}" required autocomplete="tel">
+                            </label>
+
+                            <label>Град
+                                <input type="text" name="city" value="{{ order.city }}" required
+                                       autocomplete="shipping address-level2">
+                            </label>
+                        </div>
+
+                        <div class="card soft p" style="margin-top:1rem">
+                            <label>Код на офис
+                                <input type="text" name="receiver_office_code" id="receiver_office_code"
+                                       value="{{ order.econt_office_code|default:'' }}"
+                                       placeholder="напр. 1501" pattern="[0-9]*" inputmode="numeric" autocomplete="off">
+                            </label>
+                            <p class="small muted">Кодът трябва да е числов и да е от същия град.</p>
+                        </div>
+
+                        <div class="actions mt">
+                            <button type="submit" class="btn btn-primary">Създай товарителница</button>
+                        </div>
+                    </form>
+                </div>
+
+                <aside class="checkout-aside">
+                    <div class="card soft">
+                        <h3 class="mb-0">Съвет</h3>
+                        <p class="small muted">Уверете се, че кодът е за град „{{ order.city }}“.</p>
+                        {% if order and order.econt_label_pdf %}
+                            <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
+                                товарителница</a></p>
+                        {% endif %}
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <style>
+        .form label {
+            display: block;
+            margin: .5rem 0
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns:1fr 1fr 1fr;
+            gap: 1rem
+        }
+
+        .card.soft {
+            background: var(--soft, #f6f6f7);
+            border-radius: 16px;
+            padding: 1rem
+        }
+
+        .mt {
+            margin-top: 1rem
+        }
+
+        .p {
+            padding: 1rem
+        }
+
+        @media (max-width: 800px) {
+            .field-grid {
+                grid-template-columns:1fr
+            }
+        }
+    </style>
+{% endblock %}
