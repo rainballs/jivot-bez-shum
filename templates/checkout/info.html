@@ -5,7 +5,6 @@
 {% block content %}
     <section class="section">
         <div class="container">
-            <!-- one form that spans both columns -->
             <form method="post" class="checkout-grid-2col">
                 {% csrf_token %}
 
@@ -16,8 +15,7 @@
                     {% if messages %}
                         <div class="alerts">
                             {% for m in messages %}
-                                <div class="alert">{{ m }}</div>
-                            {% endfor %}
+                                <div class="alert">{{ m }}</div>{% endfor %}
                         </div>
                     {% endif %}
 
@@ -25,22 +23,41 @@
                         <label>Име и фамилия {{ form.full_name }}</label>
                         {% for e in form.full_name.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
+
                         <label>Имейл {{ form.email }}</label>
                         {% for e in form.email.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
+
                         <label>Телефон {{ form.phone }}</label>
                         {% for e in form.phone.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
                     </div>
+
+                    <!-- Only the delivery CHOICE (no address/office fields here) -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <div class="radio-row">
+                            <label class="radio">
+                                <input type="radio" name="delivery_method" value="address"
+                                       {% if form.initial.delivery_method == "address" or not form.initial.delivery_method %}checked{% endif %}>
+                                <span>Доставка до адрес</span>
+                            </label>
+                            <label class="radio" style="margin-left:1.25rem">
+                                <input type="radio" name="delivery_method" value="office"
+                                       {% if form.initial.delivery_method == "office" %}checked{% endif %}>
+                                <span>Доставка до офис/АПС</span>
+                            </label>
+                        </div>
+                        <p class="small muted" style="margin:.5rem 0 0">
+                            * Подробностите за адрес/офис ще попълните на следващата стъпка.
+                        </p>
+                    </div>
+
                     {% if form.non_field_errors %}
                         <div class="error">{{ form.non_field_errors }}</div>
                     {% endif %}
                     {% if pay_form.errors %}
                         <div class="error">Проблем с избора на плащане.</div>
                     {% endif %}
-                    <p class="small muted" style="margin-top:.5rem">
-                        * Доставката (адрес или офис/АПС) ще се избере и изчисли на следващата стъпка (Еконт).
-                    </p>
                 </div>
 
                 <!-- RIGHT: summary, quantity, payment and submit -->
@@ -57,7 +74,7 @@
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                         <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
                                     </div>
-                                    {# Няма data-ship-line тук; ще бъде показано на стъпка Еконт #}
+                                    <div class="small muted" data-ship-line></div>
                                 {% endif %}
                             </div>
                         </div>
@@ -67,25 +84,21 @@
                             {{ form.quantity }}
                         </div>
 
-                        <!-- Payment method radios (from pay_form) -->
                         <div class="pay-method">
                             <label style="font-weight:700; display:block; margin:10px 0 6px;">Метод на плащане</label>
-                            <div class="pay-tiles">
-                                {{ pay_form.payment_method }}
-                            </div>
+                            <div class="pay-tiles">{{ pay_form.payment_method }}</div>
                         </div>
 
                         <div class="total-row">
                             <div>Крайна сума:</div>
                             <div class="total">
-                                <!-- Показваме само цената на продукта тук; скриптът ще добавя доставка само когато има UI за доставка -->
                                 <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / €
                                 <span data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
                             </div>
                         </div>
 
                         <p class="small muted" style="margin-top:6px">
-                            * Крайната сума с доставка ще се изчисли при избор на метод за доставка (Еконт).
+                            * Сумата включва доставка: 9.00 лв (до адрес) или 7.00 лв (офис/АПС).
                         </p>
 
                         <div class="actions actions-right">
@@ -98,39 +111,57 @@
         </div>
     </section>
 
+    <style>
+        .card.soft {
+            background: var(--soft, #f6f6f7);
+            border-radius: 16px;
+            padding: 1rem
+        }
+
+        .radio-row {
+            display: flex;
+            align-items: center
+        }
+
+        .error {
+            color: #b02f27;
+            font-size: .9rem;
+            margin: .25rem 0
+        }
+    </style>
+
     <script>
-        // Same script kept, but made safe when delivery UI is absent (this page).
         document.addEventListener("DOMContentLoaded", function () {
-            const sel = document.querySelector('#id_delivery_method') || document.querySelector('select[name="delivery_method"]');
-            const address = document.querySelector("[data-address]");
-            const office = document.querySelector("[data-office]");
-            const hasDeliveryUI = !!sel && !!address && !!office;
+            // Elements
+            const qtyInput = document.querySelector('input[name="quantity"]');
+            const outBGN = document.querySelector("[data-total-bgn]");
+            const outEUR = document.querySelector("[data-total-eur]");
+            const shipLine = document.querySelector("[data-ship-line]");
+            const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
 
             // Helpers
             function toNum(s) {
-                return parseFloat(String(s).replace(",", ".").trim()) || 0;
+                return parseFloat(String(s).replace(",", ".").trim()) || 0
             }
 
             function fmt(n) {
-                return (Math.round(n * 100) / 100).toFixed(2);
+                return (Math.round(n * 100) / 100).toFixed(2)
             }
 
             const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
             const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
-            const outBGN = document.querySelector("[data-total-bgn]");
-            const outEUR = document.querySelector("[data-total-eur]");
-            const qtyInput = document.querySelector('input[name="quantity"]');
-            const shipLine = document.querySelector("[data-ship-line]"); // not present on this page
+
+            function currentDelivery() {
+                const checked = document.querySelector('input[name="delivery_method"]:checked');
+                return checked ? checked.value : "address";
+            }
 
             function shipBGN() {
-                if (!hasDeliveryUI) return 0; // ⬅️ no shipping on this page
-                const v = sel?.value; // "address" or "office"
-                return v === "address" ? 9.00 : 7.00;
+                return currentDelivery() === "address" ? 9.00 : 7.00;
             }
 
             function shipEUR() {
-                const BGN_PER_EUR = 1.95583;
-                return shipBGN() / BGN_PER_EUR;
+                return shipBGN() / 1.95583;
             }
 
             function recalc() {
@@ -139,41 +170,12 @@
 
                 if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
                 if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
-
-                if (shipLine && hasDeliveryUI) {
-                    shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
-                }
+                if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
             }
 
-            function applyDelivery() {
-                if (!hasDeliveryUI) {
-                    // No delivery widgets here → just recalc totals without shipping
-                    recalc();
-                    return;
-                }
-                if (sel.value === "address") {
-                    address.style.display = "grid";
-                    office.style.display = "none";
-                } else {
-                    address.style.display = "none";
-                    office.style.display = "grid";
-                }
-                recalc();
-            }
-
-            // Listeners
-            if (sel) {
-                sel.addEventListener("change", applyDelivery);
-                sel.addEventListener("input", applyDelivery);
-            }
+            dmRadios.forEach(r => r.addEventListener("change", recalc));
             if (qtyInput) qtyInput.addEventListener("input", recalc);
-
-            document.querySelector(".checkout-grid-2col")?.addEventListener("change", function (e) {
-                if (e.target === sel) applyDelivery();
-            });
-
-            // Init
-            applyDelivery();
+            recalc(); // init
         });
     </script>
 {% endblock %}

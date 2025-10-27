@@ -105,14 +105,22 @@ def checkout_info(request):
         if info_form.is_valid() and pay_form.is_valid():
             qty = info_form.cleaned_data["quantity"]
 
-            # Create order
+            # Create + populate order from the "info" step
             order = info_form.save(commit=False)
             order.quantity = qty
             order.paid = False
+
+            # Delivery method chosen via radio on this page
+            dm = request.POST.get("delivery_method", "address")
+            order.delivery_method = (
+                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+            )
+
+            # Payment method from the separate form
             order.payment_method = pay_form.cleaned_data["payment_method"]
             order.save()
 
-            # One line item
+            # One line item (lock price at time of order)
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -121,7 +129,7 @@ def checkout_info(request):
                 unit_price_eur=product.price_eur,
             )
 
-            # totals
+            # Totals (incl. shipping derived from delivery_method)
             order.recompute_totals()
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
@@ -131,12 +139,20 @@ def checkout_info(request):
             send_order_notification(order, event="created")
             request.session["current_order_id"] = order.id
 
-            # Branch by payment method
-            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
+            # ===== Branch out =====
+            if order.payment_method in {
+                PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY
+            }:
+                # >>> REDIRECT: paid online → Stripe checkout <<<
                 return redirect("stripe_create_session")
             else:
-                # COD → go choose Address/Office on the Econt page
-                return redirect("econt_collect")
+                # COD → go to the proper Econt page depending on delivery choice
+                if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                    # >>> REDIRECT: COD + TO_ADDRESS → address form <<<
+                    return redirect("econt_collect_address")
+                else:
+                    # >>> REDIRECT: COD + TO_OFFICE → office/APS form <<<
+                    return redirect("econt_collect_office")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
