@@ -102,31 +102,37 @@ def econt_collect(request):
 
 @require_http_methods(["GET"])
 def econt_collect_address(request):
-    """
-    Card success or COD → show the ADDRESS form, and if card, mark paid.
-    If the user selected 'same as billing', prefill shipping fields.
-    """
+    """Card success or COD → show the ADDRESS form, prefill if billing address used."""
     order, err = _ensure_paid_from_stripe(request)
 
     if not order:
         messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
 
-    # Prefill from billing if requested
-    if getattr(order, "ship_same_as_billing", False):
-        order.full_name = order.full_name or getattr(order, "billing_full_name", "") or order.full_name
-        order.phone = order.phone or getattr(order, "billing_phone", "") or order.phone
-        order.city = order.city or getattr(order, "billing_city", "") or order.city
-        # street/num are still entered on this page
-
-    # If user accidentally landed here but chose office, route them correctly
+    # Redirect to office page if needed
     if order.delivery_method == DeliveryMethod.TO_OFFICE:
         return redirect("econt_collect_office")
+
+    # Prefill logic (used by template JS)
+    billing_data = {}
+    if getattr(order, "ship_same_as_billing", False):
+        billing_data = {
+            "full_name": order.billing_full_name or order.full_name,
+            "phone": order.billing_phone or order.phone,
+            "city": order.billing_city or order.city,
+            "street": order.billing_street or "",
+            "postcode": order.billing_postcode or "",
+        }
+
+    context = {
+        "order": order,
+        "billing_data": billing_data,
+    }
 
     if err:
         messages.warning(request, err)
 
-    return render(request, "econt/address.html", {"order": order})
+    return render(request, "econt/address.html", context)
 
 
 @require_http_methods(["GET"])

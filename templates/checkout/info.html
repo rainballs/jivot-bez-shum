@@ -42,7 +42,7 @@
                     <!-- Optional: dedicated billing fields (from the form additions) -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="field-grid">
-                            <label>Име и фамилия (фактура) {{ form.billing_full_name }}</label>
+                            <label>Име и фамилия или Фирма (фактура) {{ form.billing_full_name }}</label>
                             <label>Имейл (фактура) {{ form.billing_email }}</label>
                             <label>Телефон (фактура) {{ form.billing_phone }}</label>
                         </div>
@@ -55,7 +55,9 @@
 
                         <div style="margin-top:.75rem">
                             <label class="checkbox">
-                                {{ form.ship_same_as_billing }} <span>Използвай същия адрес за доставка</span>
+                                <input type="checkbox" name="ship_same_as_billing"
+                                       {% if form.ship_same_as_billing.value and form.initial.delivery_method != 'office' %}checked{% endif %}>
+                                <span>Използвай същия адрес за доставка</span>
                             </label>
                         </div>
                     </div>

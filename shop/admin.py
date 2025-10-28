@@ -2,7 +2,7 @@ from django.contrib import admin
 
 # Register your models here.
 from django.contrib import admin
-from .models import Product, Order, OrderItem
+from .models import Product, Order, OrderItem, DeliveryMethod
 
 
 @admin.register(Product)
@@ -44,12 +44,12 @@ class OrderAdmin(admin.ModelAdmin):
             "fields": (
                 ("city", "postal_code"),
                 "address_line",
-                "office_text",
-                ("econt_office_code", "econt_shipment_num"),
-                ("econt_status", "econt_errors"),
+                ("office_text", "econt_office_code"),
+                ("econt_shipment_num", "econt_status"),
+                "econt_errors",
                 "econt_label_pdf",
-                "shipping_preview",
-            )
+                "delivery_preview",
+            ),
         }),
         ("Фактура (billing)", {
             "fields": (
@@ -79,6 +79,15 @@ class OrderAdmin(admin.ModelAdmin):
         return obj.shipping_full_address()
 
     shipping_preview.short_description = "Адрес за доставка (преглед)"
+
+    @admin.display(description="Адрес за доставка (преглед)")
+    def delivery_preview(self, obj):
+        if obj.delivery_method == DeliveryMethod.TO_OFFICE:
+            return f"{obj.city}, офис {obj.office_text or obj.econt_office_code}"
+        elif obj.delivery_method == DeliveryMethod.TO_ADDRESS:
+            parts = [obj.city, obj.address_line, obj.postal_code]
+            return ", ".join(p for p in parts if p)
+        return "-"
 
 
 # (Optional) if you manage items in admin
