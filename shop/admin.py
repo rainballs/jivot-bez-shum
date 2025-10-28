@@ -21,77 +21,64 @@ class OrderItemInline(admin.TabularInline):
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
         "id", "full_name", "email", "phone",
-        "delivery_method", "courier", "paid", "payment_method",
-        "city", "created_at",
+        "delivery_method", "paid", "total_bgn", "created_at",
     )
-    list_filter = ("paid", "payment_method", "delivery_method", "courier", "created_at")
-    search_fields = (
-        "id", "full_name", "email", "phone",
-        "billing_full_name", "billing_email", "billing_phone",
-        "city", "address_line", "office_text", "econt_shipment_num",
+    list_filter = ("paid", "delivery_method", "created_at")
+    search_fields = ("full_name", "email", "phone", "city", "office_text", "econt_shipment_num")
+
+    # IMPORTANT: put computed helpers ONLY here
+    readonly_fields = (
+        "delivery_preview",
+        "econt_shipment_num",
+        "econt_status",
+        "econt_errors",
+        "econt_label_pdf",
+        "created_at",
     )
-    readonly_fields = ("created_at", "billing_preview", "shipping_preview")
 
     fieldsets = (
         ("Клиент", {
+            "fields": ("full_name", "email", "phone", "paid", "payment_method")
+        }),
+        ("Фактуриране", {
             "fields": (
-                ("full_name", "email", "phone"),
-                ("delivery_method", "courier", "payment_method", "paid"),
-                "created_at",
+                "billing_full_name", "billing_email", "billing_phone",
+                "billing_city", "billing_address_line", "billing_postal_code",
+                "ship_same_as_billing",
             )
         }),
         ("Доставка (реални полета за Еконт)", {
             "fields": (
-                ("city", "postal_code"),
-                "address_line",
-                ("office_text", "econt_office_code"),
-                ("econt_shipment_num", "econt_status"),
-                "econt_errors",
-                "econt_label_pdf",
-                "delivery_preview",
-            ),
-        }),
-        ("Фактура (billing)", {
-            "fields": (
-                ("billing_full_name", "billing_email", "billing_phone"),
-                ("billing_city", "billing_postcode"),
-                ("billing_street", "billing_num"),
-                ("billing_entrance", "billing_floor", "billing_apartment"),
-                "ship_same_as_billing",
-                "billing_preview",
+                "city", "postal_code", "address_line", "office_text",
+                "econt_office_code", "econt_shipment_num",
+                "econt_status", "econt_errors", "econt_label_pdf",
+                "delivery_preview",  # <- allowed here *because* it's in readonly_fields
             )
         }),
         ("Суми", {
-            "fields": (
-                ("quantity",),
-                ("subtotal_bgn", "shipping_bgn", "total_bgn"),
-                ("subtotal_eur", "shipping_eur", "total_eur"),
-            )
+            "fields": ("quantity", "subtotal_bgn", "shipping_bgn", "total_bgn",
+                       "subtotal_eur", "shipping_eur", "total_eur")
+        }),
+        ("Технически", {
+            "fields": ("delivery_method", "courier", "created_at")
         }),
     )
 
-    def billing_preview(self, obj):
-        return obj.billing_full_address()
-
-    billing_preview.short_description = "Фактурен адрес (преглед)"
-
-    def shipping_preview(self, obj):
-        return obj.shipping_full_address()
-
-    shipping_preview.short_description = "Адрес за доставка (преглед)"
-
-    @admin.display(description="Адрес за доставка (преглед)")
     def delivery_preview(self, obj):
-        if obj.delivery_method == DeliveryMethod.TO_OFFICE:
-            return f"{obj.city}, офис {obj.office_text or obj.econt_office_code}"
-        elif obj.delivery_method == DeliveryMethod.TO_ADDRESS:
-            parts = [obj.city, obj.address_line, obj.postal_code]
-            return ", ".join(p for p in parts if p)
-        return "-"
+        """
+        Nice one-line preview in admin.
+        Shows either Address or Office depending on delivery_method.
+        """
+        if obj.delivery_method == obj.DeliveryMethod.TO_OFFICE:
+            return f"Офис/АПС: {obj.office_text or obj.econt_office_code or '—'}"
+        city = obj.city or "—"
+        addr = obj.address_line or "—"
+        pc = obj.postal_code or "—"
+        return f"{city}, {addr}, {pc}"
+
+    delivery_preview.short_description = "Адрес за доставка (преглед)"
 
 
-# (Optional) if you manage items in admin
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "order", "product", "quantity", "unit_price_bgn", "unit_price_eur")
-    search_fields = ("order__id", "product__name")
+    list_display = ("order", "product", "quantity", "unit_price_bgn")
