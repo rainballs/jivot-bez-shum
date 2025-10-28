@@ -100,21 +100,35 @@ def econt_collect(request):
 
 @require_http_methods(["GET"])
 def econt_collect_address(request):
-    """COD → address flow: show only the address form."""
-    order = _get_current_order(request)
+    """Card success or COD → show the ADDRESS form, and if card, mark paid."""
+    order, err = _ensure_paid_from_stripe(request)
     if not order:
-        messages.error(request, "Няма активна поръчка.")
+        messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
+
+    # If user accidentally landed here but chose office, route them correctly
+    if order.delivery_method == DeliveryMethod.TO_OFFICE:
+        return redirect("econt_collect_office")
+
+    if err:
+        messages.warning(request, err)
     return render(request, "econt/address.html", {"order": order})
 
 
 @require_http_methods(["GET"])
 def econt_collect_office(request):
-    """COD → office/APS flow: show only the office form."""
-    order = _get_current_order(request)
+    """Card success or COD → show the OFFICE/APS form, and if card, mark paid."""
+    order, err = _ensure_paid_from_stripe(request)
     if not order:
-        messages.error(request, "Няма активна поръчка.")
+        messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
+
+    # If user accidentally landed here but chose address, route them correctly
+    if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+        return redirect("econt_collect_address")
+
+    if err:
+        messages.warning(request, err)
     return render(request, "econt/office.html", {"order": order})
 
 
@@ -127,8 +141,8 @@ def econt_submit(request):
 
     # Basic fields
     order.full_name = (request.POST.get("full_name") or order.full_name or "").strip()
-    order.phone = (request.POST.get("phone") or order.phone or "").strip()  # <- fix plural
-    order.city = (request.POST.get("city") or order.city or "").strip()  # <- now comes from hidden field
+    order.phone = (request.POST.get("phone") or order.phone or "").strip()  # <- singular
+    order.city = (request.POST.get("city") or order.city or "").strip()  # <- now posted from office.html
 
     # Mode comes from hidden input on each page
     to_office = request.POST.get("to_office") == "1"
@@ -219,3 +233,50 @@ def api_econt_offices(request):
         return JsonResponse({"ok": True, "items": items})
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+
+def _ensure_paid_from_stripe(request):
+    """
+    If this page was reached via Stripe success, verify the session and
+    mark the order as paid (idempotent). Returns (order, error_msg).
+    On non-card flows (no session_id), it just returns the current order.
+    """
+    session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
+    # If no session_id, just use whatever is in the session (COD flow or user revisiting).
+    if not session_id:
+        return _get_current_order(request), None
+
+    try:
+        sess = stripe.checkout.Session.retrieve(
+            session_id,
+            expand=["payment_intent"],
+            api_key=settings.STRIPE_SECRET_KEY,
+        )
+    except Exception as e:
+        return None, f"Грешка при потвърждение на плащане: {e}"
+
+    if sess.get("payment_status") != "paid":
+        return None, "Плащането все още не е потвърдено от Stripe."
+
+    order_id = (sess.get("metadata") or {}).get("order_id")
+    if not order_id:
+        return None, "Липсва информация за поръчката (order_id)."
+
+    try:
+        order = Order.objects.get(pk=order_id)
+    except Order.DoesNotExist:
+        return None, "Поръчката не беше намерена."
+
+    if not order.paid:
+        order.paid = True
+        order.save(update_fields=["paid"])
+        try:
+            from .utils import send_order_notification
+            send_order_notification(order, event="paid")
+        except Exception:
+            pass
+
+    # keep handy
+    request.session["current_order_id"] = order.pk
+    request.session["stripe_session_id"] = sess.id
+    return order, None
