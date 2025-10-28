@@ -39,7 +39,8 @@ logger = logging.getLogger("stripe")
 def econt_collect(request):
     """
     Stripe success redirect. Verify payment server-side and mark Order.paid,
-    then route to the correct Econt page (address/office).
+    then route to the correct Econt page (address/office). We do NOT create
+    an Econt label here because the user still needs to enter address/office.
     """
     session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
     if not session_id:
@@ -53,8 +54,10 @@ def econt_collect(request):
             expand=["payment_intent", "line_items"],
             api_key=settings.STRIPE_SECRET_KEY,
         )
-        logger.info("✅ Success redirect: session %s, status=%s, payment_status=%s",
-                    sess.id, sess.get("status"), sess.get("payment_status"))
+        logger.info(
+            "✅ Stripe success: session=%s status=%s payment_status=%s",
+            sess.get("id"), sess.get("status"), sess.get("payment_status"),
+        )
     except Exception as e:
         logger.error("Stripe retrieve failed for %s: %s", session_id, e)
         messages.error(request, "Грешка при потвърждение на плащане.")
@@ -66,17 +69,18 @@ def econt_collect(request):
 
     order_id = (sess.get("metadata") or {}).get("order_id")
     if not order_id:
-        logger.error("Stripe session %s has no metadata.order_id", sess.id)
+        logger.error("Stripe session %s has no metadata.order_id", sess.get("id"))
         messages.error(request, "Липсва информация за поръчката.")
         return redirect("checkout_info")
 
     try:
         order = Order.objects.get(pk=order_id)
     except Order.DoesNotExist:
-        logger.error("Order %s not found for Stripe session %s", order_id, sess.id)
+        logger.error("Order %s not found for Stripe session %s", order_id, sess.get("id"))
         messages.error(request, "Поръчката не беше намерена.")
         return redirect("checkout_info")
 
+    # Idempotent mark-as-paid
     if not order.paid:
         order.paid = True
         order.save(update_fields=["paid"])
@@ -85,17 +89,15 @@ def econt_collect(request):
             send_order_notification(order, event="paid")
         except Exception as e:
             logger.error("send_order_notification failed for order %s: %s", order.pk, e)
-        # Do NOT create label here; user still needs to enter address/office details.
 
-    # keep session hints
+    # keep hints in the session
     request.session["current_order_id"] = order.pk
-    request.session["stripe_session_id"] = sess.id
+    request.session["stripe_session_id"] = sess.get("id")
 
-    # Route to the correct Econt page; no collect.html!
+    # Route to the chosen delivery flow (no intermediate collect.html)
     if order.delivery_method == DeliveryMethod.TO_ADDRESS:
         return redirect("econt_collect_address")
-    else:
-        return redirect("econt_collect_office")
+    return redirect("econt_collect_office")
 
 
 @require_http_methods(["GET"])
@@ -237,12 +239,12 @@ def api_econt_offices(request):
 
 def _ensure_paid_from_stripe(request):
     """
-    If this page was reached via Stripe success, verify the session and
-    mark the order as paid (idempotent). Returns (order, error_msg).
-    On non-card flows (no session_id), it just returns the current order.
+    If we arrived here after a Stripe Checkout success, verify the session and
+    idempotently mark the order as paid. Returns (order, error_msg_or_None).
+    For COD / manual revisits (no session_id), returns (current_order, None).
     """
+    # COD flow or revisit: no session id is fine — just return the current order
     session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
-    # If no session_id, just use whatever is in the session (COD flow or user revisiting).
     if not session_id:
         return _get_current_order(request), None
 
@@ -274,9 +276,10 @@ def _ensure_paid_from_stripe(request):
             from .utils import send_order_notification
             send_order_notification(order, event="paid")
         except Exception:
+            # Non-fatal for the page flow
             pass
 
-    # keep handy
+    # keep handy for subsequent steps
     request.session["current_order_id"] = order.pk
-    request.session["stripe_session_id"] = sess.id
+    request.session["stripe_session_id"] = sess.get("id")
     return order, None
