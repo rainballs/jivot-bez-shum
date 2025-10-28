@@ -105,22 +105,33 @@ def checkout_info(request):
         if info_form.is_valid() and pay_form.is_valid():
             qty = info_form.cleaned_data["quantity"]
 
-            # Create + populate order from the "info" step
-            order = info_form.save(commit=False)
+            # Create order with billing (invoice) details
+            order: Order = info_form.save(commit=False)
             order.quantity = qty
             order.paid = False
 
-            # Delivery method chosen via radio on this page
+            # Delivery method (radio on this page)
             dm = request.POST.get("delivery_method", "address")
             order.delivery_method = (
                 DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
             )
 
-            # Payment method from the separate form
+            # Payment method (separate form)
             order.payment_method = pay_form.cleaned_data["payment_method"]
+
+            # Optional: prefill display-only shipping fields from billing (handy on the next screen)
+            # We DO NOT finalize shipping address here—user can change it on the address page.
+            if order.ship_same_as_billing:
+                order.full_name = order.billing_full_name
+                order.email = order.billing_email
+                order.phone = order.billing_phone
+                order.city = order.billing_city
+                order.address_line = order.billing_street
+                order.postal_code = order.billing_postcode
+
             order.save()
 
-            # One line item (lock price at time of order)
+            # One line item (book)
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -129,7 +140,7 @@ def checkout_info(request):
                 unit_price_eur=product.price_eur,
             )
 
-            # Totals (incl. shipping derived from delivery_method)
+            # Totals (shipping derived from delivery_method)
             order.recompute_totals()
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
@@ -139,21 +150,24 @@ def checkout_info(request):
             send_order_notification(order, event="created")
             request.session["current_order_id"] = order.id
 
-            # ===== Branch out =====
-            # ===== Branch out =====
+            # Branch by payment
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 return redirect("stripe_create_session")
+
+            # COD → go to proper Econt page
+            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                return redirect("econt_collect_address")
             else:
-                # COD → make sure no stale Stripe session survives
-                request.session.pop("stripe_session_id", None)
-                if order.delivery_method == DeliveryMethod.TO_ADDRESS:
-                    return redirect("econt_collect_address")
-                else:
-                    return redirect("econt_collect_office")
+                return redirect("econt_collect_office")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
-        info_form = CheckoutInfoForm(initial={"quantity": 1})
+        # Reasonable defaults
+        info_form = CheckoutInfoForm(initial={
+            "quantity": 1,
+            "ship_same_as_billing": True,
+        })
+        # Card by default
         pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.COD})
 
     return render(

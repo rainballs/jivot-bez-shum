@@ -102,11 +102,22 @@ def econt_collect(request):
 
 @require_http_methods(["GET"])
 def econt_collect_address(request):
-    """Card success or COD → show the ADDRESS form, and if card, mark paid."""
+    """
+    Card success or COD → show the ADDRESS form, and if card, mark paid.
+    If the user selected 'same as billing', prefill shipping fields.
+    """
     order, err = _ensure_paid_from_stripe(request)
+
     if not order:
         messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
+
+    # Prefill from billing if requested
+    if getattr(order, "ship_same_as_billing", False):
+        order.full_name = order.full_name or getattr(order, "billing_full_name", "") or order.full_name
+        order.phone = order.phone or getattr(order, "billing_phone", "") or order.phone
+        order.city = order.city or getattr(order, "billing_city", "") or order.city
+        # street/num are still entered on this page
 
     # If user accidentally landed here but chose office, route them correctly
     if order.delivery_method == DeliveryMethod.TO_OFFICE:
@@ -114,6 +125,7 @@ def econt_collect_address(request):
 
     if err:
         messages.warning(request, err)
+
     return render(request, "econt/address.html", {"order": order})
 
 
