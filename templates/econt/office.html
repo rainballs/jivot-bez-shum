@@ -13,56 +13,55 @@
                             <div class="alert">{{ m }}</div>{% endfor %}</div>
                     {% endif %}
 
-                    <form method="post" action="{% url 'econt_submit' %}" class="form" id="office-form" novalidate>
+                    <form method="post" action="{% url 'econt_submit' %}" class="form" novalidate>
                         {% csrf_token %}
                         <input type="hidden" name="to_office" value="1">
-                        <input type="hidden" name="receiver_office_code" id="office_code">
-                        <input type="hidden" id="city_id">
-                        <!-- NEW: send the picked city name -->
-                        <input type="hidden" name="city" id="city_name">
 
                         <div class="field-grid">
-                            <!-- city autocomplete (existing) -->
+                            <label>Име и фамилия
+                                <input type="text" name="full_name" value="{{ order.full_name }}" required
+                                       autocomplete="name">
+                            </label>
+
+                            <label>Телефон
+                                <input type="text" name="phone" value="{{ order.phone }}" required autocomplete="tel">
+                            </label>
+
                             <label>Град (изберете от списъка)
-                                <input type="text" id="city-input" value="{{ order.city|default_if_none:'' }}"
+                                <!-- visible input used by your autocomplete -->
+                                <input type="text" id="city_input" value="{{ order.city|default_if_none:'' }}"
                                        autocomplete="off" placeholder="Започнете да пишете…">
-                                <input type="hidden" id="city-id" value="">
+                                <!-- dropdown container for suggestions -->
+                                <div id="city_suggest" class="autocomplete" style="display:none"></div>
+                                <!-- hidden fields that your JS fills -->
+                                <input type="hidden" id="city_id" value="">
+                                <input type="hidden" id="city_name" name="city"
+                                       value="{{ order.city|default_if_none:'' }}">
                             </label>
                         </div>
 
-                        <div id="office-search" class="card soft p" style="margin-top:1rem">
-                            <label>Търсене в офисите
-                                <input type="text" id="office-q" placeholder="име, адрес…" autocomplete="off">
-                            </label>
-
-                            <div id="office-results" class="mt"></div>
-
-                            <!-- IMPORTANT: where we store the user’s selection -->
-                            <input type="hidden" name="receiver_office_code" id="receiver_office_code"
-                                   value="{{ order.econt_office_code|default:'' }}">
-                            <p class="small muted">Изберете град, за да заредите офисите.</p>
-                        </div>
-
-                        <div id="city_suggest" class="suggest-box" style="display:none"></div>
-
+                        <!-- Offices panel (your JS fills #offices_list and #office_code) -->
                         <div class="card soft p" style="margin-top:1rem">
-                            <div class="field-grid">
-                                <label>Търсене в офисите
-                                    <input type="text" id="office_search" placeholder="име, адрес…" autocomplete="off">
-                                </label>
-                                <div></div>
-                                <div></div>
+                            <label>Търсене в офисите
+                                <input type="text" id="office_search" placeholder="име, адрес…" autocomplete="off">
+                            </label>
+
+                            <div id="offices_list" class="mt">
+                                <div class="small muted">Изберете град, за да заредите офисите.</div>
                             </div>
 
-                            <div id="offices_list" class="offices-list">
-                                <div class="muted small">Изберете град, за да заредите офисите.</div>
-                            </div>
+                            <!-- Hidden office code actually submitted to server -->
+                            <input type="hidden" name="receiver_office_code" id="office_code"
+                                   value="{{ order.econt_office_code|default:'' }}">
 
-                            <p class="small muted" id="picked_info" style="display:none; margin-top:.5rem;"></p>
+                            <!-- A small line that your JS updates with the picked office -->
+                            <div id="picked_info" class="small muted" style="display:none;margin-top:.5rem;"></div>
                         </div>
 
                         <div class="actions mt">
-                            <button type="submit" class="btn btn-primary" id="submit-btn">Създай товарителница</button>
+                            <button type="submit" class="btn btn-primary" id="submit_btn" disabled>Създай
+                                товарителница
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -70,8 +69,8 @@
                 <aside class="checkout-aside">
                     <div class="card soft">
                         <h3 class="mb-0">Съвет</h3>
-                        <p class="small muted">Изберете точно град „{{ order.city }}“ (или коригирайте) и след това
-                            посочете офис/АПС.</p>
+                        <p class="small muted">Изберете точно град „{{ order.city|default:"" }}“ (или коригирайте) и
+                            след това посочете офис/АПС.</p>
                         {% if order and order.econt_label_pdf %}
                             <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
                                 товарителница</a></p>
@@ -100,22 +99,27 @@
             padding: 1rem
         }
 
-        .p {
-            padding: 1rem
-        }
-
         .mt {
             margin-top: 1rem
         }
 
-        .suggest-box {
-            border: 1px solid #e0e0e0;
+        .p {
+            padding: 1rem
+        }
+
+        .muted {
+            color: var(--muted, #6f6f75)
+        }
+
+        /* simple dropdown list */
+        .autocomplete {
+            position: relative;
             background: #fff;
-            border-radius: 12px;
-            padding: .25rem;
+            border: 1px solid #e5e5ea;
+            border-radius: 10px;
+            margin-top: 6px;
             max-height: 220px;
-            overflow: auto;
-            margin-top: .5rem
+            overflow: auto
         }
 
         .suggest-item {
@@ -127,154 +131,32 @@
             background: #f6f6f7
         }
 
-        .offices-list {
-            margin-top: .5rem;
-            display: grid;
-            gap: .5rem
-        }
-
-        .office-item {
-            border: 1px solid #e5e5e5;
-            border-radius: 12px;
+        /* office cards */
+        #offices_list .office-item {
             padding: .75rem;
-            cursor: pointer
+            border: 1px solid transparent;
+            border-radius: 14px;
+            margin: .35rem 0;
+            cursor: pointer;
+            background: #fff
         }
 
-        .office-item:hover {
-            background: #fafafa
+        #offices_list .office-item:hover {
+            border-color: #e5e5ea
         }
 
-        .office-item.active {
-            border-color: #c43e2b;
-            box-shadow: 0 0 0 2px rgba(196, 62, 43, .15)
+        #offices_list .office-item.active {
+            border-color: #c7392f
         }
 
         .office-name {
             font-weight: 600
         }
 
-        .muted {
-            color: #666
-        }
-
-        .small {
-            font-size: .9rem
-        }
-
         @media (max-width: 800px) {
             .field-grid {
-                grid-template-columns:1fr
+                grid-template-columns:1fr;
             }
         }
     </style>
-
-    <script>
-        (function () {
-            const $ = s => document.querySelector(s);
-            const cityInput = $('#city-input');
-            const cityId = $('#city-id');
-            const officeQ = $('#office-q');
-            const officeResults = $('#office-results');
-            const officeCodeHidden = $('#receiver_office_code');
-            const submitBtn = $('#submit-btn');
-
-            let offices = []; // current list for selected city
-
-            // --- simple helpers ---
-            function htmlEscape(s) {
-                return (s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-            }
-
-            function renderOffices(list) {
-                officeResults.innerHTML = '';
-                list.forEach(o => {
-                    const div = document.createElement('div');
-                    div.className = 'office-item';
-                    div.tabIndex = 0;
-                    div.setAttribute('data-code', o.code || '');
-                    div.innerHTML = `<div class="office-title">${htmlEscape(o.name)} <span class="muted">(#${htmlEscape(o.code)})</span></div>
-                       <div class="small muted">${htmlEscape(o.address || '')}</div>`;
-                    div.addEventListener('click', () => selectOffice(o));
-                    div.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') selectOffice(o);
-                    });
-                    officeResults.appendChild(div);
-                });
-            }
-
-            function selectOffice(o) {
-                officeCodeHidden.value = o.code || '';
-                // highlight selection
-                [...officeResults.children].forEach(n => n.classList.remove('selected'));
-                const card = [...officeResults.children].find(n => n.getAttribute('data-code') === o.code);
-                if (card) card.classList.add('selected');
-            }
-
-            // --- city autocomplete (very light) ---
-            let cityTimer = null;
-            const cityBox = document.createElement('div');
-            cityBox.className = 'autocomplete';
-            cityInput.parentNode.appendChild(cityBox);
-
-            function fetchCities(q) {
-                if (!q || q.length < 2) {
-                    cityBox.innerHTML = '';
-                    return;
-                }
-                fetch(`/api/econt/cities/?q=${encodeURIComponent(q)}`)
-                    .then(r => r.json()).then(data => {
-                    if (!data.ok) {
-                        cityBox.innerHTML = '';
-                        return;
-                    }
-                    cityBox.innerHTML = '';
-                    (data.items || []).forEach(c => {
-                        const opt = document.createElement('div');
-                        opt.className = 'opt';
-                        opt.textContent = c.name;
-                        opt.addEventListener('click', () => {
-                            cityInput.value = c.name;
-                            cityId.value = c.id;
-                            cityBox.innerHTML = '';
-                            // clear previous office selection and load new offices
-                            officeCodeHidden.value = '';
-                            officeResults.innerHTML = '<div class="small muted">Зареждане…</div>';
-                            fetch(`/api/econt/offices/?cityID=${encodeURIComponent(c.id)}`)
-                                .then(r => r.json()).then(res => {
-                                offices = (res.ok ? res.items : []) || [];
-                                renderOffices(offices);
-                            }).catch(() => {
-                                officeResults.innerHTML = '<div class="small muted">Неуспешно зареждане.</div>';
-                            });
-                        });
-                        cityBox.appendChild(opt);
-                    });
-                });
-            }
-
-            cityInput.addEventListener('input', () => {
-                clearTimeout(cityTimer);
-                cityTimer = setTimeout(() => fetchCities(cityInput.value.trim()), 250);
-            });
-
-            // --- office search filter ---
-            officeQ.addEventListener('input', () => {
-                const q = officeQ.value.trim().toLowerCase();
-                const filtered = !q ? offices : offices.filter(o =>
-                    (o.name || '').toLowerCase().includes(q) ||
-                    (o.address || '').toLowerCase().includes(q) ||
-                    String(o.code || '').includes(q)
-                );
-                renderOffices(filtered);
-            });
-
-            // Guard submit: must have city + office code
-            submitBtn.addEventListener('click', (e) => {
-                if (!cityId.value || !officeCodeHidden.value) {
-                    e.preventDefault();
-                    alert('Моля, изберете град и офис/АПС от списъка.');
-                }
-            });
-        })();
-    </script>
 {% endblock %}
