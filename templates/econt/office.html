@@ -159,4 +159,152 @@
             }
         }
     </style>
+
+    <script>
+        (() => {
+            const $ = sel => document.querySelector(sel);
+            const cityInput = $('#city_input');
+            const cityBox = $('#city_suggest');
+            const cityIdField = $('#city_id');
+            const officeList = $('#offices_list');
+            const officeSearch = $('#office_search');
+            const officeCode = $('#office_code');
+            const submitBtn = $('#submit_btn');
+            const pickedInfo = $('#picked_info');
+
+            let cities = [];
+            let offices = [];
+            let pickedOffice = null;
+            let debounceT;
+
+            function debounced(fn, ms = 250) {
+                clearTimeout(debounceT);
+                debounceT = setTimeout(fn, ms);
+            }
+
+            function renderCitySuggest() {
+                const q = (cityInput.value || '').trim();
+                if (!q) {
+                    cityBox.style.display = 'none';
+                    return;
+                }
+                cityBox.innerHTML = cities.map(c => `
+      <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
+        ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+      </div>`).join('');
+                cityBox.style.display = cities.length ? 'block' : 'none';
+            }
+
+            function searchCities() {
+                const q = (cityInput.value || '').trim();
+                if (!q) {
+                    cities = [];
+                    renderCitySuggest();
+                    return;
+                }
+                fetch(`/api/econt/cities/?q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        cities = data.ok ? (data.items || []) : [];
+                        renderCitySuggest();
+                    })
+                    .catch(() => {
+                        cities = [];
+                        renderCitySuggest();
+                    });
+            }
+
+            function pickCity(id, name) {
+                cityIdField.value = id;
+                cityInput.value = name;
+                cityBox.style.display = 'none';
+                loadOffices(id);
+            }
+
+            function loadOffices(cityID) {
+                officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
+                fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        offices = data.ok ? (data.items || []) : [];
+                        pickedOffice = null;
+                        officeCode.value = '';
+                        submitBtn.disabled = true;
+                        pickedInfo.style.display = 'none';
+                        renderOffices();
+                    })
+                    .catch(() => {
+                        offices = [];
+                        officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
+                    });
+            }
+
+            function renderOffices() {
+                const q = (officeSearch.value || '').toLowerCase();
+                const filtered = offices.filter(o =>
+                    (o.name || '').toLowerCase().includes(q) ||
+                    (o.address || '').toLowerCase().includes(q) ||
+                    (o.code || '').toLowerCase().includes(q)
+                );
+                if (!filtered.length) {
+                    officeList.innerHTML = `<div class="small muted">Няма резултати.</div>`;
+                    return;
+                }
+                officeList.innerHTML = filtered.map(o => `
+      <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
+           data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
+        <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
+        <div class="muted small">${o.address || ''}</div>
+      </div>
+    `).join('');
+            }
+
+            function pickOffice(code, name, addr) {
+                pickedOffice = {code, name, addr};
+                officeCode.value = code;
+                submitBtn.disabled = false;
+                pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
+                pickedInfo.style.display = 'block';
+                renderOffices();
+            }
+
+            // Events
+            cityInput.addEventListener('input', () => debounced(searchCities, 250));
+            cityInput.addEventListener('focus', () => {
+                if (cities.length) cityBox.style.display = 'block';
+            });
+            document.addEventListener('click', (e) => {
+                if (!cityBox.contains(e.target) && e.target !== cityInput) cityBox.style.display = 'none';
+            });
+            cityBox.addEventListener('click', (e) => {
+                const item = e.target.closest('.suggest-item');
+                if (!item) return;
+                pickCity(item.dataset.id, item.dataset.name);
+            });
+
+            officeSearch.addEventListener('input', renderOffices);
+            officeList.addEventListener('click', (e) => {
+                const it = e.target.closest('.office-item');
+                if (!it) return;
+                pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
+            });
+
+            // Prefill: if server passed a city name, fetch suggestions then auto-pick if unique
+            document.addEventListener('DOMContentLoaded', () => {
+                const preset = (cityInput.value || '').trim();
+                if (preset) {
+                    fetch(`/api/econt/cities/?q=${encodeURIComponent(preset)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            cities = data.ok ? (data.items || []) : [];
+                            // If one exact match by name → auto pick
+                            const exact = cities.find(c => c.name === preset) || cities[0];
+                            if (exact) pickCity(exact.id, exact.name);
+                        })
+                        .catch(() => {
+                        });
+                }
+            });
+        })();
+    </script>
 {% endblock %}
