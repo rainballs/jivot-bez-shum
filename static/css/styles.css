@@ -2727,11 +2727,11 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
 /* Optional dark-mode tweak */
 @media (prefers-color-scheme: dark) {
     label.checkbox > input[type="checkbox"] {
-        background: #0f0f12;
+        background: #ffffff;
         border-color: #3a3a45;
     }
 
     label.checkbox > span {
-        color: #f0f0f3;
+        color: #000;
     }
 }
