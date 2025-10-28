@@ -22,17 +22,25 @@
                         <input type="hidden" name="city" id="city_name">
 
                         <div class="field-grid">
-                            <label>Име и фамилия
-                                <input type="text" name="full_name" value="{{ order.full_name }}" required
-                                       autocomplete="name">
-                            </label>
-                            <label>Телефон
-                                <input type="text" name="phone" value="{{ order.phone }}" required autocomplete="tel">
-                            </label>
+                            <!-- city autocomplete (existing) -->
                             <label>Град (изберете от списъка)
-                                <input type="text" id="city_input" value="{{ order.city }}"
-                                       placeholder="Започнете да пишете…" autocomplete="off" required>
+                                <input type="text" id="city-input" value="{{ order.city|default_if_none:'' }}"
+                                       autocomplete="off" placeholder="Започнете да пишете…">
+                                <input type="hidden" id="city-id" value="">
                             </label>
+                        </div>
+
+                        <div id="office-search" class="card soft p" style="margin-top:1rem">
+                            <label>Търсене в офисите
+                                <input type="text" id="office-q" placeholder="име, адрес…" autocomplete="off">
+                            </label>
+
+                            <div id="office-results" class="mt"></div>
+
+                            <!-- IMPORTANT: where we store the user’s selection -->
+                            <input type="hidden" name="receiver_office_code" id="receiver_office_code"
+                                   value="{{ order.econt_office_code|default:'' }}">
+                            <p class="small muted">Изберете град, за да заредите офисите.</p>
                         </div>
 
                         <div id="city_suggest" class="suggest-box" style="display:none"></div>
@@ -54,9 +62,7 @@
                         </div>
 
                         <div class="actions mt">
-                            <button type="submit" id="submit_btn" class="btn btn-primary" disabled>Създай
-                                товарителница
-                            </button>
+                            <button type="submit" class="btn btn-primary" id="submit-btn">Създай товарителница</button>
                         </div>
                     </form>
                 </div>
@@ -163,158 +169,111 @@
     </style>
 
     <script>
-        (() => {
-            const $ = sel => document.querySelector(sel);
-            const cityInput = $('#city_input');
-            const cityBox = $('#city_suggest');
-            const cityIdField = $('#city_id');
-            const cityNameOut = $('#city_name');     // <— new
-            const officeList = $('#offices_list');
-            const officeSearch = $('#office_search');
-            const officeCode = $('#office_code');
-            const submitBtn = $('#submit_btn');
-            const pickedInfo = $('#picked_info');
+        (function () {
+            const $ = s => document.querySelector(s);
+            const cityInput = $('#city-input');
+            const cityId = $('#city-id');
+            const officeQ = $('#office-q');
+            const officeResults = $('#office-results');
+            const officeCodeHidden = $('#receiver_office_code');
+            const submitBtn = $('#submit-btn');
 
-            let cities = [];
-            let offices = [];
-            let pickedOffice = null;
-            let debounceT;
+            let offices = []; // current list for selected city
 
-            function debounced(fn, ms = 250) {
-                clearTimeout(debounceT);
-                debounceT = setTimeout(fn, ms);
+            // --- simple helpers ---
+            function htmlEscape(s) {
+                return (s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
             }
 
-            function renderCitySuggest() {
-                const q = (cityInput.value || '').trim();
-                if (!q) {
-                    cityBox.style.display = 'none';
-                    return;
-                }
-                cityBox.innerHTML = cities.map(c => `
-      <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
-        ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
-      </div>`).join('');
-                cityBox.style.display = cities.length ? 'block' : 'none';
+            function renderOffices(list) {
+                officeResults.innerHTML = '';
+                list.forEach(o => {
+                    const div = document.createElement('div');
+                    div.className = 'office-item';
+                    div.tabIndex = 0;
+                    div.setAttribute('data-code', o.code || '');
+                    div.innerHTML = `<div class="office-title">${htmlEscape(o.name)} <span class="muted">(#${htmlEscape(o.code)})</span></div>
+                       <div class="small muted">${htmlEscape(o.address || '')}</div>`;
+                    div.addEventListener('click', () => selectOffice(o));
+                    div.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') selectOffice(o);
+                    });
+                    officeResults.appendChild(div);
+                });
             }
 
-            function searchCities() {
-                const q = (cityInput.value || '').trim();
-                if (!q) {
-                    cities = [];
-                    renderCitySuggest();
+            function selectOffice(o) {
+                officeCodeHidden.value = o.code || '';
+                // highlight selection
+                [...officeResults.children].forEach(n => n.classList.remove('selected'));
+                const card = [...officeResults.children].find(n => n.getAttribute('data-code') === o.code);
+                if (card) card.classList.add('selected');
+            }
+
+            // --- city autocomplete (very light) ---
+            let cityTimer = null;
+            const cityBox = document.createElement('div');
+            cityBox.className = 'autocomplete';
+            cityInput.parentNode.appendChild(cityBox);
+
+            function fetchCities(q) {
+                if (!q || q.length < 2) {
+                    cityBox.innerHTML = '';
                     return;
                 }
                 fetch(`/api/econt/cities/?q=${encodeURIComponent(q)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        cities = data.ok ? (data.items || []) : [];
-                        renderCitySuggest();
-                    })
-                    .catch(() => {
-                        cities = [];
-                        renderCitySuggest();
+                    .then(r => r.json()).then(data => {
+                    if (!data.ok) {
+                        cityBox.innerHTML = '';
+                        return;
+                    }
+                    cityBox.innerHTML = '';
+                    (data.items || []).forEach(c => {
+                        const opt = document.createElement('div');
+                        opt.className = 'opt';
+                        opt.textContent = c.name;
+                        opt.addEventListener('click', () => {
+                            cityInput.value = c.name;
+                            cityId.value = c.id;
+                            cityBox.innerHTML = '';
+                            // clear previous office selection and load new offices
+                            officeCodeHidden.value = '';
+                            officeResults.innerHTML = '<div class="small muted">Зареждане…</div>';
+                            fetch(`/api/econt/offices/?cityID=${encodeURIComponent(c.id)}`)
+                                .then(r => r.json()).then(res => {
+                                offices = (res.ok ? res.items : []) || [];
+                                renderOffices(offices);
+                            }).catch(() => {
+                                officeResults.innerHTML = '<div class="small muted">Неуспешно зареждане.</div>';
+                            });
+                        });
+                        cityBox.appendChild(opt);
                     });
+                });
             }
 
-            function pickCity(id, name) {
-                cityIdField.value = id;
-                cityInput.value = name;
-                cityNameOut.value = name;              // <— submit city name
-                cityBox.style.display = 'none';
-                loadOffices(id);
-                updateSubmitState();
-            }
+            cityInput.addEventListener('input', () => {
+                clearTimeout(cityTimer);
+                cityTimer = setTimeout(() => fetchCities(cityInput.value.trim()), 250);
+            });
 
-            function loadOffices(cityID) {
-                officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
-                fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        offices = data.ok ? (data.items || []) : [];
-                        pickedOffice = null;
-                        officeCode.value = '';
-                        pickedInfo.style.display = 'none';
-                        renderOffices();
-                        updateSubmitState();
-                    })
-                    .catch(() => {
-                        offices = [];
-                        officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
-                        updateSubmitState();
-                    });
-            }
-
-            function renderOffices() {
-                const q = (officeSearch.value || '').toLowerCase();
-                const filtered = offices.filter(o =>
+            // --- office search filter ---
+            officeQ.addEventListener('input', () => {
+                const q = officeQ.value.trim().toLowerCase();
+                const filtered = !q ? offices : offices.filter(o =>
                     (o.name || '').toLowerCase().includes(q) ||
                     (o.address || '').toLowerCase().includes(q) ||
-                    (o.code || '').toLowerCase().includes(q)
+                    String(o.code || '').includes(q)
                 );
-                if (!filtered.length) {
-                    officeList.innerHTML = `<div class="small muted">Няма резултати.</div>`;
-                    return;
+                renderOffices(filtered);
+            });
+
+            // Guard submit: must have city + office code
+            submitBtn.addEventListener('click', (e) => {
+                if (!cityId.value || !officeCodeHidden.value) {
+                    e.preventDefault();
+                    alert('Моля, изберете град и офис/АПС от списъка.');
                 }
-                officeList.innerHTML = filtered.map(o => `
-      <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
-           data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
-        <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
-        <div class="muted small">${o.address || ''}</div>
-      </div>
-    `).join('');
-            }
-
-            function pickOffice(code, name, addr) {
-                pickedOffice = {code, name, addr};
-                officeCode.value = code;
-                pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
-                pickedInfo.style.display = 'block';
-                renderOffices();
-                updateSubmitState();
-            }
-
-            function updateSubmitState() {
-                const hasCity = !!cityNameOut.value.trim();
-                const hasOffice = !!officeCode.value.trim();
-                submitBtn.disabled = !(hasCity && hasOffice);
-            }
-
-            // Events
-            cityInput.addEventListener('input', () => debounced(searchCities, 200));
-            cityInput.addEventListener('focus', () => {
-                if (cities.length) cityBox.style.display = 'block';
-            });
-            document.addEventListener('click', (e) => {
-                if (!cityBox.contains(e.target) && e.target !== cityInput) cityBox.style.display = 'none';
-            });
-            cityBox.addEventListener('click', (e) => {
-                const item = e.target.closest('.suggest-item');
-                if (!item) return;
-                pickCity(item.dataset.id, item.dataset.name);
-            });
-            officeSearch.addEventListener('input', renderOffices);
-            officeList.addEventListener('click', (e) => {
-                const it = e.target.closest('.office-item');
-                if (!it) return;
-                pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
-            });
-
-            // Prefill
-            document.addEventListener('DOMContentLoaded', () => {
-                const preset = (cityInput.value || '').trim();
-                if (preset) {
-                    fetch(`/api/econt/cities/?q=${encodeURIComponent(preset)}`)
-                        .then(r => r.json())
-                        .then(data => {
-                            const items = data.ok ? (data.items || []) : [];
-                            const match = items.find(c => c.name === preset) || items[0];
-                            if (match) pickCity(match.id, match.name);
-                        })
-                        .catch(() => {
-                        });
-                }
-                updateSubmitState();
             });
         })();
     </script>
