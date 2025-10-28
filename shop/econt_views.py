@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.views.decorators.http import require_http_methods, require_GET
 from django.utils.html import escape
-from .models import Order, DeliveryMethod
+from .models import Order, DeliveryMethod, PaymentMethod
 from .econt_service import create_econt_label
 import json
 from django.views.decorators.http import require_http_methods
