@@ -19,31 +19,32 @@ import re
 
 
 def _split_street_num(line: str) -> tuple[str, str]:
-    """
-    Best-effort split of a Bulgarian-style address line into (street, number).
-    Handles endings like "... 12", "... №12", "... 12A", "... 12-14".
-    If not detected, returns (line, "") so user can fill the number.
-    """
     if not line:
         return "", ""
-    s = line.strip()
-
-    # 1) Try explicit "№"
-    m = re.search(r'№\s*([0-9A-Za-zА-Яа-я\-\/]+)\s*$', s)
+    s = str(line).strip()
+    m = re.search(r'\s+(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
     if m:
         num = m.group(1)
-        street = s[:m.start()].rstrip(", ").strip()
+        street = s[:m.start(1)].strip(' ,')
         return street, num
-
-    # 2) Try last token that looks like a number (with optional suffix)
-    m = re.search(r'\s([0-9]+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
-    if m:
-        num = m.group(1)
-        street = s[:m.start()].rstrip(", ").strip()
-        return street, num
-
-    # 3) Fallback: could not detect a trailing number
     return s, ""
+
+
+def _get_billing(order, name, default=""):
+    """
+    Read a billing field defensively:
+    - supports both billing_postcode and billing_postal_code
+    - returns empty string if missing
+    """
+    # exact name first
+    if hasattr(order, name):
+        return getattr(order, name) or default
+    # common alias for postcode/postal_code
+    if name == "billing_postcode" and hasattr(order, "billing_postal_code"):
+        return getattr(order, "billing_postal_code") or default
+    if name == "billing_postal_code" and hasattr(order, "billing_postcode"):
+        return getattr(order, "billing_postcode") or default
+    return default
 
 
 def _get_current_order(request):
@@ -137,27 +138,26 @@ def econt_collect_address(request):
         messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
 
-    # If the user picked Office by mistake, route them
     if order.delivery_method == DeliveryMethod.TO_OFFICE:
         return redirect("econt_collect_office")
 
-    # Build prefill dict (server-side), so the form is already filled on load
     prefill = {
-        "full_name": order.full_name,
-        "phone": order.phone,
-        "city": order.city,
+        "full_name": order.full_name or "",
+        "phone": order.phone or "",
+        "city": order.city or "",
         "receiver_street": "",
         "receiver_num": "",
-        "receiver_postcode": order.postal_code,
+        "receiver_postcode": (order.postal_code or ""),
     }
 
-    # If “use same as billing” was checked, override with billing data
-    if order.ship_same_as_billing:
-        prefill["full_name"] = order.billing_full_name or prefill["full_name"]
-        prefill["phone"] = order.billing_phone or prefill["phone"]
-        prefill["city"] = order.billing_city or prefill["city"]
-        prefill["receiver_postcode"] = order.billing_postal_code or ""
-        street, num = _split_street_num(order.billing_address_line or "")
+    if getattr(order, "ship_same_as_billing", False):
+        prefill["full_name"] = _get_billing(order, "billing_full_name", prefill["full_name"])
+        prefill["phone"] = _get_billing(order, "billing_phone", prefill["phone"])
+        prefill["city"] = _get_billing(order, "billing_city", prefill["city"])
+        prefill["receiver_postcode"] = _get_billing(order, "billing_postcode", "")
+
+        bill_line = _get_billing(order, "billing_address_line", "")
+        street, num = _split_street_num(bill_line)
         prefill["receiver_street"] = street
         prefill["receiver_num"] = num
 

@@ -15,49 +15,62 @@
                     {% if messages %}
                         <div class="alerts">
                             {% for m in messages %}
-                                <div class="alert">{{ m }}</div>
-                            {% endfor %}
+                                <div class="alert">{{ m }}</div>{% endfor %}
                         </div>
                     {% endif %}
 
                     <h3 style="margin-top:.25rem">Адрес за фактуриране</h3>
-                    <div class="field-grid">
 
+                    <div class="field-grid">
                         <label>Име и фамилия {{ form.full_name }}</label>
                         {% for e in form.full_name.errors %}
-                            <div class="error">{{ e }}</div>
-                        {% endfor %}
+                            <div class="error">{{ e }}</div>{% endfor %}
 
                         <label>Имейл {{ form.email }}</label>
                         {% for e in form.email.errors %}
-                            <div class="error">{{ e }}</div>
-                        {% endfor %}
+                            <div class="error">{{ e }}</div>{% endfor %}
 
                         <label>Телефон {{ form.phone }}</label>
                         {% for e in form.phone.errors %}
-                            <div class="error">{{ e }}</div>
-                        {% endfor %}
+                            <div class="error">{{ e }}</div>{% endfor %}
                     </div>
 
-                    <!-- Optional: dedicated billing fields (from the form additions) -->
+                    <!-- Billing details block -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="field-grid">
                             <label>Име и фамилия или Фирма (фактура) {{ form.billing_full_name }}</label>
+                            {% for e in form.billing_full_name.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
+
                             <label>Имейл (фактура) {{ form.billing_email }}</label>
+                            {% for e in form.billing_email.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
+
                             <label>Телефон (фактура) {{ form.billing_phone }}</label>
+                            {% for e in form.billing_phone.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
                         </div>
 
                         <div class="field-grid" style="margin-top:1rem">
                             <label>Град (фактура) {{ form.billing_city }}</label>
+                            {% for e in form.billing_city.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
+
                             <label>Адрес (фактура) {{ form.billing_street }}</label>
+                            {% for e in form.billing_street.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
+
                             <label>Пощ. код (фактура) {{ form.billing_postcode }}</label>
+                            {% for e in form.billing_postcode.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
                         </div>
 
                         <div style="margin-top:.75rem">
                             <label class="checkbox">
-                                <input type="checkbox" name="ship_same_as_billing">
-                                <span>Използвай същия адрес за доставка</span>
+                                {{ form.ship_same_as_billing }} <span>Използвай същия адрес за доставка</span>
                             </label>
+                            {% for e in form.ship_same_as_billing.errors %}
+                                <div class="error">{{ e }}</div>{% endfor %}
                         </div>
                     </div>
 
@@ -81,11 +94,9 @@
                     </div>
 
                     {% if form.non_field_errors %}
-                        <div class="error">{{ form.non_field_errors }}</div>
-                    {% endif %}
+                        <div class="error">{{ form.non_field_errors }}</div>{% endif %}
                     {% if pay_form.errors %}
-                        <div class="error">Проблем с избора на плащане.</div>
-                    {% endif %}
+                        <div class="error">Проблем с избора на плащане.</div>{% endif %}
                 </div>
 
                 <!-- RIGHT: summary, quantity, payment and submit -->
@@ -143,35 +154,43 @@
         .card.soft {
             background: var(--soft, #f6f6f7);
             border-radius: 16px;
-            padding: 1rem
+            padding: 1rem;
         }
 
         .radio-row {
             display: flex;
-            align-items: center
+            align-items: center;
         }
 
         .error {
             color: #b02f27;
             font-size: .9rem;
-            margin: .25rem 0
+            margin: .25rem 0;
         }
 
-        .checkbox input {
-            margin-right: .5rem
+        /* nice checkbox */
+        .checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            cursor: pointer;
+        }
+
+        .checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
         }
     </style>
 
     <script>
+        // totals + shipping preview
         document.addEventListener("DOMContentLoaded", function () {
-            // Elements
             const qtyInput = document.querySelector('input[name="quantity"]');
             const outBGN = document.querySelector("[data-total-bgn]");
             const outEUR = document.querySelector("[data-total-eur]");
             const shipLine = document.querySelector("[data-ship-line]");
             const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
 
-            // Helpers
             function toNum(s) {
                 return parseFloat(String(s).replace(",", ".").trim()) || 0
             }
@@ -206,7 +225,21 @@
 
             dmRadios.forEach(r => r.addEventListener("change", recalc));
             if (qtyInput) qtyInput.addEventListener("input", recalc);
-            recalc(); // init
+            recalc();
+        });
+
+        // keep UX sane: if user picks "office", uncheck "same as billing"
+        document.addEventListener('DOMContentLoaded', () => {
+            const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
+            const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
+            const sameBox = document.querySelector('input[name="ship_same_as_billing"]');
+
+            function syncBox() {
+                if (rbOffice && rbOffice.checked && sameBox) sameBox.checked = false;
+            }
+
+            [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', syncBox));
+            syncBox();
         });
     </script>
 {% endblock %}
