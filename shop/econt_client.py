@@ -150,6 +150,101 @@ class EcontClient:
         return items[0] if items else None
 
 
+# def build_create_label_json(
+#         *,
+#         sender_name: str,
+#         sender_phone: str,
+#         sender_city: str,
+#         sender_address: str | None,
+#         sender_office_code: str | None,
+#         receiver_name: str,
+#         receiver_phone: str,
+#         receiver_city: str,
+#         receiver_office_code: str | None = None,
+#         receiver_street: str | None = None,
+#         receiver_num: str | None = None,
+#         receiver_postcode: str | None = None,
+#         receiver_entrance: str | None = None,
+#         receiver_floor: str | None = None,
+#         receiver_apartment: str | None = None,
+#         weight_kg: float = 0.8,
+#         parcels: int = 1,
+#         cod_bgn: float = 0.0,
+#         declared_value_bgn: float = 0.0,
+#         payer: str = "receiver",
+#         label_format: str = "10x9",
+# ) -> dict:
+#     if not Order.paid:
+#         declared_value_bgn = Order.total_bgn
+#
+#     payload = {
+#         "shipmentType": "PACK",  # ← REQUIRED for JSON API
+#         "service": None,  # set below
+#         "packCount": int(parcels),
+#         "weight": float(weight_kg),
+#         "shipmentDescription": "Книга",
+#         "payer": (payer or "receiver").upper(),  # "RECEIVER" or "SENDER"
+#         "declaredValue": float(declared_value_bgn),
+#         "label": {"format": label_format},
+#
+#         "senderClient": {"name": sender_name, "phones": [sender_phone]},
+#         "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
+#         "senderAddress": {
+#             "city": {
+#                 "country": {
+#                     "code3": "BGR"
+#                 },
+#                 "name": sender_city,
+#                 "postCode": "8000"
+#             }
+#         },
+#         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
+#         "receiverAddress": {
+#             "city": {
+#                 "country": {
+#                     "code3": "BGR"
+#                 },
+#                 "name": receiver_city,
+#                 "postCode": receiver_postcode
+#             },
+#         },
+#         "delivery": {"date": date, "timeIntervalId": 0}
+#     }
+#
+#     # Sender: office OR address
+#     if sender_office_code:
+#         payload["senderOfficeCode"] = str(sender_office_code)
+#     else:
+#         # Econt accepts a free-form street when needed; if you have split fields, map them here.
+#         payload["senderAddress"]["street"] = sender_address or ""
+#
+#     # Route: office vs door
+#     if receiver_office_code:
+#         payload["service"] = "toOffice"
+#         payload["receiverOfficeCode"] = str(receiver_office_code)
+#     else:
+#         payload["service"] = "toDoor"
+#         ra = payload["receiverAddress"]
+#         ra["street"] = receiver_street or ""
+#         if receiver_num:
+#             ra["num"] = str(receiver_num)
+#         if receiver_postcode:
+#             ra["postCode"] = str(receiver_postcode)
+#         if receiver_entrance:
+#             ra["entrance"] = receiver_entrance
+#         if receiver_floor:
+#             ra["floor"] = receiver_floor
+#         if receiver_apartment:
+#             ra["apartment"] = receiver_apartment
+#
+#         delivery_day = _next_workday(date.today()).isoformat()
+#         payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
+#     # COD (optional)
+#     if cod_bgn and float(cod_bgn) > 0:
+#         payload["cdAmount"] = float(cod_bgn)
+#
+#     return payload
+
 def build_create_label_json(
         *,
         sender_name: str,
@@ -174,16 +269,18 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    if not Order.paid:
-        declared_value_bgn = Order.total_bgn
+    # If you really want declared value only when not paid:
+    # (remove if you prefer to always send declared value)
+    # NOTE: don't reference Order class here — use the parameters you pass in.
+    # keep declared_value_bgn as-is
 
     payload = {
-        "shipmentType": "PACK",  # ← REQUIRED for JSON API
+        "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": (payer or "receiver").upper(),  # "RECEIVER" or "SENDER"
+        "payer": (payer or "receiver").upper(),  # "RECEIVER" / "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -191,32 +288,31 @@ def build_create_label_json(
         "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
             "city": {
-                "country": {
-                    "code3": "BGR"
-                },
+                "country": {"code3": "BGR"},
                 "name": sender_city,
-                "postCode": "8000"
+                "postCode": "8000",
             }
         },
+
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
         "receiverAddress": {
             "city": {
-                "country": {
-                    "code3": "BGR"
-                },
+                "country": {"code3": "BGR"},
                 "name": receiver_city,
-                "postCode": receiver_postcode
-            },
+                "postCode": receiver_postcode,
+            }
         },
-        "delivery": {"date": date, "timeIntervalId": 0}
     }
 
     # Sender: office OR address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
-        # Econt accepts a free-form street when needed; if you have split fields, map them here.
         payload["senderAddress"]["street"] = sender_address or ""
+
+    # Compute a proper string date once
+    delivery_day = _next_workday(date.today()).isoformat()
+    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
     # Route: office vs door
     if receiver_office_code:
@@ -237,9 +333,6 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-        delivery_day = _next_workday(date.today()).isoformat()
-        payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
-    # COD (optional)
     if cod_bgn and float(cod_bgn) > 0:
         payload["cdAmount"] = float(cod_bgn)
 

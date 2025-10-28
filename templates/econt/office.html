@@ -161,25 +161,27 @@
 
     <script>
         (() => {
-            const $ = sel => document.querySelector(sel);
+            const $ = s => document.querySelector(s);
             const cityInput = $('#city_input');
             const cityBox = $('#city_suggest');
             const cityIdField = $('#city_id');
+            const cityNameOut = $('#city_name');     // <-- hidden field that will be POST-ed
+
             const officeList = $('#offices_list');
             const officeSearch = $('#office_search');
-            const officeCode = $('#office_code');
+            const officeCode = $('#office_code');   // <-- hidden field that will be POST-ed
             const submitBtn = $('#submit_btn');
             const pickedInfo = $('#picked_info');
 
             let cities = [];
             let offices = [];
             let pickedOffice = null;
-            let debounceT;
+            let t;
 
-            function debounced(fn, ms = 250) {
-                clearTimeout(debounceT);
-                debounceT = setTimeout(fn, ms);
-            }
+            const debounced = (fn, ms = 250) => {
+                clearTimeout(t);
+                t = setTimeout(fn, ms);
+            };
 
             function renderCitySuggest() {
                 const q = (cityInput.value || '').trim();
@@ -216,8 +218,10 @@
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
+                cityNameOut.value = name;       // <-- THIS makes sure POST['city'] has the picked name
                 cityBox.style.display = 'none';
                 loadOffices(id);
+                updateSubmitState();
             }
 
             function loadOffices(cityID) {
@@ -228,13 +232,14 @@
                         offices = data.ok ? (data.items || []) : [];
                         pickedOffice = null;
                         officeCode.value = '';
-                        submitBtn.disabled = true;
                         pickedInfo.style.display = 'none';
                         renderOffices();
+                        updateSubmitState();
                     })
                     .catch(() => {
                         offices = [];
                         officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
+                        updateSubmitState();
                     });
             }
 
@@ -254,20 +259,24 @@
            data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
         <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
         <div class="muted small">${o.address || ''}</div>
-      </div>
-    `).join('');
+      </div>`).join('');
             }
 
             function pickOffice(code, name, addr) {
                 pickedOffice = {code, name, addr};
-                officeCode.value = code;
-                submitBtn.disabled = false;
+                officeCode.value = code;        // <-- THIS is what your view reads as receiver_office_code
                 pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
                 pickedInfo.style.display = 'block';
                 renderOffices();
+                updateSubmitState();
             }
 
-            // Events
+            function updateSubmitState() {
+                const ok = !!cityNameOut.value.trim() && !!officeCode.value.trim();
+                submitBtn.disabled = !ok;
+            }
+
+            // events
             cityInput.addEventListener('input', () => debounced(searchCities, 250));
             cityInput.addEventListener('focus', () => {
                 if (cities.length) cityBox.style.display = 'block';
@@ -288,20 +297,21 @@
                 pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
             });
 
-            // Prefill: if server passed a city name, fetch suggestions then auto-pick if unique
+            // Prefill if you arrived with a city already stored on the order
             document.addEventListener('DOMContentLoaded', () => {
                 const preset = (cityInput.value || '').trim();
                 if (preset) {
                     fetch(`/api/econt/cities/?q=${encodeURIComponent(preset)}`)
                         .then(r => r.json())
                         .then(data => {
-                            cities = data.ok ? (data.items || []) : [];
-                            // If one exact match by name → auto pick
-                            const exact = cities.find(c => c.name === preset) || cities[0];
-                            if (exact) pickCity(exact.id, exact.name);
+                            const items = data.ok ? (data.items || []) : [];
+                            const match = items.find(c => c.name === preset) || items[0];
+                            if (match) pickCity(match.id, match.name);
                         })
                         .catch(() => {
                         });
+                } else {
+                    updateSubmitState();
                 }
             });
         })();
