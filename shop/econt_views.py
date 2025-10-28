@@ -156,7 +156,7 @@ def econt_collect_address(request):
         prefill["full_name"] = order.billing_full_name or prefill["full_name"]
         prefill["phone"] = order.billing_phone or prefill["phone"]
         prefill["city"] = order.billing_city or prefill["city"]
-        prefill["receiver_postcode"] = order.billing_postal_code or ""
+        prefill["receiver_postcode"] = order.billing_post_code or ""
         street, num = _split_street_num(order.billing_address_line or "")
         prefill["receiver_street"] = street
         prefill["receiver_num"] = num
