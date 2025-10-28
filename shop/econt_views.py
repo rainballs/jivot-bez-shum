@@ -15,6 +15,35 @@ from .views import get_single_product
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from .econt_service import get_cities, get_offices_by_city_id
+import re
+
+
+def _split_street_num(line: str) -> tuple[str, str]:
+    """
+    Best-effort split of a Bulgarian-style address line into (street, number).
+    Handles endings like "... 12", "... №12", "... 12A", "... 12-14".
+    If not detected, returns (line, "") so user can fill the number.
+    """
+    if not line:
+        return "", ""
+    s = line.strip()
+
+    # 1) Try explicit "№"
+    m = re.search(r'№\s*([0-9A-Za-zА-Яа-я\-\/]+)\s*$', s)
+    if m:
+        num = m.group(1)
+        street = s[:m.start()].rstrip(", ").strip()
+        return street, num
+
+    # 2) Try last token that looks like a number (with optional suffix)
+    m = re.search(r'\s([0-9]+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+    if m:
+        num = m.group(1)
+        street = s[:m.start()].rstrip(", ").strip()
+        return street, num
+
+    # 3) Fallback: could not detect a trailing number
+    return s, ""
 
 
 def _get_current_order(request):
@@ -102,37 +131,40 @@ def econt_collect(request):
 
 @require_http_methods(["GET"])
 def econt_collect_address(request):
-    """Card success or COD → show the ADDRESS form, prefill if billing address used."""
+    """Card success or COD → show the ADDRESS form, and if card, mark paid."""
     order, err = _ensure_paid_from_stripe(request)
-
     if not order:
         messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
 
-    # Redirect to office page if needed
+    # If the user picked Office by mistake, route them
     if order.delivery_method == DeliveryMethod.TO_OFFICE:
         return redirect("econt_collect_office")
 
-    # Prefill logic (used by template JS)
-    billing_data = {}
-    if getattr(order, "ship_same_as_billing", False):
-        billing_data = {
-            "full_name": order.billing_full_name or order.full_name,
-            "phone": order.billing_phone or order.phone,
-            "city": order.billing_city or order.city,
-            "street": order.billing_street or "",
-            "postcode": order.billing_postcode or "",
-        }
-
-    context = {
-        "order": order,
-        "billing_data": billing_data,
+    # Build prefill dict (server-side), so the form is already filled on load
+    prefill = {
+        "full_name": order.full_name,
+        "phone": order.phone,
+        "city": order.city,
+        "receiver_street": "",
+        "receiver_num": "",
+        "receiver_postcode": "",
     }
+
+    # If “use same as billing” was checked, override with billing data
+    if order.ship_same_as_billing:
+        prefill["full_name"] = order.billing_full_name or prefill["full_name"]
+        prefill["phone"] = order.billing_phone or prefill["phone"]
+        prefill["city"] = order.billing_city or prefill["city"]
+        prefill["receiver_postcode"] = order.billing_postal_code or ""
+        street, num = _split_street_num(order.billing_address_line or "")
+        prefill["receiver_street"] = street
+        prefill["receiver_num"] = num
 
     if err:
         messages.warning(request, err)
 
-    return render(request, "econt/address.html", context)
+    return render(request, "econt/address.html", {"order": order, "prefill": prefill})
 
 
 @require_http_methods(["GET"])

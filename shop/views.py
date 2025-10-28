@@ -116,6 +116,12 @@ def checkout_info(request):
                 DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
             )
 
+            # If user picked office, never carry this flag forward
+            if order.delivery_method == DeliveryMethod.TO_OFFICE:
+                order.ship_same_as_billing = False
+            else:
+                order.ship_same_as_billing = bool(request.POST.get("ship_same_as_billing"))
+                
             # Payment method (separate form)
             order.payment_method = pay_form.cleaned_data["payment_method"]
 
