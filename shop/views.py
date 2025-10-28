@@ -140,18 +140,15 @@ def checkout_info(request):
             request.session["current_order_id"] = order.id
 
             # ===== Branch out =====
-            if order.payment_method in {
-                PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY
-            }:
-                # >>> REDIRECT: paid online → Stripe checkout <<<
+            # ===== Branch out =====
+            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 return redirect("stripe_create_session")
             else:
-                # COD → go to the proper Econt page depending on delivery choice
+                # COD → make sure no stale Stripe session survives
+                request.session.pop("stripe_session_id", None)
                 if order.delivery_method == DeliveryMethod.TO_ADDRESS:
-                    # >>> REDIRECT: COD + TO_ADDRESS → address form <<<
                     return redirect("econt_collect_address")
                 else:
-                    # >>> REDIRECT: COD + TO_OFFICE → office/APS form <<<
                     return redirect("econt_collect_office")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
@@ -188,6 +185,7 @@ def checkout_payment(request):
             # COD → go to the proper Econt page (address/office)
             order.paid = False
             order.save(update_fields=["paid"])
+            request.session.pop("stripe_session_id", None)
             if order.delivery_method == DeliveryMethod.TO_ADDRESS:
                 return redirect("econt_collect_address")
             else:

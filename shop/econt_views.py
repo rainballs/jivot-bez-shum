@@ -204,7 +204,7 @@ def econt_submit(request):
         messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect(back_name)
 
-    messages.success(request, "Товарителницата е създадена успешно.")
+    # messages.success(request, "Товарителницата е създадена успешно.")
     return redirect("thank_you")
 
 
@@ -239,14 +239,20 @@ def api_econt_offices(request):
 
 def _ensure_paid_from_stripe(request):
     """
-    If we arrived here after a Stripe Checkout success, verify the session and
-    idempotently mark the order as paid. Returns (order, error_msg_or_None).
-    For COD / manual revisits (no session_id), returns (current_order, None).
+    If we arrived here after Stripe success, verify the session and idempotently
+    mark the order as paid. For COD (cash on delivery) we skip Stripe entirely.
+    Returns (order, error_msg_or_None).
     """
-    # COD flow or revisit: no session id is fine — just return the current order
+    current = _get_current_order(request)
+
+    # If current order exists and it's COD → never touch Stripe
+    if current and getattr(current, "payment_method", None) == PaymentMethod.COD:
+        return current, None
+
     session_id = request.GET.get("session_id") or request.session.get("stripe_session_id")
     if not session_id:
-        return _get_current_order(request), None
+        # No Stripe context → just return whatever we have (COD / revisit)
+        return current, None
 
     try:
         sess = stripe.checkout.Session.retrieve(
@@ -264,10 +270,21 @@ def _ensure_paid_from_stripe(request):
     if not order_id:
         return None, "Липсва информация за поръчката (order_id)."
 
+    # IMPORTANT: only trust Stripe if it matches the order in our session (if any)
+    if current and str(current.pk) != str(order_id):
+        # Mismatch → ignore this Stripe session; treat like COD/revisit
+        return current, None
+
     try:
         order = Order.objects.get(pk=order_id)
     except Order.DoesNotExist:
         return None, "Поръчката не беше намерена."
+
+    # Extra guard: never flip to paid if order method is COD
+    if getattr(order, "payment_method", None) == PaymentMethod.COD:
+        request.session["current_order_id"] = order.pk
+        request.session["stripe_session_id"] = sess.get("id")
+        return order, None
 
     if not order.paid:
         order.paid = True
@@ -276,10 +293,8 @@ def _ensure_paid_from_stripe(request):
             from .utils import send_order_notification
             send_order_notification(order, event="paid")
         except Exception:
-            # Non-fatal for the page flow
             pass
 
-    # keep handy for subsequent steps
     request.session["current_order_id"] = order.pk
     request.session["stripe_session_id"] = sess.get("id")
     return order, None
