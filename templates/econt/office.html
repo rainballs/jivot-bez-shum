@@ -30,7 +30,7 @@
                             <label>Град (изберете от списъка)
                                 <!-- visible input used by your autocomplete -->
                                 <input type="text" id="city_input" value="{{ order.city|default_if_none:'' }}"
-                                       autocomplete="off" placeholder="Започнете да пишете…">
+                                       autocomplete="on" placeholder="Започнете да пишете…">
                                 <!-- dropdown container for suggestions -->
                                 <div id="city_suggest" class="autocomplete" style="display:none"></div>
                                 <!-- hidden fields that your JS fills -->
@@ -43,7 +43,7 @@
                         <!-- Offices panel (your JS fills #offices_list and #office_code) -->
                         <div class="card soft p" style="margin-top:1rem">
                             <label>Търсене в офисите
-                                <input type="text" id="office_search" placeholder="име, адрес…" autocomplete="off">
+                                <input type="text" id="office_search" placeholder="име, адрес…" autocomplete="on">
                             </label>
 
                             <div id="offices_list" class="mt">
@@ -69,8 +69,7 @@
                 <aside class="checkout-aside">
                     <div class="card soft">
                         <h3 class="mb-0">Съвет</h3>
-                        <p class="small muted">Изберете точно град „{{ order.city|default:"" }}“ (или коригирайте) и
-                            след това посочете офис/АПС.</p>
+                        <p class="small muted">Изберете град и Офис на ЕКОНТ</p>
                         {% if order and order.econt_label_pdf %}
                             <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
                                 товарителница</a></p>
