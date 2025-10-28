@@ -224,7 +224,10 @@ def stripe_create_checkout_session(request):
             mode="payment",
             payment_method_types=["card"],
             line_items=stripe_checkout_line_items(order, product),
-            metadata={"order_id": str(order.id)},
+            metadata={
+                "order_id": str(order.id),
+                "delivery_method": str(order.delivery_method),
+            },
             success_url=success_url,  # ⬅️ go to address/office page
             cancel_url=stripe_cancel_url(request),
             currency="bgn",

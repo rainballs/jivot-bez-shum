@@ -126,9 +126,9 @@ def econt_submit(request):
         return redirect("checkout_info")
 
     # Basic fields
-    order.full_name = request.POST.get("full_name", order.full_name).strip()
-    order.phones = request.POST.get("phone", order.phone).strip()
-    order.city = request.POST.get("city", order.city).strip()
+    order.full_name = (request.POST.get("full_name") or order.full_name or "").strip()
+    order.phone = (request.POST.get("phone") or order.phone or "").strip()  # <- fix plural
+    order.city = (request.POST.get("city") or order.city or "").strip()  # <- now comes from hidden field
 
     # Mode comes from hidden input on each page
     to_office = request.POST.get("to_office") == "1"

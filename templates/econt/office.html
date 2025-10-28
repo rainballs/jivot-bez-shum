@@ -18,6 +18,8 @@
                         <input type="hidden" name="to_office" value="1">
                         <input type="hidden" name="receiver_office_code" id="office_code">
                         <input type="hidden" id="city_id">
+                        <!-- NEW: send the picked city name -->
+                        <input type="hidden" name="city" id="city_name">
 
                         <div class="field-grid">
                             <label>Име и фамилия
@@ -29,15 +31,12 @@
                             </label>
                             <label>Град (изберете от списъка)
                                 <input type="text" id="city_input" value="{{ order.city }}"
-                                       placeholder="Започнете да пишете…"
-                                       autocomplete="off" required>
+                                       placeholder="Започнете да пишете…" autocomplete="off" required>
                             </label>
                         </div>
 
-                        <!-- City suggestions -->
                         <div id="city_suggest" class="suggest-box" style="display:none"></div>
 
-                        <!-- Offices UI -->
                         <div class="card soft p" style="margin-top:1rem">
                             <div class="field-grid">
                                 <label>Търсене в офисите
@@ -169,6 +168,7 @@
             const cityInput = $('#city_input');
             const cityBox = $('#city_suggest');
             const cityIdField = $('#city_id');
+            const cityNameOut = $('#city_name');     // <— new
             const officeList = $('#offices_list');
             const officeSearch = $('#office_search');
             const officeCode = $('#office_code');
@@ -220,8 +220,10 @@
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
+                cityNameOut.value = name;              // <— submit city name
                 cityBox.style.display = 'none';
                 loadOffices(id);
+                updateSubmitState();
             }
 
             function loadOffices(cityID) {
@@ -232,13 +234,14 @@
                         offices = data.ok ? (data.items || []) : [];
                         pickedOffice = null;
                         officeCode.value = '';
-                        submitBtn.disabled = true;
                         pickedInfo.style.display = 'none';
                         renderOffices();
+                        updateSubmitState();
                     })
                     .catch(() => {
                         offices = [];
                         officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
+                        updateSubmitState();
                     });
             }
 
@@ -265,14 +268,20 @@
             function pickOffice(code, name, addr) {
                 pickedOffice = {code, name, addr};
                 officeCode.value = code;
-                submitBtn.disabled = false;
                 pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
                 pickedInfo.style.display = 'block';
                 renderOffices();
+                updateSubmitState();
+            }
+
+            function updateSubmitState() {
+                const hasCity = !!cityNameOut.value.trim();
+                const hasOffice = !!officeCode.value.trim();
+                submitBtn.disabled = !(hasCity && hasOffice);
             }
 
             // Events
-            cityInput.addEventListener('input', () => debounced(searchCities, 250));
+            cityInput.addEventListener('input', () => debounced(searchCities, 200));
             cityInput.addEventListener('focus', () => {
                 if (cities.length) cityBox.style.display = 'block';
             });
@@ -284,7 +293,6 @@
                 if (!item) return;
                 pickCity(item.dataset.id, item.dataset.name);
             });
-
             officeSearch.addEventListener('input', renderOffices);
             officeList.addEventListener('click', (e) => {
                 const it = e.target.closest('.office-item');
@@ -292,21 +300,21 @@
                 pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
             });
 
-            // Prefill: if server passed a city name, fetch suggestions then auto-pick if unique
+            // Prefill
             document.addEventListener('DOMContentLoaded', () => {
                 const preset = (cityInput.value || '').trim();
                 if (preset) {
                     fetch(`/api/econt/cities/?q=${encodeURIComponent(preset)}`)
                         .then(r => r.json())
                         .then(data => {
-                            cities = data.ok ? (data.items || []) : [];
-                            // If one exact match by name → auto pick
-                            const exact = cities.find(c => c.name === preset) || cities[0];
-                            if (exact) pickCity(exact.id, exact.name);
+                            const items = data.ok ? (data.items || []) : [];
+                            const match = items.find(c => c.name === preset) || items[0];
+                            if (match) pickCity(match.id, match.name);
                         })
                         .catch(() => {
                         });
                 }
+                updateSubmitState();
             });
         })();
     </script>
