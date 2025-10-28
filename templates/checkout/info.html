@@ -20,6 +20,7 @@
                     {% endif %}
 
                     <div class="field-grid">
+                        <h1>Адрес за фактуриране</h1>
                         <label>Име и фамилия {{ form.full_name }}</label>
                         {% for e in form.full_name.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
@@ -31,6 +32,33 @@
                         <label>Телефон {{ form.phone }}</label>
                         {% for e in form.phone.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
+                    </div>
+
+                    <div class="field-grid" style="margin-top:1rem">
+                        <label>Улица / булевард
+                            <input type="text" name="receiver_street" placeholder="напр. ул. Александър Велики"
+                                   required>
+                        </label>
+                        <label>№
+                            <input type="text" name="receiver_num" placeholder="напр. 12" required
+                                   inputmode="numeric" pattern="[0-9A-Za-z\-]+">
+                        </label>
+                        <label>Пощ. код (по желание)
+                            <input type="text" name="receiver_postcode" placeholder="напр. 8000" inputmode="numeric"
+                                   pattern="[0-9]+">
+                        </label>
+                    </div>
+
+                    <div class="field-grid">
+                        <label>Вход (по желание)
+                            <input type="text" name="receiver_entrance" placeholder="напр. Б">
+                        </label>
+                        <label>Етаж (по желание)
+                            <input type="text" name="receiver_floor" placeholder="напр. 3">
+                        </label>
+                        <label>Апартамент (по желание)
+                            <input type="text" name="receiver_apartment" placeholder="напр. 8">
+                        </label>
                     </div>
 
                     <!-- Only the delivery CHOICE (no address/office fields here) -->

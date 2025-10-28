@@ -19,8 +19,70 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("id", "full_name", "total_bgn", "total_eur", "paid", "created_at")
-    readonly_fields = ("subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur", "total_bgn", "total_eur",
-                       "created_at")
-    inlines = [OrderItemInline]
-    search_fields = ("full_name", "email", "phone")
+    list_display = (
+        "id", "full_name", "email", "phone",
+        "delivery_method", "courier", "paid", "payment_method",
+        "city", "created_at",
+    )
+    list_filter = ("paid", "payment_method", "delivery_method", "courier", "created_at")
+    search_fields = (
+        "id", "full_name", "email", "phone",
+        "billing_full_name", "billing_email", "billing_phone",
+        "city", "address_line", "office_text", "econt_shipment_num",
+    )
+    readonly_fields = ("created_at", "billing_preview", "shipping_preview")
+
+    fieldsets = (
+        ("Клиент", {
+            "fields": (
+                ("full_name", "email", "phone"),
+                ("delivery_method", "courier", "payment_method", "paid"),
+                "created_at",
+            )
+        }),
+        ("Доставка (реални полета за Еконт)", {
+            "fields": (
+                ("city", "postal_code"),
+                "address_line",
+                "office_text",
+                ("econt_office_code", "econt_shipment_num"),
+                ("econt_status", "econt_errors"),
+                "econt_label_pdf",
+                "shipping_preview",
+            )
+        }),
+        ("Фактура (billing)", {
+            "fields": (
+                ("billing_full_name", "billing_email", "billing_phone"),
+                ("billing_city", "billing_postcode"),
+                ("billing_street", "billing_num"),
+                ("billing_entrance", "billing_floor", "billing_apartment"),
+                "ship_same_as_billing",
+                "billing_preview",
+            )
+        }),
+        ("Суми", {
+            "fields": (
+                ("quantity",),
+                ("subtotal_bgn", "shipping_bgn", "total_bgn"),
+                ("subtotal_eur", "shipping_eur", "total_eur"),
+            )
+        }),
+    )
+
+    def billing_preview(self, obj):
+        return obj.billing_full_address()
+
+    billing_preview.short_description = "Фактурен адрес (преглед)"
+
+    def shipping_preview(self, obj):
+        return obj.shipping_full_address()
+
+    shipping_preview.short_description = "Адрес за доставка (преглед)"
+
+
+# (Optional) if you manage items in admin
+@admin.register(OrderItem)
+class OrderItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "order", "product", "quantity", "unit_price_bgn", "unit_price_eur")
+    search_fields = ("order__id", "product__name")

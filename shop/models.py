@@ -77,6 +77,22 @@ class Order(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Billing (invoice) address ---
+    billing_full_name = models.CharField(max_length=200, blank=True, default="",
+                                         verbose_name=_("Фактура: Име и фамилия"))
+    billing_email = models.EmailField(blank=True, default="", verbose_name=_("Фактура: Имейл"))
+    billing_phone = models.CharField(max_length=32, blank=True, default="", verbose_name=_("Фактура: Телефон"))
+    billing_city = models.CharField(max_length=120, blank=True, default="", verbose_name=_("Фактура: Град"))
+    billing_street = models.CharField(max_length=255, blank=True, default="", verbose_name=_("Фактура: Улица/бул."))
+    billing_num = models.CharField(max_length=32, blank=True, default="", verbose_name=_("Фактура: №"))
+    billing_postcode = models.CharField(max_length=16, blank=True, default="", verbose_name=_("Фактура: Пощ. код"))
+    billing_entrance = models.CharField(max_length=16, blank=True, default="", verbose_name=_("Фактура: Вход"))
+    billing_floor = models.CharField(max_length=16, blank=True, default="", verbose_name=_("Фактура: Етаж"))
+    billing_apartment = models.CharField(max_length=16, blank=True, default="", verbose_name=_("Фактура: Апартамент"))
+
+    # If True, prefill shipping on the next step with the billing data (you already use this in the view)
+    ship_same_as_billing = models.BooleanField(default=True, verbose_name=_("Използвай фактурния адрес за доставка"))
+
     class Meta:
         ordering = ["-created_at"]
         verbose_name = _("Поръчка")
@@ -84,6 +100,22 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.id or '—'} — {self.full_name}"
+
+    def billing_full_address(self) -> str:
+        parts = [
+            self.billing_city,
+            f"{self.billing_street} №{self.billing_num}".strip(),
+            f"вх. {self.billing_entrance}" if self.billing_entrance else "",
+            f"ет. {self.billing_floor}" if self.billing_floor else "",
+            f"ап. {self.billing_apartment}" if self.billing_apartment else "",
+            self.billing_postcode,
+        ]
+        return ", ".join(p for p in parts if p)
+
+    def shipping_full_address(self) -> str:
+        # Uses your existing shipping fields
+        parts = [self.city, self.address_line, self.postal_code, self.office_text]
+        return ", ".join(p for p in parts if p)
 
     def set_shipping_flat(self):
         """9.00 лв for delivery to address, else 7.00 лв. EUR auto-converted."""
