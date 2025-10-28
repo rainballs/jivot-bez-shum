@@ -19,14 +19,24 @@ import re
 
 
 def _split_street_num(line: str) -> tuple[str, str]:
+    """
+    Split 'ул. Обориште 70', 'ul Oborishte №70', 'бул. Витоша 12А', 'ул Пирин 5/7' -> ('ул. Обориште', '70'), etc.
+    """
     if not line:
         return "", ""
     s = str(line).strip()
-    m = re.search(r'\s+(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+
+    # Try explicit № first
+    m = re.search(r'(?:№\s*)(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+    if not m:
+        # Fallback: last numeric token at end
+        m = re.search(r'\s(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+
     if m:
         num = m.group(1)
-        street = s[:m.start(1)].strip(' ,')
-        return street, num
+        street = s[:m.start(1)].rstrip(' ,№')
+        return street.strip(), num.strip()
+
     return s, ""
 
 
@@ -132,12 +142,12 @@ def econt_collect(request):
 
 @require_http_methods(["GET"])
 def econt_collect_address(request):
-    """Card success or COD → show the ADDRESS form, and if card, mark paid."""
     order, err = _ensure_paid_from_stripe(request)
     if not order:
         messages.error(request, err or "Няма активна поръчка.")
         return redirect("checkout_info")
 
+    # Route to office page if needed
     if order.delivery_method == DeliveryMethod.TO_OFFICE:
         return redirect("econt_collect_office")
 
@@ -147,17 +157,18 @@ def econt_collect_address(request):
         "city": order.city or "",
         "receiver_street": "",
         "receiver_num": "",
-        "receiver_postcode": (order.postal_code or ""),
+        "receiver_postcode": order.postal_code or "",
     }
 
+    # If the checkbox was selected on info.html
     if getattr(order, "ship_same_as_billing", False):
-        prefill["full_name"] = _get_billing(order, "billing_full_name", prefill["full_name"])
-        prefill["phone"] = _get_billing(order, "billing_phone", prefill["phone"])
-        prefill["city"] = _get_billing(order, "billing_city", prefill["city"])
-        prefill["receiver_postcode"] = _get_billing(order, "billing_postcode", "")
+        prefill["full_name"] = order.billing_full_name or prefill["full_name"]
+        prefill["phone"] = order.billing_phone or prefill["phone"]
+        prefill["city"] = order.billing_city or prefill["city"]
+        prefill["receiver_postcode"] = order.billing_postcode or prefill["receiver_postcode"]
 
-        bill_line = _get_billing(order, "billing_address_line", "")
-        street, num = _split_street_num(bill_line)
+        # IMPORTANT: use the billing street line here
+        street, num = _split_street_num(order.billing_street or order.billing_address_line or "")
         prefill["receiver_street"] = street
         prefill["receiver_num"] = num
 
