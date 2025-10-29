@@ -179,10 +179,10 @@ h3 {
     color: var(--muted)
 }
 
-.hero-art {
-    justify-self: end;
-    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, .12))
-}
+/*.hero-art {*/
+/*    justify-self: end;*/
+/*    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, .12))*/
+/*}*/
 
 /* ========== SECTIONS ========== */
 .section {
@@ -702,10 +702,10 @@ h3 {
 }
 
 /* book art shadow stronger on light side */
-.hero.hero-split .hero-art {
-    justify-self: end;
-    filter: drop-shadow(0 20px 40px rgba(0, 0, 0, .25))
-}
+/*.hero.hero-split .hero-art {*/
+/*    justify-self: end;*/
+/*    filter: drop-shadow(0 20px 40px rgba(0, 0, 0, .25))*/
+/*}*/
 
 /* ============================
    ABOUT / FEATURES band (white)
