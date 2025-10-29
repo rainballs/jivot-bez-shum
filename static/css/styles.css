@@ -1101,19 +1101,41 @@ h3 {
     z-index: 2; /* ensure the blend sits above the image */
 }
 
-/* Right-edge fade (keep as-is; included for completeness) */
+/*!* Right-edge fade (keep as-is; included for completeness) *!*/
+/*.portrait-wrap.fade-right::before {*/
+/*    content: "";*/
+/*    position: absolute;*/
+/*    top: 0;*/
+/*    bottom: 0;*/
+/*    right: -28px;*/
+/*    width: 180px;*/
+/*    background: linear-gradient(*/
+/*            to right,*/
+/*            rgba(237, 237, 240, 0) 0%,*/
+/*            rgba(237, 237, 240, .85) 75%,*/
+/*            #ededf0 100%*/
+/*    );*/
+/*    pointer-events: none;*/
+/*    z-index: 2;*/
+/*}*/
+
 .portrait-wrap.fade-right::before {
     content: "";
     position: absolute;
     top: 0;
     bottom: 0;
-    right: -28px;
-    width: 180px;
+
+    /* put the gradient’s left edge where the image column ends */
+    left: 27.5%;
+
+    /* responsive width (min 200px, prefer ~20vw, max 320px) */
+    width: clamp(200px, 20vw, 320px);
+
     background: linear-gradient(
             to right,
             rgba(237, 237, 240, 0) 0%,
             rgba(237, 237, 240, .85) 75%,
-            #ededf0 100%
+            rgba(237, 237, 240, 1) 100%
     );
     pointer-events: none;
     z-index: 2;

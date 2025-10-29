@@ -141,6 +141,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # STRIPE TEST CREDENTIALS
 STRIPE_PUBLIC_KEY = env("STRIPE_PUBLIC_KEY", default="")
 STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+# STRIPE REAL CREDENTIALS
+STRIPE_PUBLIC_LIVE_KEY = env("STRIPE_PUBLIC_LIVE_KEY", default="")
+STRIPE_SECRET_LIVE_KEY = env("STRIPE_SECRET_LIVE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")

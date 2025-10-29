@@ -221,7 +221,7 @@ def checkout_payment(request):
 
             # Anything that's not COD goes to Stripe
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
-                if not settings.STRIPE_PUBLIC_KEY or not settings.STRIPE_SECRET_KEY:
+                if not settings.STRIPE_PUBLIC_LIVE_KEY or not settings.STRIPE_SECRET_LIVE_KEY:
                     messages.error(request, "Stripe не е конфигуриран (липсват STRIPE_PUBLIC_KEY / STRIPE_SECRET_KEY).")
                     return redirect("checkout_payment")
                 return redirect("stripe_create_session")
