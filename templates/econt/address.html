@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Доставка — Адрес{% endblock %}
+
 {% block content %}
     <section class="section">
         <div class="container">
@@ -13,65 +14,88 @@
                         </div>
                     {% endif %}
 
-                    <form method="post" action="{% url 'econt_submit' %}" class="form" novalidate>
-                        {% csrf_token %}
-                        <input type="hidden" name="to_office" value="0">
+                    {# When ship_same_as_billing was checked, lock all inputs #}
+                    {% with lock=order.ship_same_as_billing %}
+                        {% if lock %}
+                            <p class="small muted" style="margin:.25rem 0 1rem">
+                                Полетата по-долу са <strong>заключени</strong> – използват се данните за фактуриране от
+                                предишната стъпка.
+                            </p>
+                        {% endif %}
 
-                        <div class="field-grid">
-                            <label>Име и фамилия
-                                <input type="text" name="full_name"
-                                       value="{{ prefill.full_name|default:order.full_name }}"
-                                       required autocomplete="name">
-                            </label>
-                            <label>Телефон
-                                <input type="text" name="phone"
-                                       value="{{ prefill.phone|default:order.phone }}"
-                                       required autocomplete="tel">
-                            </label>
-                            <label>Град
-                                <input type="text" name="city"
-                                       value="{{ prefill.city|default:order.city }}"
-                                       required autocomplete="shipping address-level2">
-                            </label>
-                        </div>
+                        <form method="post" action="{% url 'econt_submit' %}" class="form" novalidate>
+                            {% csrf_token %}
+                            <input type="hidden" name="to_office" value="0">
 
-                        <div class="field-grid" style="margin-top:1rem">
-                            <label>Улица / булевард
-                                <input type="text" name="receiver_street"
-                                       value="{{ prefill.receiver_street|default_if_none:'' }}"
-                                       placeholder="напр. ул. Александър Велики" required>
-                            </label>
-                            <label>№
-                                <input type="text" name="receiver_num"
-                                       value="{{ prefill.receiver_num|default_if_none:'' }}"
-                                       placeholder="напр. 12" required inputmode="numeric"
-                                       pattern="[0-9A-Za-z\-\/]+">
-                            </label>
-                            <label>Пощ. код (по желание)
-                                <input type="text" name="receiver_postcode"
-                                       value="{{ prefill.receiver_postcode|default_if_none:'' }}"
-                                       placeholder="напр. 8000" inputmode="numeric" pattern="[0-9]+">
-                            </label>
-                        </div>
+                            <div class="field-grid">
+                                <label>Име и фамилия
+                                    <input type="text" name="full_name"
+                                           value="{{ prefill.full_name|default:order.full_name }}"
+                                           required autocomplete="name"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
 
-                        <div class="field-grid">
-                            <label>Вход (по желание)
-                                <input type="text" name="receiver_entrance" placeholder="напр. Б">
-                            </label>
-                            <label>Етаж (по желание)
-                                <input type="text" name="receiver_floor" placeholder="напр. 3">
-                            </label>
-                            <label>Апартамент (по желание)
-                                <input type="text" name="receiver_apartment" placeholder="напр. 8">
-                            </label>
-                        </div>
+                                <label>Телефон
+                                    <input type="text" name="phone"
+                                           value="{{ prefill.phone|default:order.phone }}"
+                                           required autocomplete="tel"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
 
-                        <p class="small muted">Попълнете поне „Улица“ и „№“. Останалото е по желание.</p>
+                                <label>Град
+                                    <input type="text" name="city"
+                                           value="{{ prefill.city|default:order.city }}"
+                                           required autocomplete="shipping address-level2"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+                            </div>
 
-                        <div class="actions mt">
-                            <button type="submit" class="btn btn-primary">Създай товарителница</button>
-                        </div>
-                    </form>
+                            <div class="field-grid" style="margin-top:1rem">
+                                <label>Улица / булевард
+                                    <input type="text" name="receiver_street"
+                                           value="{{ prefill.receiver_street|default_if_none:'' }}"
+                                           placeholder="напр. ул. Александър Велики" required
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+
+                                <label>№
+                                    <input type="text" name="receiver_num"
+                                           value="{{ prefill.receiver_num|default_if_none:'' }}"
+                                           placeholder="напр. 12" required inputmode="numeric"
+                                           pattern="[0-9A-Za-z\-\/]+"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+
+                                <label>Пощ. код (по желание)
+                                    <input type="text" name="receiver_postcode"
+                                           value="{{ prefill.receiver_postcode|default_if_none:'' }}"
+                                           placeholder="напр. 8000" inputmode="numeric" pattern="[0-9]+"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+                            </div>
+
+                            <div class="field-grid">
+                                <label>Вход (по желание)
+                                    <input type="text" name="receiver_entrance" placeholder="напр. Б"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+                                <label>Етаж (по желание)
+                                    <input type="text" name="receiver_floor" placeholder="напр. 3"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+                                <label>Апартамент (по желание)
+                                    <input type="text" name="receiver_apartment" placeholder="напр. 8"
+                                           {% if lock %}readonly aria-readonly="true" class="ro"{% endif %}>
+                                </label>
+                            </div>
+
+                            <p class="small muted">Попълнете поне „Улица“ и „№“. Останалото е по желание.</p>
+
+                            <div class="actions mt">
+                                <button type="submit" class="btn btn-primary">Създай товарителница</button>
+                            </div>
+                        </form>
+                    {% endwith %}
                 </div>
 
                 <aside class="checkout-aside">
@@ -91,23 +115,23 @@
     <style>
         .form label {
             display: block;
-            margin: .5rem 0
+            margin: .5rem 0;
         }
 
         .field-grid {
             display: grid;
             grid-template-columns:1fr 1fr 1fr;
-            gap: 1rem
+            gap: 1rem;
         }
 
         .card.soft {
             background: #f6f6f7;
             border-radius: 16px;
-            padding: 1rem
+            padding: 1rem;
         }
 
         .mt {
-            margin-top: 1rem
+            margin-top: 1rem;
         }
 
         @media (max-width: 800px) {
@@ -115,22 +139,13 @@
                 grid-template-columns:1fr
             }
         }
-    </style>
 
-    {% if billing_data %}
-        <script>
-            document.addEventListener("DOMContentLoaded", () => {
-                const data = document.getElementById("billing-prefill")?.dataset;
-                const btn = document.getElementById("copy_billing");
-                if (!data || !btn) return;
-                btn.addEventListener("click", () => {
-                    if (data.name) document.querySelector('input[name="full_name"]').value = data.name;
-                    if (data.phone) document.querySelector('input[name="phone"]').value = data.phone;
-                    if (data.city) document.querySelector('input[name="city"]').value = data.city;
-                    if (data.street) document.querySelector('#street').value = data.street;
-                    if (data.postcode) document.querySelector('#postcode').value = data.postcode;
-                });
-            });
-        </script>
-    {% endif %}
+        /* subtle readonly look */
+        input.ro[readonly] {
+            background: #f4f6fb;
+            color: #444;
+            opacity: 0.85;
+            cursor: not-allowed;
+        }
+    </style>
 {% endblock %}
