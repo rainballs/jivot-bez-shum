@@ -74,7 +74,7 @@
                         </div>
                     </div>
 
-                    <!-- Only the delivery CHOICE (no delivery address/office inputs here) -->
+                    <!-- Only the delivery CHOICE -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="radio-row">
                             <label class="radio">
@@ -168,7 +168,6 @@
             margin: .25rem 0;
         }
 
-        /* nice checkbox */
         .checkbox {
             display: inline-flex;
             align-items: center;
@@ -183,7 +182,7 @@
     </style>
 
     <script>
-        // totals + shipping preview
+        // total with shipping preview
         document.addEventListener("DOMContentLoaded", function () {
             const qtyInput = document.querySelector('input[name="quantity"]');
             const outBGN = document.querySelector("[data-total-bgn]");
@@ -228,7 +227,7 @@
             recalc();
         });
 
-        // keep UX sane: if user picks "office", uncheck "same as billing"
+        // UX: Office/APS should not auto-copy billing to shipping
         document.addEventListener('DOMContentLoaded', () => {
             const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
             const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');

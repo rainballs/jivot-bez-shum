@@ -121,7 +121,7 @@ def checkout_info(request):
                 order.ship_same_as_billing = False
             else:
                 order.ship_same_as_billing = bool(request.POST.get("ship_same_as_billing"))
-                
+
             # Payment method (separate form)
             order.payment_method = pay_form.cleaned_data["payment_method"]
 
@@ -167,6 +167,30 @@ def checkout_info(request):
                 return redirect("econt_collect_office")
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
+        # inside your checkout_info POST branch, after info_form.is_valid() and pay_form.is_valid()
+        order = info_form.save(commit=False)
+
+        # delivery method radio (address/office) from the template
+        dm = request.POST.get("delivery_method", "address")
+        from .models import DeliveryMethod
+        order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+
+        # chosen payment method
+        order.payment_method = pay_form.cleaned_data["payment_method"]
+
+        # mirror billing → shipping if user wants same address
+        if order.ship_same_as_billing:
+            order.full_name = order.billing_full_name or order.full_name
+            order.email = order.billing_email or order.email
+            order.phone = order.billing_phone or order.phone
+            order.city = order.billing_city or order.city
+            order.postal_code = order.billing_postcode or order.postal_code
+            # keep only the street in address_line; the house number is asked on the next page
+            order.address_line = order.billing_street or order.address_line
+
+        order.quantity = info_form.cleaned_data["quantity"]
+        order.paid = False
+        order.save()
     else:
         # Reasonable defaults
         info_form = CheckoutInfoForm(initial={

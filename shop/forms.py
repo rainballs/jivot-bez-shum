@@ -1,6 +1,7 @@
+# shop/forms.py
 from django import forms
 from django.core.validators import RegexValidator
-from .models import Order, DeliveryMethod, Courier, PaymentMethod
+from .models import Order, PaymentMethod
 
 phone_validator = RegexValidator(
     regex=r"^\+?\d[\d\s\-]{6,}$",
@@ -18,63 +19,62 @@ class CheckoutInfoForm(forms.ModelForm):
     quantity = forms.IntegerField(
         min_value=1,
         initial=1,
-        widget=forms.NumberInput(attrs={"class": "qty-input", "inputmode": "numeric"})
+        widget=forms.NumberInput(attrs={"class": "qty-input", "inputmode": "numeric"}),
+        label="",
     )
 
-    # NEW — billing (invoice) section + toggle
+    # Billing (invoice) section + toggle (names match your Order fields)
     billing_full_name = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "Име и фамилия (за фактура)"}),
-        label="Име и фамилия (фактура)"
+        label="Име и фамилия (фактура)",
     )
     billing_email = forms.EmailField(
         required=False,
         widget=forms.EmailInput(attrs={"placeholder": "name@example.com"}),
-        label="Имейл (фактура)"
+        label="Имейл (фактура)",
     )
     billing_phone = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "+359 ..."}),
-        label="Телефон (фактура)"
+        label="Телефон (фактура)",
     )
     billing_city = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "Град (фактура)"}),
-        label="Град (фактура)"
+        label="Град (фактура)",
     )
     billing_street = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "ул. / бул., №, вх., ет., ап. (фактура)"}),
-        label="Адрес (фактура)"
+        label="Адрес (фактура)",
     )
     billing_postcode = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"placeholder": "Пощ. код (фактура)"}),
-        label="Пощ. код (фактура)"
+        label="Пощ. код (фактура)",
     )
     ship_same_as_billing = forms.BooleanField(
         required=False,
         initial=True,
-        label="Използвай същия адрес за доставка"
+        label="Използвай същия адрес за доставка",
     )
 
     class Meta:
         model = Order
-        # ⚠️ Minimal change: keep your original public contact fields + quantity.
-        # Delivery/office details are still handled on the next step (address/office pages).
-        fields = ["full_name", "email", "phone", "quantity",
-                  # Include the new billing + toggle in the form binding
-                  "billing_full_name", "billing_email", "billing_phone",
-                  "billing_city", "billing_street", "billing_postcode",
-                  "ship_same_as_billing",
-                  ]
+        # Public contact + qty + billing (delivery fields collected on next step)
+        fields = [
+            "full_name", "email", "phone", "quantity",
+            "billing_full_name", "billing_email", "billing_phone",
+            "billing_city", "billing_street", "billing_postcode",
+            "ship_same_as_billing",
+        ]
         widgets = {
             "full_name": forms.TextInput(attrs={"placeholder": "Име и фамилия"}),
             "email": forms.EmailInput(attrs={"placeholder": "name@example.com"}),
             "phone": forms.TextInput(attrs={"placeholder": "+359 ..."}),
 
-            # You can keep these widget specs if you still use them elsewhere in templates,
-            # but note they are NOT in `fields` (delivery details are collected later):
+            # Kept for compatibility where referenced in templates; NOT in fields above:
             "delivery_method": forms.Select(attrs={"class": "select"}),
             "courier": forms.Select(attrs={"class": "select"}),
             "address_line": forms.TextInput(attrs={"placeholder": "ул. / бул., №, вх., ет., ап."}),
@@ -83,55 +83,36 @@ class CheckoutInfoForm(forms.ModelForm):
             "office_text": forms.TextInput(attrs={"placeholder": "Офис/АПС код или адрес"}),
         }
 
-    # --- Validators you already had, kept safe/minimal ---
-
+    # --- Validators you had, kept the same ---
     def clean_phone(self):
         v = self.cleaned_data.get("phone", "")
-        # keep your existing validator
         phone_validator(v)
         return v
 
     def clean(self):
         """
-        Minimal changes:
-        - DO NOT force delivery address validation here anymore (it happens on the next step).
-        - If user ticks 'ship_same_as_billing', ensure billing basics are present.
+        We don't validate the delivery address here (done on the Econt pages).
+        If 'same as billing' is ticked, require the essential billing bits.
         """
         cleaned = super().clean()
 
-        # Only validate billing fields if the toggle is True (or if you want them always required, flip logic)
         if cleaned.get("ship_same_as_billing"):
-            bf = cleaned.get("billing_full_name")
-            be = cleaned.get("billing_email")
-            bc = cleaned.get("billing_city")
-            bs = cleaned.get("billing_street")
-            # keep it light: require the essential bits for an invoice
             missing = []
-            if not bf: missing.append("Име и фамилия (фактура)")
-            if not be: missing.append("Имейл (фактура)")
-            if not bc: missing.append("Град (фактура)")
-            if not bs: missing.append("Адрес (фактура)")
+            if not cleaned.get("billing_full_name"):  missing.append("Име и фамилия (фактура)")
+            if not cleaned.get("billing_email"):      missing.append("Имейл (фактура)")
+            if not cleaned.get("billing_city"):       missing.append("Град (фактура)")
+            if not cleaned.get("billing_street"):     missing.append("Адрес (фактура)")
             if missing:
                 raise forms.ValidationError("Моля, попълнете: " + ", ".join(missing))
 
-        # If you still want to keep postal code format validation for billing:
         bp = cleaned.get("billing_postcode") or ""
         if bp:
             try:
                 postcode_validator(bp)
             except Exception:
-                # soften failure: turn it into a form error instead of raising
                 self.add_error("billing_postcode", "Невалиден пощенски код.")
 
-        # ❗️Old delivery-step validation removed:
-        # - We no longer enforce delivery_method/address_line/city/postal_code/office_text here,
-        #   because those are collected and validated on econt address/office pages.
-
         return cleaned
-
-
-from django import forms
-from .models import Order, PaymentMethod
 
 
 class PaymentMethodForm(forms.ModelForm):
@@ -147,9 +128,7 @@ class PaymentMethodForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         f = self.fields["payment_method"]
         f.required = True
-        # Robustly remove any empty ("") choice even if model has blank=True
         f.choices = [(v, l) for (v, l) in f.choices if v]  # drop the empty one
-        # Optional: if you want to show only Card + COD:
         f.choices = [
             (PaymentMethod.CARD, "Плащане с карта"),
             (PaymentMethod.COD, "Наложен платеж"),
