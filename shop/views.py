@@ -21,7 +21,7 @@ from .forms import CheckoutInfoForm, PaymentMethodForm
 from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
 
 # Configure Stripe once (safe even if keys are empty; we check before use)
-stripe.api_key = settings.STRIPE_SECRET_KEY
+stripe.api_key = settings.STRIPE_SECRET_LIVE_KEY
 
 
 # ---------- Helpers ----------

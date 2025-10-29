@@ -92,7 +92,7 @@ def econt_collect(request):
         sess = stripe.checkout.Session.retrieve(
             session_id,
             expand=["payment_intent", "line_items"],
-            api_key=settings.STRIPE_SECRET_KEY,
+            api_key=settings.STRIPE_SECRET_LIVE_KEY,
         )
         logger.info(
             "✅ Stripe success: session=%s status=%s payment_status=%s",
@@ -319,7 +319,7 @@ def _ensure_paid_from_stripe(request):
         sess = stripe.checkout.Session.retrieve(
             session_id,
             expand=["payment_intent"],
-            api_key=settings.STRIPE_SECRET_KEY,
+            api_key=settings.STRIPE_SECRET_LIVE_KEY,
         )
     except Exception as e:
         return None, f"Грешка при потвърждение на плащане: {e}"
