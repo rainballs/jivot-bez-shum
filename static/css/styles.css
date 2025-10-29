@@ -1432,11 +1432,11 @@ h3 {
 .cta-book-floating {
     position: absolute;
     left: 50%;
-    top: -220px; /* how far the book floats up */
-    transform: translateX(-70%);
+    top: -120px; /* how far the book floats up */
+    transform: translateX(-30%);
     pointer-events: none; /* clicks go through */
     z-index: 1;
-    scale: 0.8;
+    scale: 2;
 }
 
 .cta-book-img {
