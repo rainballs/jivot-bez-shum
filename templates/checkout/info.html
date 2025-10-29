@@ -15,43 +15,38 @@
                     {% if messages %}
                         <div class="alerts">
                             {% for m in messages %}
-                                <div class="alert">{{ m }}</div>{% endfor %}
+                                <div class="alert">{{ m }}</div>
+                            {% endfor %}
                         </div>
                     {% endif %}
 
+                    <!-- We render your original contact fields, but visually hide them.
+                         JS will keep them in sync with the visible billing fields. -->
+                    <div class="sr-only">
+                        <label>Име и фамилия {{ form.full_name }}</label>
+                        <label>Имейл {{ form.email }}</label>
+                        <label>Телефон {{ form.phone }}</label>
+                    </div>
+
                     <h3 style="margin-top:.25rem">Адрес за фактуриране</h3>
 
+                    <!-- Visible, unified trio (these drive the hidden form fields) -->
                     <div class="field-grid">
-                        <label>Име и фамилия {{ form.full_name }}</label>
-                        {% for e in form.full_name.errors %}
+                        <label>Име и фамилия (фактура) {{ form.billing_full_name }}</label>
+                        {% for e in form.billing_full_name.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
 
-                        <label>Имейл {{ form.email }}</label>
-                        {% for e in form.email.errors %}
+                        <label>Имейл (фактура) {{ form.billing_email }}</label>
+                        {% for e in form.billing_email.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
 
-                        <label>Телефон {{ form.phone }}</label>
-                        {% for e in form.phone.errors %}
+                        <label>Телефон (фактура) {{ form.billing_phone }}</label>
+                        {% for e in form.billing_phone.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
                     </div>
 
-                    <!-- Billing details block -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="field-grid">
-                            <label>Име и фамилия или Фирма (фактура) {{ form.billing_full_name }}</label>
-                            {% for e in form.billing_full_name.errors %}
-                                <div class="error">{{ e }}</div>{% endfor %}
-
-                            <label>Имейл (фактура) {{ form.billing_email }}</label>
-                            {% for e in form.billing_email.errors %}
-                                <div class="error">{{ e }}</div>{% endfor %}
-
-                            <label>Телефон (фактура) {{ form.billing_phone }}</label>
-                            {% for e in form.billing_phone.errors %}
-                                <div class="error">{{ e }}</div>{% endfor %}
-                        </div>
-
-                        <div class="field-grid" style="margin-top:1rem">
                             <label>Град (фактура) {{ form.billing_city }}</label>
                             {% for e in form.billing_city.errors %}
                                 <div class="error">{{ e }}</div>{% endfor %}
@@ -65,7 +60,8 @@
                                 <div class="error">{{ e }}</div>{% endfor %}
                         </div>
 
-                        <div style="margin-top:.75rem">
+                        <!-- SAME-AS DELIVERY (wrapper gets hidden/disabled for office) -->
+                        <div id="same_box_wrap" style="margin-top:.75rem">
                             <label class="checkbox">
                                 {{ form.ship_same_as_billing }} <span>Използвай същия адрес за доставка</span>
                             </label>
@@ -74,7 +70,7 @@
                         </div>
                     </div>
 
-                    <!-- Only the delivery CHOICE -->
+                    <!-- Delivery choice only (details on next step) -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="radio-row">
                             <label class="radio">
@@ -95,11 +91,9 @@
 
                     {% if form.non_field_errors %}
                         <div class="error">{{ form.non_field_errors }}</div>{% endif %}
-                    {% if pay_form.errors %}
-                        <div class="error">Проблем с избора на плащане.</div>{% endif %}
                 </div>
 
-                <!-- RIGHT: summary, quantity, payment and submit -->
+                <!-- RIGHT: summary -->
                 <aside class="checkout-summary">
                     <div class="card summary-card">
                         <div class="summary-head">Резюме</div>
@@ -168,6 +162,16 @@
             margin: .25rem 0;
         }
 
+        /* visually-hidden but present for form submit & JS sync */
+        .sr-only {
+            position: absolute !important;
+            left: -10000px !important;
+            top: auto !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
+
         .checkbox {
             display: inline-flex;
             align-items: center;
@@ -182,7 +186,7 @@
     </style>
 
     <script>
-        // total with shipping preview
+        // --- Shipping preview (unchanged) ---
         document.addEventListener("DOMContentLoaded", function () {
             const qtyInput = document.querySelector('input[name="quantity"]');
             const outBGN = document.querySelector("[data-total-bgn]");
@@ -227,18 +231,51 @@
             recalc();
         });
 
-        // UX: Office/APS should not auto-copy billing to shipping
+        // --- Unify: visible billing trio -> hidden original fields (live sync) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const visName = document.querySelector('input[name="billing_full_name"]');
+            const visEmail = document.querySelector('input[name="billing_email"]');
+            const visPhone = document.querySelector('input[name="billing_phone"]');
+
+            const hidName = document.querySelector('input[name="full_name"]');
+            const hidEmail = document.querySelector('input[name="email"]');
+            const hidPhone = document.querySelector('input[name="phone"]');
+
+            function sync() {
+                if (hidName && visName) hidName.value = visName.value;
+                if (hidEmail && visEmail) hidEmail.value = visEmail.value;
+                if (hidPhone && visPhone) hidPhone.value = visPhone.value;
+            }
+
+            [visName, visEmail, visPhone].forEach(el => el && el.addEventListener('input', sync));
+            sync(); // initial
+        });
+
+        // --- Hide/disable "same address" when 'office' is selected ---
         document.addEventListener('DOMContentLoaded', () => {
             const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
             const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
+            const sameWrap = document.getElementById('same_box_wrap');
             const sameBox = document.querySelector('input[name="ship_same_as_billing"]');
 
-            function syncBox() {
-                if (rbOffice && rbOffice.checked && sameBox) sameBox.checked = false;
+            function applyState() {
+                const office = rbOffice && rbOffice.checked;
+                if (office) {
+                    if (sameWrap) sameWrap.style.display = 'none';
+                    if (sameBox) {
+                        sameBox.checked = false;
+                        sameBox.disabled = true;
+                    }
+                } else {
+                    if (sameWrap) sameWrap.style.display = '';
+                    if (sameBox) {
+                        sameBox.disabled = false; /* default remains whatever user chose */
+                    }
+                }
             }
 
-            [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', syncBox));
-            syncBox();
+            [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', applyState));
+            applyState();
         });
     </script>
 {% endblock %}
