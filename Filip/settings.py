@@ -161,9 +161,9 @@ ORDER_NOTIFY_EMAIL = env("ORDER_NOTIFY_EMAIL", default="admin@example.com")
 SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
 
 ECONT = {
-    "BASE_URL": os.getenv("ECONT_BASE_URL", "https://demo.econt.com/ee/services"),
-    "USER": os.getenv("ECONT_USERNAME", ""),
-    "PASS": os.getenv("ECONT_PASSWORD", ""),
+    "BASE_URL": os.getenv("ECONT_LIVE_BASE_URL", "https://demo.econt.com/ee/services"),
+    "USER": os.getenv("ECONT_LIVE_USERNAME", ""),
+    "PASS": os.getenv("ECONT_LIVE_PASSWORD", ""),
     "DEFAULTS": {
         "sender_name": os.getenv("ECONT_SENDER_NAME", ""),
         "sender_phone": os.getenv("ECONT_SENDER_PHONE", ""),
