@@ -274,13 +274,15 @@ def build_create_label_json(
     # NOTE: don't reference Order class here — use the parameters you pass in.
     # keep declared_value_bgn as-is
 
+    payer = (payer or "receiver").upper()
+
     payload = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": (payer or "receiver").upper(),  # "RECEIVER" / "SENDER"
+        "payer": payer,  # "RECEIVER" / "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
