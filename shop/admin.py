@@ -26,7 +26,6 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ("paid", "delivery_method", "created_at")
     search_fields = ("full_name", "email", "phone", "city", "office_text", "econt_shipment_num")
 
-    # IMPORTANT: put computed helpers ONLY here
     readonly_fields = (
         "delivery_preview",
         "econt_shipment_num",
@@ -40,24 +39,36 @@ class OrderAdmin(admin.ModelAdmin):
         ("Клиент", {
             "fields": ("full_name", "email", "phone", "paid", "payment_method")
         }),
+        # Billing: leave ONLY billing-specific fields here
         ("Фактуриране", {
             "fields": (
-                "billing_full_name", "billing_email", "billing_phone",
-                "city", "address_line", "postal_code",
+                "billing_full_name",
+                "billing_email",
+                "billing_phone",
                 "ship_same_as_billing",
             )
         }),
+        # Shipping / Econt: put the unified address here
         ("Доставка (реални полета за Еконт)", {
             "fields": (
-                "city", "postal_code", "address_line", "office_text",
-                "econt_office_code", "econt_shipment_num",
-                "econt_status", "econt_errors", "econt_label_pdf",
-                "delivery_preview",  # <- allowed here *because* it's in readonly_fields
+                "city",
+                "postal_code",
+                "address_line",
+                "office_text",
+                "econt_office_code",
+                "econt_shipment_num",
+                "econt_status",
+                "econt_errors",
+                "econt_label_pdf",
+                "delivery_preview",
             )
         }),
         ("Суми", {
-            "fields": ("quantity", "subtotal_bgn", "shipping_bgn", "total_bgn",
-                       "subtotal_eur", "shipping_eur", "total_eur")
+            "fields": (
+                "quantity",
+                "subtotal_bgn", "shipping_bgn", "total_bgn",
+                "subtotal_eur", "shipping_eur", "total_eur",
+            )
         }),
         ("Технически", {
             "fields": ("delivery_method", "courier", "created_at")
@@ -65,10 +76,6 @@ class OrderAdmin(admin.ModelAdmin):
     )
 
     def delivery_preview(self, obj):
-        """
-        Nice one-line preview in admin.
-        Shows either Address or Office depending on delivery_method.
-        """
         if obj.delivery_method == obj.DeliveryMethod.TO_OFFICE:
             return f"Офис/АПС: {obj.office_text or obj.econt_office_code or '—'}"
         city = obj.city or "—"
