@@ -8,17 +8,20 @@ import json
 import requests
 from django.conf import settings
 from .econt_client import EcontClient, EcontError, build_create_label_json
+from .models import PaymentMethod
 
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
     """
     Creates an Econt label (JSON API) using settings.ECONT.
-    Returns: { ok, shipment_num, saved_pdf, error }
+    Business rules:
+    - if order.paid == True -> COD 0.00, courier paid by SENDER
+    - if order.paid == False or payment_method == COD -> COD = order.total_bgn, courier paid by RECEIVER
     """
     overrides = overrides or {}
     d = settings.ECONT["DEFAULTS"]
 
-    # Receiver data
+    # --------- 1) Receiver data ---------
     receiver_name = (
             getattr(order, "full_name", "") or
             f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
@@ -26,10 +29,10 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     receiver_phone = getattr(order, "phone", "")
     receiver_city = getattr(order, "city", "")
 
-    # Office vs address
+    # office vs address
     receiver_office_code = getattr(order, "econt_office_code", "") or overrides.get("receiver_office_code")
 
-    # Structured address (to door)
+    # structured address
     r_street = overrides.get("receiver_street")
     r_num = overrides.get("receiver_num")
     r_postcode = overrides.get("receiver_postcode")
@@ -37,12 +40,30 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
-    # Shipping economics
-    cod_bgn = 0.0 if getattr(order, "paid", False) else float(getattr(order, "total_bgn", 0.0) or 0.0)
-    declared_bgn = float(getattr(order, "total_bgn", 0.0) or 0.0)
-    weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
-    payer = "receiver" if cod_bgn == 0 else "sender"
+    # --------- 2) Payment / COD rules ---------
+    total_bgn = float(getattr(order, "total_bgn", 0.0) or 0.0)
 
+    # decide paid / not paid
+    is_paid = bool(getattr(order, "paid", False))
+    pm = getattr(order, "payment_method", None)
+    is_cod_payment = (pm == PaymentMethod.COD)
+
+    if is_paid and not is_cod_payment:
+        # card/stripe/etc already paid
+        cod_bgn = 0.0
+        payer = "sender"  # merchant pays courier
+    else:
+        # cash on delivery OR order not yet paid
+        cod_bgn = total_bgn
+        payer = "receiver"  # receiver pays courier on delivery
+
+    # declared value = value of the shipment, usually the order total
+    declared_bgn = total_bgn
+
+    # fallback weight
+    weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
+
+    # --------- 3) Build payload ---------
     payload = build_create_label_json(
         sender_name=d["sender_name"],
         sender_phone=d["sender_phone"],
@@ -64,9 +85,9 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
 
         weight_kg=weight_kg,
         parcels=1,
-        cod_bgn=cod_bgn,
+        cod_bgn=cod_bgn,  # <-- our rule above
         declared_value_bgn=declared_bgn,
-        payer=payer,
+        payer=payer,  # <-- our rule above
         label_format=d.get("label_format", "10x9"),
     )
 
@@ -84,7 +105,6 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "shipment_num": None, "saved_pdf": False, "error": err}
 
-    # Success fields (shipment number + optional base64 PDF)
     shipment_num = res.get("shipmentNumber") or res.get("num") or res.get("shipment_num")
     pdf_bytes = None
     if "pdfBase64" in res:
@@ -128,10 +148,12 @@ def _nomenclatures_url(method: str) -> str:
         base += "/"
     return f"{base}NomenclaturesService.{method}.json"
 
+
 def _auth():
     user = getattr(settings, "ECONT_USERNAME", None)
-    pwd  = getattr(settings, "ECONT_PASSWORD", None)
+    pwd = getattr(settings, "ECONT_PASSWORD", None)
     return (user, pwd) if user and pwd else None
+
 
 def _post_json(url: str, payload: dict) -> dict:
     body = json.dumps(payload, ensure_ascii=False)
@@ -144,6 +166,7 @@ def _post_json(url: str, payload: dict) -> dict:
     )
     r.raise_for_status()
     return r.json()
+
 
 def get_cities(country_code: str = "BGR", name_query: str = "") -> list[dict]:
     """
@@ -169,6 +192,7 @@ def get_cities(country_code: str = "BGR", name_query: str = "") -> list[dict]:
             "postCode": c.get("postCode"),
         })
     return cities
+
 
 def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> list[dict]:
     """
@@ -198,4 +222,3 @@ def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> list[dict
             "address": pretty,
         })
     return offices
-
