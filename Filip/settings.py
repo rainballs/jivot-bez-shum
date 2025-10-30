@@ -146,16 +146,14 @@ STRIPE_PUBLIC_LIVE_KEY = env("STRIPE_PUBLIC_LIVE_KEY", default="")
 STRIPE_SECRET_LIVE_KEY = env("STRIPE_SECRET_LIVE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
-EMAIL_HOST = env("EMAIL_HOST", default="")
-EMAIL_PORT = env.int("EMAIL_PORT", default=587)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Clonify <no-reply@localhost>")
-
-# Who should receive the admin/order notifications?
-ORDER_NOTIFY_EMAIL = env("ORDER_NOTIFY_EMAIL", default="admin@example.com")
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+ORDER_NOTIFY_EMAIL = os.environ.get("ORDER_NOTIFY_EMAIL", EMAIL_HOST_USER)
 
 # For links inside emails (e.g., admin link)
 SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
