@@ -335,8 +335,13 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    if cod_bgn and float(cod_bgn) > 0:
-        payload["cdAmount"] = float(cod_bgn)
+    # COD only if > 0
+    cod_bgn = float(cod_bgn or 0.0)
+    if cod_bgn > 0:
+        payload["cdAmount"] = cod_bgn
+        payload["cdCurrency"] = "BGN"  # <-- add this
+        # optional, but good for clarity
+        payload["cdType"] = "get"  # <- collect on delivery
 
     return payload
 
