@@ -17,6 +17,7 @@
 
 .p25 {
     font-size: 25px;
+    line-height: 34px;
 }
 
 html, body {
@@ -91,7 +92,7 @@ a {
 .btn {
     display: inline-block;
     border: 1px solid var(--ink);
-    padding: 10px 18px;
+    padding: 10px 24px;
     border-radius: 999px;
     transition: .15s;
     background: #fff
@@ -119,7 +120,7 @@ a {
 h1, h2, h3 {
     font-family: "Playfair Display";
     color: var(--ink);
-    margin: 0 0 10px
+    margin: 0 0 0px
 }
 
 h1 {
@@ -128,7 +129,8 @@ h1 {
 }
 
 h2 {
-    font-size: 54px
+    font-size: 54px;
+    font-weight: 800;
 }
 
 h3 {
@@ -641,7 +643,7 @@ h3 {
     content: "";
     position: absolute;
     inset: 0;
-    width: 58vw; /* covers left half on desktop */
+    width: 50vw; /* covers left half on desktop */
     background: #0d0d0f; /* deep black */
     transform: none;
     z-index: 0;
@@ -653,7 +655,7 @@ h3 {
     position: absolute;
     left: -6vw;
     right: -6vw;
-    bottom: -60px;
+    bottom: -100px;
     height: 160px;
     background: #fff;
     transform: skewY(-3.5deg);
@@ -698,7 +700,7 @@ h3 {
     background: var(--red);
     border-color: var(--red);
     color: #fff;
-    margin-top: 5vw;
+    margin: 3vw 0;
 }
 
 /* book art shadow stronger on light side */
@@ -905,7 +907,7 @@ h3 {
 
 /* When author follows the quote slab, remove its own top diagonal */
 .section.author-split.is-attached {
-    padding-top: 56px
+    padding-top: 0
 }
 
 .section.author-split.is-attached::before {
@@ -926,6 +928,7 @@ h3 {
 .section.author-split .two-col {
     grid-template-columns: .95fr 1.05fr;
     align-items: center;
+    height: 1000px;
 }
 
 /* Responsive polish so the diagonals remain clean */
@@ -1043,7 +1046,7 @@ h3 {
     /*max-width: 620px; !* adjust to your taste *!*/
     max-width: 100%;
     width: 100%;
-    filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .15));
+    filter: none
 }
 
 /* Responsive: ease bleed on narrow screens so it doesn’t feel cramped */
@@ -1958,14 +1961,14 @@ input.is-invalid, select.is-invalid {
 
 .section-toc .feature {
     text-align: center;
-    padding: 0 12px;
+    padding: 0 0;
 }
 
 .section-toc .feature-icon {
     display: block;
-    margin: 0 auto 12px;
-    width: 40px;
-    height: 40px;
+    margin: 24px auto 12px;
+    width: 50px;
+    height: 50px;
 }
 
 .section-toc .feature h3 {
@@ -1980,6 +1983,7 @@ input.is-invalid, select.is-invalid {
     margin: 0;
     color: #2F3747;
     line-height: 1.6;
+    font-family: 'Nunito';
 }
 
 @media (max-width: 900px) {
@@ -2135,14 +2139,14 @@ input.is-invalid, select.is-invalid {
     font-weight: 800;
     line-height: 1.05;
     /*font-size: clamp(44px, 6vw, 78px);*/
-    font-size: 88px;
+    font-size: 86px;
     letter-spacing: 0.5px;
     margin: 0 0 18px;
 }
 
 .hero-lead {
     /*font-size: clamp(18px, 2.1vw, 22px);*/
-    font-size: 25px;
+    font-size: 23px;
     line-height: 1.55;
     margin: 0;
 }
