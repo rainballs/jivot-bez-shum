@@ -43,7 +43,7 @@ class OrderAdmin(admin.ModelAdmin):
         ("Фактуриране", {
             "fields": (
                 "billing_full_name", "billing_email", "billing_phone",
-                "billing_city", "billing_address_line", "billing_postal_code",
+                "city", "address_line", "postal_code",
                 "ship_same_as_billing",
             )
         }),
