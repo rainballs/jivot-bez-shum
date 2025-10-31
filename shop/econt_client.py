@@ -22,20 +22,9 @@ class EcontError(RuntimeError):
 
 
 def _next_workday(d: date) -> date:
-    """
-    Next working day (Mon–Fri).
-    Fri -> Mon
-    Sat -> Mon
-    Sun -> Mon
-    other -> +1 day
-    """
-    wd = d.weekday()  # Mon=0 ... Sun=6
-    if wd == 4:  # Friday
-        return d + timedelta(days=3)
-    if wd == 5:  # Saturday
-        return d + timedelta(days=2)
-    if wd == 6:  # Sunday
-        return d + timedelta(days=1)
+    wd = d.weekday()
+    if wd >= 4:  # Fri–Sun → Monday
+        return d + timedelta(days=7 - wd)
     return d + timedelta(days=1)
 
 
@@ -280,26 +269,23 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    """
-    JSON for ee.econt LabelService.createLabel.json
-    - TO OFFICE → simple date
-    - TO DOOR   → date + interval + alt string date
-    - COD       → top-level + services + (optional) agreement
-    """
+    # If you really want declared value only when not paid:
+    # (remove if you prefer to always send declared value)
+    # NOTE: don't reference Order class here — use the parameters you pass in.
+    # keep declared_value_bgn as-is
+
     payer = (payer or "receiver").upper()
 
-    # ---- 1) base ----
-    payload: dict = {
+    payload = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,
+        "payer": payer,  # "RECEIVER" / "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
-        # sender
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
         "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
@@ -310,7 +296,6 @@ def build_create_label_json(
             }
         },
 
-        # receiver – city
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
         "receiverAddress": {
             "city": {
@@ -319,38 +304,23 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
-
-        # Econt extras go here
-        "services": {},
     }
 
-    # ---- 2) sender: office or address ----
+    # Sender: office OR address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # ---- 3) delivery date(s) ----
-    real_delivery_day = _next_workday(date.today())
-    iso_day = real_delivery_day.strftime("%Y-%m-%d")  # 2025-11-03
-    bg_day = real_delivery_day.strftime("%d.%m.%Y")  # 03.11.2025
+    # Compute a proper string date once
+    delivery_day = _next_workday(date.today()).isoformat()
+    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # some installs look ONLY at this:
-    payload["deliveryDate"] = iso_day
-
-    # ---- 4) route ----
+    # Route: office vs door
     if receiver_office_code:
-        # ----------------- TO OFFICE -----------------
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
-
-        # office usually OK with just ISO date
-        payload["delivery"] = {
-            "date": iso_day
-        }
-
     else:
-        # ----------------- TO DOOR -----------------
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
         ra["street"] = receiver_street or ""
@@ -365,33 +335,13 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-        # THIS is what was giving 517 → some servers want BOTH ISO and human date
-        payload["delivery"] = {
-            "date": iso_day,  # machine
-            "dateStr": bg_day,  # sometimes required
-            "timeIntervalId": 1,  # pick a real interval
-        }
-
-    # ---- 5) COD ----
+    # COD only if > 0
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        # top-level
         payload["cdAmount"] = cod_bgn
-        payload["cdType"] = "GET"
-        payload["cdCurrency"] = "BGN"
-
-        # !!! many Econt accounts will NOT print COD unless you send agreement
-        agreement_num = "0000000000"  # ← REPLACE with real from Econt
-        payload["cdAgreementNum"] = agreement_num
-
-        # services block (XML-like)
-        payload["services"]["cd"] = {
-            "type": "GET",
-            "amount": cod_bgn,
-            "value": cod_bgn,
-        }
-        payload["services"]["cd_currency"] = "BGN"
-        payload["services"]["cd_agreement_num"] = agreement_num
+        payload["cdCurrency"] = "BGN"  # <-- add this
+        # optional, but good for clarity
+        payload["cdType"] = "get"  # <- collect on delivery
 
     return payload
 
