@@ -881,7 +881,7 @@ h3 {
     height: 160px;
     background: rgba(237, 237, 240, 1);
     transform: skewY(-3.5deg);
-    border-top: 0px rgba(237, 237, 240, 1);
+    border-top: 0 rgba(237, 237, 240, 1);
 }
 
 .quote-inner {
