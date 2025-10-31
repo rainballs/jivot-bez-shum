@@ -120,7 +120,7 @@ a {
 h1, h2, h3 {
     font-family: "Playfair Display";
     color: var(--ink);
-    margin: 0 0 0px
+    margin: 0 0 0
 }
 
 h1 {
@@ -1287,7 +1287,7 @@ h3 {
 .chapters-more {
     display: flex;
     justify-content: end;
-    margin-top: 10px;
+    margin-top: 30px;
     color: #c7392f;
     font-weight: 600;
     text-decoration: underline 1px;
@@ -1385,8 +1385,8 @@ h3 {
 .acc summary .chev {
     width: 10px;
     height: 10px;
-    border-right: 2px solid #c7392f;
-    border-bottom: 2px solid #c7392f;
+    border-right: 2px solid #0b0b0d;
+    border-bottom: 2px solid #0b0b0d;
     transform: rotate(-45deg);
 }
 
@@ -1496,6 +1496,7 @@ h3 {
     font-weight: 800;
     font-size: 20px;
     margin-bottom: 16px;
+    font-family: 'PLAYFAIR DISPLAY', serif;
 }
 
 /* red, pill-shaped button */
@@ -1656,6 +1657,7 @@ h3 {
 
     .section.author-split .two-col {
         grid-template-columns: 1fr;
+        height: auto;
     }
 
     .portrait-wrap.fade-right::before {
