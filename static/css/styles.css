@@ -1526,6 +1526,10 @@ h3 {
 
 /* ---- Responsive polish ---- */
 @media (max-width: 900px) {
+    .space h2{
+        padding-top: 15vw;
+    }
+
     .cta.cta-book {
         padding: 140px 0 84px;
     }
