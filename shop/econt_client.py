@@ -245,6 +245,9 @@ class EcontClient:
 #
 #     return payload
 
+from datetime import date
+
+
 def build_create_label_json(
         *,
         sender_name: str,
@@ -269,20 +272,15 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    # If you really want declared value only when not paid:
-    # (remove if you prefer to always send declared value)
-    # NOTE: don't reference Order class here — use the parameters you pass in.
-    # keep declared_value_bgn as-is
-
     payer = (payer or "receiver").upper()
 
-    payload = {
+    payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,  # "RECEIVER" / "SENDER"
+        "payer": payer,
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -304,19 +302,22 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
+
+        # IMPORTANT: this is where Econt wants ALL extras
+        "services": {},
     }
 
-    # Sender: office OR address
+    # 1) sender: office or address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # Compute a proper string date once
+    # 2) delivery date
     delivery_day = _next_workday(date.today()).isoformat()
     payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # Route: office vs door
+    # 3) route
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -335,13 +336,21 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # COD only if > 0
+    # 4) COD → **goes into services**
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        payload["cdAmount"] = cod_bgn
-        payload["cdCurrency"] = "BGN"  # <-- add this
-        # optional, but good for clarity
-        payload["cdType"] = "get"  # <- collect on delivery
+        # this reflects your XML:
+        # <cd type="GET">31.99</cd>
+        # <cd_currency>BGN</cd_currency>
+        payload["services"]["cd"] = {
+            "type": "GET",
+            "amount": cod_bgn,  # some JSON variants want "amount"
+            "value": cod_bgn,  # others want "value"
+        }
+        payload["services"]["cd_currency"] = "BGN"
+
+        # if your contract requires agreement num:
+        # payload["services"]["cd_agreement_num"] = "123456"
 
     return payload
 
