@@ -23,30 +23,19 @@ class EcontError(RuntimeError):
 
 def _next_workday(d: date) -> date:
     """
-    Return the next working day (Mon–Fri).
-    - Mon → Tue
-    - Tue → Wed
-    - Wed → Thu
-    - Thu → Fri
-    - Fri → Mon
-    - Sat → Mon
-    - Sun → Mon
+    Next working day (Mon–Fri).
+    Fri -> Mon
+    Sat -> Mon
+    Sun -> Mon
+    other -> +1 day
     """
     wd = d.weekday()  # Mon=0 ... Sun=6
-
-    # Friday (4) → +3 days → Monday
-    if wd == 4:
+    if wd == 4:  # Friday
         return d + timedelta(days=3)
-
-    # Saturday (5) → +2 days → Monday
-    if wd == 5:
+    if wd == 5:  # Saturday
         return d + timedelta(days=2)
-
-    # Sunday (6) → +1 day → Monday
-    if wd == 6:
+    if wd == 6:  # Sunday
         return d + timedelta(days=1)
-
-    # Mon–Thu → tomorrow
     return d + timedelta(days=1)
 
 
@@ -292,17 +281,14 @@ def build_create_label_json(
         label_format: str = "10x9",
 ) -> dict:
     """
-    Build the exact JSON Econt expects for LabelService.createLabel.json
-    This version:
-    - puts COD BOTH on top-level AND in services
-    - sets a real delivery date
-    - uses interval=1 for toDoor (interval=0 was giving 517)
+    JSON for ee.econt LabelService.createLabel.json
+    - TO OFFICE → simple date
+    - TO DOOR   → date + interval + alt string date
+    - COD       → top-level + services + (optional) agreement
     """
-
-    # normalize payer
     payer = (payer or "receiver").upper()
 
-    # 1) base payload
+    # ---- 1) base ----
     payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
@@ -320,49 +306,51 @@ def build_create_label_json(
             "city": {
                 "country": {"code3": "BGR"},
                 "name": sender_city,
-                "postCode": "8000",  # your base office postcode
+                "postCode": "8000",
             }
         },
 
-        # receiver (city part)
+        # receiver – city
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
         "receiverAddress": {
             "city": {
                 "country": {"code3": "BGR"},
                 "name": receiver_city,
-                # we will overwrite postCode below if we have receiver_postcode
                 "postCode": receiver_postcode,
             }
         },
 
-        # IMPORTANT: Econt puts extras here
+        # Econt extras go here
         "services": {},
     }
 
-    # 2) sender: office OR address
+    # ---- 2) sender: office or address ----
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
-        # send real street if not office
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # 3) delivery date: ALWAYS send it
-    # Econt complained: “Моля, изберете ден...” → send a real date
-    delivery_day = _next_workday(date.today()).strftime("%Y-%m-%d")
-    # some instances read this:
-    payload["deliveryDate"] = delivery_day
+    # ---- 3) delivery date(s) ----
+    real_delivery_day = _next_workday(date.today())
+    iso_day = real_delivery_day.strftime("%Y-%m-%d")  # 2025-11-03
+    bg_day = real_delivery_day.strftime("%d.%m.%Y")  # 03.11.2025
 
-    # 4) route: office vs door
+    # some installs look ONLY at this:
+    payload["deliveryDate"] = iso_day
+
+    # ---- 4) route ----
     if receiver_office_code:
-        # ---- TO OFFICE ----
+        # ----------------- TO OFFICE -----------------
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
-        # office usually does not need interval
+
+        # office usually OK with just ISO date
         payload["delivery"] = {
-            "date": delivery_day
+            "date": iso_day
         }
+
     else:
-        # ---- TO DOOR ----
+        # ----------------- TO DOOR -----------------
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
         ra["street"] = receiver_street or ""
@@ -377,32 +365,33 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-        # THIS was the 517 → interval 0
-        # most ee.econt setups want 1..n
+        # THIS is what was giving 517 → some servers want BOTH ISO and human date
         payload["delivery"] = {
-            "date": delivery_day,
-            "timeIntervalId": 1,  # 1 = first interval in Econt UI
+            "date": iso_day,  # machine
+            "dateStr": bg_day,  # sometimes required
+            "timeIntervalId": 1,  # pick a real interval
         }
 
-    # 5) COD – THIS IS THE IMPORTANT PART
+    # ---- 5) COD ----
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        # TOP-LEVEL – the JSON API actually looks here
-        payload["cdAmount"] = cod_bgn  # ← amount to collect
-        payload["cdType"] = "GET"  # ← “събери от получателя”
+        # top-level
+        payload["cdAmount"] = cod_bgn
+        payload["cdType"] = "GET"
         payload["cdCurrency"] = "BGN"
 
-        # XML-style services block – harmless to include
+        # !!! many Econt accounts will NOT print COD unless you send agreement
+        agreement_num = "0000000000"  # ← REPLACE with real from Econt
+        payload["cdAgreementNum"] = agreement_num
+
+        # services block (XML-like)
         payload["services"]["cd"] = {
             "type": "GET",
             "amount": cod_bgn,
             "value": cod_bgn,
         }
         payload["services"]["cd_currency"] = "BGN"
-
-        # if your account requires an agreement number, UNCOMMENT:
-        # payload["cdAgreementNum"] = "YOUR-AGREEMENT-NUMBER"
-        # payload["services"]["cd_agreement_num"] = "YOUR-AGREEMENT-NUMBER"
+        payload["services"]["cd_agreement_num"] = agreement_num
 
     return payload
 
