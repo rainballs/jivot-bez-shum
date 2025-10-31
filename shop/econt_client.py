@@ -22,16 +22,10 @@ class EcontError(RuntimeError):
 
 
 def _next_workday(d: date) -> date:
-    """Generic “next working day” – we’ll use it only for OFFICE."""
-    wd = d.weekday()  # Mon=0 ... Sun=6
-    if wd >= 4:  # Fri, Sat, Sun -> Monday
+    wd = d.weekday()
+    if wd >= 4:  # Fri–Sun → Monday
         return d + timedelta(days=7 - wd)
     return d + timedelta(days=1)
-
-
-def _today_str() -> str:
-    """Return today's date as ISO string – this is what your DOOR labels want."""
-    return date.today().isoformat()
 
 
 def _first_nonempty(*vals) -> Optional[str]:
@@ -275,28 +269,23 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    """
-    FINAL version for your EE instance.
+    # If you really want declared value only when not paid:
+    # (remove if you prefer to always send declared value)
+    # NOTE: don't reference Order class here — use the parameters you pass in.
+    # keep declared_value_bgn as-is
 
-    Rules:
-    - toOffice -> delivery = next workday
-    - toDoor   -> delivery = TODAY (because EE keeps saying “choose day”)
-    - COD      -> send top-level cdAmount/cdType/cdCurrency
-                  AND simple services mirror
-    """
     payer = (payer or "receiver").upper()
 
-    payload: dict = {
+    payload = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,
+        "payer": payer,  # "RECEIVER" / "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
-        # sender
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
         "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
@@ -307,7 +296,6 @@ def build_create_label_json(
             }
         },
 
-        # receiver
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
         "receiverAddress": {
             "city": {
@@ -316,31 +304,23 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
-
-        # place for xml-like extras
-        "services": {},
     }
 
-    # ---------- sender: office OR address ----------
+    # Sender: office OR address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # ---------- route ----------
+    # Compute a proper string date once
+    delivery_day = _next_workday(date.today()).isoformat()
+    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
+
+    # Route: office vs door
     if receiver_office_code:
-        # --- TO OFFICE ---
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
-
-        delivery_day = _next_workday(date.today()).isoformat()
-
-        # office is fine with next workday
-        payload["delivery"] = {"date": delivery_day}
-        payload["deliveryDate"] = delivery_day
-
     else:
-        # --- TO DOOR ---
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
         ra["street"] = receiver_street or ""
@@ -355,29 +335,13 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-        # THIS WAS THE PROBLEM:
-        # your EE wants an explicit DELIVERY DAY for DOOR.
-        # we'll give it TODAY and also timeIntervalId=0.
-        today = _today_str()
-        payload["delivery"] = {
-            "date": today,
-            "timeIntervalId": 0,  # demo usually accepts 0 = whole day
-        }
-        payload["deliveryDate"] = today
-
-    # ---------- COD ----------
+    # COD only if > 0
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        # top-level JSON fields (what your logs show)
         payload["cdAmount"] = cod_bgn
-        payload["cdType"] = "GET"
-        payload["cdCurrency"] = "BGN"
-
-        # XML-style mirror (what their doc snippet shows)
-        payload["services"]["cd"] = cod_bgn
-        payload["services"]["cd_currency"] = "BGN"
-        # if your real company account needs this, keep it:
-        # payload["services"]["cd_agreement_num"] = "0000000000"
+        payload["cdCurrency"] = "BGN"  # <-- add this
+        # optional, but good for clarity
+        payload["cdType"] = "get"  # <- collect on delivery
 
     return payload
 
