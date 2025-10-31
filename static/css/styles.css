@@ -118,7 +118,7 @@ a {
 
 /* ========== TYPOGRAPHY ========== */
 h1, h2, h3 {
-    font-family: "Playfair Display";
+    font-family: "Playfair Display", serif;
     color: var(--ink);
     margin: 0 0 0
 }
@@ -894,7 +894,7 @@ h3 {
 .section.quote-slab blockquote {
     max-width: 940px;
     text-align: center;
-    font-family: "Playfair Display";
+    font-family: "Playfair Display", serif;
     font-style: italic;
     font-weight: 100;
     /*font-size: 26px;*/
@@ -1266,7 +1266,7 @@ h3 {
 .acc h3 {
     font-size: 22px;
     margin: 0;
-    font-family: "Playfair Display"
+    font-family: "Playfair Display", serif
 }
 
 /* small chevron */
@@ -1370,6 +1370,7 @@ h3 {
 .acc-body {
     padding: 0 18px 14px;
     font-size: 22px;
+    font-family: 'Nunito', sans-serif;
 }
 
 /* Chevron reuse (if you already styled .chev, this is not needed) */
@@ -1478,7 +1479,7 @@ h3 {
 }
 
 .cta-book-inner h2 {
-    font-family: "Playfair Display";
+    font-family: "Playfair Display", serif;
     font-size: 34px;
     line-height: 1.25;
     margin: 8px 0 10px;
@@ -1496,7 +1497,7 @@ h3 {
     font-weight: 800;
     font-size: 20px;
     margin-bottom: 16px;
-    font-family: 'PLAYFAIR DISPLAY', serif;
+    font-family: 'Playfair Display', serif;
 }
 
 /* red, pill-shaped button */
@@ -1526,7 +1527,7 @@ h3 {
 
 /* ---- Responsive polish ---- */
 @media (max-width: 900px) {
-    .space h2{
+    .space {
         padding-top: 15vw;
     }
 
@@ -1972,13 +1973,13 @@ input.is-invalid, select.is-invalid {
 
 .section-toc .feature-icon {
     display: block;
-    margin: 24px auto 12px;
+    margin: 24px auto 24px;
     width: 50px;
     height: 50px;
 }
 
 .section-toc .feature h3 {
-    margin: 6px 0 10px;
+    margin: 6px 0 24px;
     font-weight: 800;
     font-size: 22px;
     line-height: 1.25;
@@ -1989,7 +1990,7 @@ input.is-invalid, select.is-invalid {
     margin: 0;
     color: #2F3747;
     line-height: 1.6;
-    font-family: 'Nunito';
+    font-family: 'Nunito', sans-serif;
 }
 
 @media (max-width: 900px) {
@@ -2025,7 +2026,7 @@ input.is-invalid, select.is-invalid {
 }
 
 .site-header .brand {
-    font-family: "Playfair Display";
+    font-family: "Playfair Display", serif;
     color: #fff;
     text-decoration: none;
     font-weight: 700;
@@ -2141,7 +2142,7 @@ input.is-invalid, select.is-invalid {
 
 
 .hero-title {
-    font-family: "Playfair Display";
+    font-family: "Playfair Display", serif;
     font-weight: 800;
     line-height: 1.05;
     /*font-size: clamp(44px, 6vw, 78px);*/
@@ -2170,7 +2171,6 @@ input.is-invalid, select.is-invalid {
         top: 0;
         z-index: 1001;
         background: #ddd; /* like the mock grey */
-        border-bottom: 1px solid #e6e6e6;
         backdrop-filter: saturate(120%) blur(4px);
     }
 
@@ -2183,7 +2183,7 @@ input.is-invalid, select.is-invalid {
     }
 
     .mobile-header .brand {
-        font-family: "Playfair Display";
+        font-family: "Playfair Display", serif;
         font-weight: 800;
         font-size: 22px;
         color: #ffffff;
@@ -2670,6 +2670,16 @@ input.is-invalid, select.is-invalid {
     /* Copy column text tweaks to match spacing/feel */
     .author-split .author-copy {
         text-wrap: balance;
+    }
+    .author-copy {
+        text-align: center;
+    }
+    .author-copy h2 {
+        line-height: 44px;
+    }
+    .cure {
+        font-size: 25px;
+        padding-top: 5vw;
     }
 }
 
