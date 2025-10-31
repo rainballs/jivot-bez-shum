@@ -274,6 +274,7 @@ def build_create_label_json(
 ) -> dict:
     payer = (payer or "receiver").upper()
 
+    # 1) build base
     payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
@@ -303,21 +304,26 @@ def build_create_label_json(
             }
         },
 
-        # IMPORTANT: this is where Econt wants ALL extras
+        # NEW: always send services, even if empty
         "services": {},
     }
 
-    # 1) sender: office or address
+    # 2) sender: office or address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # 2) delivery date
+    # 3) DELIVERY (the thing they are complaining about)
     delivery_day = _next_workday(date.today()).isoformat()
-    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
+    payload["delivery"] = {
+        "date": delivery_day,
+        "timeIntervalId": 0,
+    }
+    # some gateways want this too:
+    payload["deliveryDate"] = delivery_day
 
-    # 3) route
+    # 4) route: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -336,21 +342,14 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # 4) COD → **goes into services**
+    # 5) COD → inside services
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        # this reflects your XML:
-        # <cd type="GET">31.99</cd>
-        # <cd_currency>BGN</cd_currency>
         payload["services"]["cd"] = {
-            "type": "GET",
-            "amount": cod_bgn,  # some JSON variants want "amount"
-            "value": cod_bgn,  # others want "value"
+            "type": "GET",  # collect from receiver
+            "amount": cod_bgn,  # JSON variant
         }
         payload["services"]["cd_currency"] = "BGN"
-
-        # if your contract requires agreement num:
-        # payload["services"]["cd_agreement_num"] = "123456"
 
     return payload
 
