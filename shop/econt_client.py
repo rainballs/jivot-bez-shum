@@ -22,17 +22,16 @@ class EcontError(RuntimeError):
 
 
 def _next_workday(d: date) -> date:
-    """
-    Return the next working day for Econt.
-    Mon→Tue, Tue→Wed, Wed→Thu, Thu→Fri,
-    Fri→Mon, Sat→Mon, Sun→Mon.
-    """
+    """Generic “next working day” – we’ll use it only for OFFICE."""
     wd = d.weekday()  # Mon=0 ... Sun=6
-    if wd >= 4:  # 4=Fri, 5=Sat, 6=Sun
-        # jump to next Monday
+    if wd >= 4:  # Fri, Sat, Sun -> Monday
         return d + timedelta(days=7 - wd)
-    # Mon..Thu → next day
     return d + timedelta(days=1)
+
+
+def _today_str() -> str:
+    """Return today's date as ISO string – this is what your DOOR labels want."""
+    return date.today().isoformat()
 
 
 def _first_nonempty(*vals) -> Optional[str]:
@@ -277,22 +276,23 @@ def build_create_label_json(
         label_format: str = "10x9",
 ) -> dict:
     """
-    Build exactly what ee.econt.com's JSON endpoint wants.
-    - toOffice  → send delivery date
-    - toDoor    → DO NOT send delivery (let Econt decide)
-    - COD       → send top-level cdAmount/cdType/cdCurrency
-                  + a tiny services mirror (xml-style names)
+    FINAL version for your EE instance.
+
+    Rules:
+    - toOffice -> delivery = next workday
+    - toDoor   -> delivery = TODAY (because EE keeps saying “choose day”)
+    - COD      -> send top-level cdAmount/cdType/cdCurrency
+                  AND simple services mirror
     """
     payer = (payer or "receiver").upper()
 
-    # base skeleton
     payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,  # "RECEIVER" / "SENDER"
+        "payer": payer,
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -313,39 +313,34 @@ def build_create_label_json(
             "city": {
                 "country": {"code3": "BGR"},
                 "name": receiver_city,
-                # keep it nullable, econt will often fill it
                 "postCode": receiver_postcode,
             }
         },
 
-        # xml-like extras go here
+        # place for xml-like extras
         "services": {},
     }
 
-    # ----- sender: office OR address -----
+    # ---------- sender: office OR address ----------
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # figure delivery day ONCE
-    delivery_day = _next_workday(date.today()).isoformat()
-
-    # ----- route: office vs door -----
+    # ---------- route ----------
     if receiver_office_code:
-        # to office
+        # --- TO OFFICE ---
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
 
-        # for office they accept the simple delivery block
-        payload["delivery"] = {
-            "date": delivery_day,
-            # many installations don't need interval for office
-        }
-        # some installations also like a flat deliveryDate
+        delivery_day = _next_workday(date.today()).isoformat()
+
+        # office is fine with next workday
+        payload["delivery"] = {"date": delivery_day}
         payload["deliveryDate"] = delivery_day
+
     else:
-        # to door
+        # --- TO DOOR ---
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
         ra["street"] = receiver_street or ""
@@ -360,24 +355,28 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-        # IMPORTANT:
-        # we DO NOT send delivery for door, because your install
-        # was returning 517 “Моля, изберете ден...”
-        # If later your office tells you the exact format they want,
-        # we can add it back here.
+        # THIS WAS THE PROBLEM:
+        # your EE wants an explicit DELIVERY DAY for DOOR.
+        # we'll give it TODAY and also timeIntervalId=0.
+        today = _today_str()
+        payload["delivery"] = {
+            "date": today,
+            "timeIntervalId": 0,  # demo usually accepts 0 = whole day
+        }
+        payload["deliveryDate"] = today
 
-    # ----- COD (cash on delivery) -----
+    # ---------- COD ----------
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        # JSON names (what your logs already showed):
-        payload["cdAmount"] = cod_bgn  # <- THIS is the money
-        payload["cdType"] = "GET"  # GET = collect from receiver
+        # top-level JSON fields (what your logs show)
+        payload["cdAmount"] = cod_bgn
+        payload["cdType"] = "GET"
         payload["cdCurrency"] = "BGN"
 
-        # XML-style mirror (what their XML docs show):
-        payload["services"]["cd"] = cod_bgn  # keep it VERY simple
+        # XML-style mirror (what their doc snippet shows)
+        payload["services"]["cd"] = cod_bgn
         payload["services"]["cd_currency"] = "BGN"
-        # if they force you to send agreement:
+        # if your real company account needs this, keep it:
         # payload["services"]["cd_agreement_num"] = "0000000000"
 
     return payload
