@@ -2671,16 +2671,28 @@ input.is-invalid, select.is-invalid {
     .author-split .author-copy {
         text-wrap: balance;
     }
+
     .author-copy {
         text-align: center;
     }
+
     .author-copy h2 {
         line-height: 44px;
     }
+
     .cure {
         font-size: 25px;
         padding-top: 5vw;
     }
+
+    .top {
+        margin: 10vw 0 0 0;
+    }
+
+    .bot {
+        margin: 0 0 8vw 0;
+    }
+
 }
 
 /* ==== Checkbox (billing -> shipping) ==== */
