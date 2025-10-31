@@ -1,4 +1,6 @@
 # shop/econt_service.py
+import logging
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -90,7 +92,10 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         payer=payer,  # <-- our rule above
         label_format=d.get("label_format", "10x9"),
     )
+    log = logging.getLogger("econt")  # top of file
 
+    # ...
+    log.error("ECONT FINAL PAYLOAD:\n%s", json.dumps(payload, ensure_ascii=False))
     client = EcontClient()
     try:
         res = client.create_label(payload)

@@ -22,9 +22,16 @@ class EcontError(RuntimeError):
 
 
 def _next_workday(d: date) -> date:
-    wd = d.weekday()
-    if wd >= 4:  # Fri–Sun → Monday
+    """
+    Return the next working day for Econt.
+    Mon→Tue, Tue→Wed, Wed→Thu, Thu→Fri,
+    Fri→Mon, Sat→Mon, Sun→Mon.
+    """
+    wd = d.weekday()  # Mon=0 ... Sun=6
+    if wd >= 4:  # 4=Fri, 5=Sat, 6=Sun
+        # jump to next Monday
         return d + timedelta(days=7 - wd)
+    # Mon..Thu → next day
     return d + timedelta(days=1)
 
 
@@ -269,14 +276,17 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    # If you really want declared value only when not paid:
-    # (remove if you prefer to always send declared value)
-    # NOTE: don't reference Order class here — use the parameters you pass in.
-    # keep declared_value_bgn as-is
-
+    """
+    Build exactly what ee.econt.com's JSON endpoint wants.
+    - toOffice  → send delivery date
+    - toDoor    → DO NOT send delivery (let Econt decide)
+    - COD       → send top-level cdAmount/cdType/cdCurrency
+                  + a tiny services mirror (xml-style names)
+    """
     payer = (payer or "receiver").upper()
 
-    payload = {
+    # base skeleton
+    payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
@@ -286,6 +296,7 @@ def build_create_label_json(
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
+        # sender
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
         "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
         "senderAddress": {
@@ -296,31 +307,45 @@ def build_create_label_json(
             }
         },
 
+        # receiver
         "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
         "receiverAddress": {
             "city": {
                 "country": {"code3": "BGR"},
                 "name": receiver_city,
+                # keep it nullable, econt will often fill it
                 "postCode": receiver_postcode,
             }
         },
+
+        # xml-like extras go here
+        "services": {},
     }
 
-    # Sender: office OR address
+    # ----- sender: office OR address -----
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # Compute a proper string date once
+    # figure delivery day ONCE
     delivery_day = _next_workday(date.today()).isoformat()
-    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # Route: office vs door
+    # ----- route: office vs door -----
     if receiver_office_code:
+        # to office
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
+
+        # for office they accept the simple delivery block
+        payload["delivery"] = {
+            "date": delivery_day,
+            # many installations don't need interval for office
+        }
+        # some installations also like a flat deliveryDate
+        payload["deliveryDate"] = delivery_day
     else:
+        # to door
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
         ra["street"] = receiver_street or ""
@@ -335,13 +360,25 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # COD only if > 0
+        # IMPORTANT:
+        # we DO NOT send delivery for door, because your install
+        # was returning 517 “Моля, изберете ден...”
+        # If later your office tells you the exact format they want,
+        # we can add it back here.
+
+    # ----- COD (cash on delivery) -----
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        payload["cdAmount"] = cod_bgn
-        payload["cdCurrency"] = "BGN"  # <-- add this
-        # optional, but good for clarity
-        payload["cdType"] = "get"  # <- collect on delivery
+        # JSON names (what your logs already showed):
+        payload["cdAmount"] = cod_bgn  # <- THIS is the money
+        payload["cdType"] = "GET"  # GET = collect from receiver
+        payload["cdCurrency"] = "BGN"
+
+        # XML-style mirror (what their XML docs show):
+        payload["services"]["cd"] = cod_bgn  # keep it VERY simple
+        payload["services"]["cd_currency"] = "BGN"
+        # if they force you to send agreement:
+        # payload["services"]["cd_agreement_num"] = "0000000000"
 
     return payload
 

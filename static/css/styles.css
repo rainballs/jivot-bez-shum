@@ -1045,7 +1045,7 @@ h3 {
     display: block;
     /*max-width: 620px; !* adjust to your taste *!*/
     max-width: 100%;
-    width: 100%;
+    width: auto;
     filter: none
 }
 
