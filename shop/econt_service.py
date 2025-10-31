@@ -9,19 +9,21 @@ import requests
 from django.conf import settings
 from .econt_client import EcontClient, EcontError, build_create_label_json
 from .models import PaymentMethod
+import base64
 
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
     """
     Creates an Econt label (JSON API) using settings.ECONT.
-    Business rules:
-    - if order.paid == True -> COD 0.00, courier paid by SENDER
-    - if order.paid == False or payment_method == COD -> COD = order.total_bgn, courier paid by RECEIVER
+
+    Rules:
+    - if order.paid == True AND payment_method != COD → cdAmount = 0.00, payer = SENDER
+    - else (not paid OR payment_method == COD) → cdAmount = order.total_bgn, payer = RECEIVER
     """
     overrides = overrides or {}
     d = settings.ECONT["DEFAULTS"]
 
-    # --------- 1) Receiver data ---------
+    # 1) receiver data
     receiver_name = (
             getattr(order, "full_name", "") or
             f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
@@ -29,10 +31,9 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     receiver_phone = getattr(order, "phone", "")
     receiver_city = getattr(order, "city", "")
 
-    # office vs address
     receiver_office_code = getattr(order, "econt_office_code", "") or overrides.get("receiver_office_code")
 
-    # structured address
+    # structured address (for toDoor)
     r_street = overrides.get("receiver_street")
     r_num = overrides.get("receiver_num")
     r_postcode = overrides.get("receiver_postcode")
@@ -40,30 +41,26 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
-    # --------- 2) Payment / COD rules ---------
+    # 2) payment / COD decision
     total_bgn = float(getattr(order, "total_bgn", 0.0) or 0.0)
 
-    # decide paid / not paid
     is_paid = bool(getattr(order, "paid", False))
     pm = getattr(order, "payment_method", None)
     is_cod_payment = (pm == PaymentMethod.COD)
 
     if is_paid and not is_cod_payment:
-        # card/stripe/etc already paid
+        # CARD / STRIPE – already paid
         cod_bgn = 0.0
-        payer = "sender"  # merchant pays courier
+        payer = "sender"  # you (merchant) pay the courier
     else:
-        # cash on delivery OR order not yet paid
+        # Cash on delivery OR not marked as paid
         cod_bgn = total_bgn
-        payer = "receiver"  # receiver pays courier on delivery
+        payer = "receiver"  # customer pays courier and COD
 
-    # declared value = value of the shipment, usually the order total
     declared_bgn = total_bgn
-
-    # fallback weight
     weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
 
-    # --------- 3) Build payload ---------
+    # 3) build payload
     payload = build_create_label_json(
         sender_name=d["sender_name"],
         sender_phone=d["sender_phone"],
@@ -85,9 +82,9 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
 
         weight_kg=weight_kg,
         parcels=1,
-        cod_bgn=cod_bgn,  # <-- our rule above
+        cod_bgn=cod_bgn,
         declared_value_bgn=declared_bgn,
-        payer=payer,  # <-- our rule above
+        payer=payer,
         label_format=d.get("label_format", "10x9"),
     )
 
@@ -105,11 +102,16 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "shipment_num": None, "saved_pdf": False, "error": err}
 
-    shipment_num = res.get("shipmentNumber") or res.get("num") or res.get("shipment_num")
+    # 4) success → save shipment num + pdf
+    shipment_num = (
+            res.get("shipmentNumber")
+            or res.get("num")
+            or res.get("shipment_num")
+    )
+
     pdf_bytes = None
     if "pdfBase64" in res:
         try:
-            import base64
             pdf_bytes = base64.b64decode(res["pdfBase64"])
         except Exception:
             pdf_bytes = None
@@ -126,7 +128,12 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
             order.econt_label_pdf.save(fname, ContentFile(pdf_bytes), save=True)
             saved_pdf = True
 
-    return {"ok": True, "shipment_num": shipment_num, "saved_pdf": saved_pdf, "error": None}
+    return {
+        "ok": True,
+        "shipment_num": shipment_num,
+        "saved_pdf": saved_pdf,
+        "error": None,
+    }
 
 
 def search_offices(city: str, query: str = "") -> list[dict]:
