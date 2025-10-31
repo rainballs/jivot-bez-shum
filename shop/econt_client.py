@@ -245,9 +245,6 @@ class EcontClient:
 #
 #     return payload
 
-from datetime import date
-
-
 def build_create_label_json(
         *,
         sender_name: str,
@@ -272,16 +269,20 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
+    # If you really want declared value only when not paid:
+    # (remove if you prefer to always send declared value)
+    # NOTE: don't reference Order class here — use the parameters you pass in.
+    # keep declared_value_bgn as-is
+
     payer = (payer or "receiver").upper()
 
-    # 1) build base
-    payload: dict = {
+    payload = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,
+        "payer": payer,  # "RECEIVER" / "SENDER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -303,27 +304,19 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
-
-        # NEW: always send services, even if empty
-        "services": {},
     }
 
-    # 2) sender: office or address
+    # Sender: office OR address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # 3) DELIVERY (the thing they are complaining about)
+    # Compute a proper string date once
     delivery_day = _next_workday(date.today()).isoformat()
-    payload["delivery"] = {
-        "date": delivery_day,
-        "timeIntervalId": 0,
-    }
-    # some gateways want this too:
-    payload["deliveryDate"] = delivery_day
+    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # 4) route: office vs door
+    # Route: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -342,14 +335,13 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # 5) COD → inside services
+    # COD only if > 0
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        payload["services"]["cd"] = {
-            "type": "GET",  # collect from receiver
-            "amount": cod_bgn,  # JSON variant
-        }
-        payload["services"]["cd_currency"] = "BGN"
+        payload["cdAmount"] = cod_bgn
+        payload["cdCurrency"] = "BGN"  # <-- add this
+        # optional, but good for clarity
+        payload["cdType"] = "get"  # <- collect on delivery
 
     return payload
 
