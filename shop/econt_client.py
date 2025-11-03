@@ -268,12 +268,8 @@ def build_create_label_json(
         declared_value_bgn: float = 0.0,
         payer: str = "receiver",
         label_format: str = "10x9",
+        cd_template: str | None = None,  # <— NEW
 ) -> dict:
-    """
-    Build EXACT JSON for
-      POST .../Shipments/LabelService.createLabel.json
-    We add "payment" ONLY if cod_bgn > 0 (== user selected COD).
-    """
     payer = (payer or "receiver").upper()
     cod_bgn = float(cod_bgn or 0.0)
 
@@ -283,12 +279,11 @@ def build_create_label_json(
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,  # "SENDER" / "RECEIVER"
+        "payer": payer,
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
-        # agent can stay — Econt tolerates it
         "senderAgent": {"name": sender_name, "phones": [sender_phone]},
         "senderAddress": {
             "city": {
@@ -308,17 +303,17 @@ def build_create_label_json(
         },
     }
 
-    # --- sender: office OR address ---
+    # sender office vs address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # --- delivery date (Econt style) ---
+    # delivery date
     delivery_day = _next_workday(date.today()).isoformat()
     payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # --- receiver: office vs door ---
+    # receiver: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -337,16 +332,14 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # --- COD: ONLY if user really chose COD (cod_bgn > 0) ---
-    if cod_bgn > 0:
-        # this is the shape Econt expects for COD in JSON
-        payload["payment"] = {
-            "cdAmount": cod_bgn,
-            "cdCurrency": "BGN",
-            "cdType": "get",  # collect on delivery
-            "side": "RECEIVER",  # receiver brings the money
-            "method": "CASH",
-        }
+    # ✅ COD ONLY if cod_bgn > 0
+    if cod_bgn > 0.0:
+        payload["cdAmount"] = cod_bgn
+        payload["cdCurrency"] = "BGN"
+        # Econt says minimal is: cdAmount, cdCurrency, cdPayOptionsTemplate
+        # https://www.econt.com/developers/39-nalozhen-platezh.html
+        if cd_template:
+            payload["cdPayOptionsTemplate"] = cd_template
 
     return payload
 

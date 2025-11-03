@@ -169,6 +169,8 @@ ECONT = {
         "sender_address": os.getenv("ECONT_SENDER_ADDRESS", ""),
         "sender_office": os.getenv("ECONT_SENDER_OFFICE_CODE", "") or None,
         "label_format": "10x9",
+        #this is the new one — required for COD:
+        "cd_template": "DEFAULT",  # put the actual name from e-Econt here
     },
 }
 
