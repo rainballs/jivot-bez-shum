@@ -128,7 +128,7 @@
                             <div class="pay-tiles">{{ pay_form.payment_method }}</div>
                         </div>
 
-                        <div class="total-row">
+                        <div class="total-row" data-total-wrap style="display:none">
                             <div>Крайна сума:</div>
                             <div class="total">
                                 <span data-total-bgn>{{ product.price_bgn|floatformat:2 }}</span> лв / €
@@ -199,6 +199,7 @@
             const outEUR = document.querySelector("[data-total-eur]");
             const shipLine = document.querySelector("[data-ship-line]");
             const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
+            const totalWrap = document.querySelector("[data-total-wrap]");   // CHANGED
 
             function toNum(s) {
                 return parseFloat(String(s).replace(",", ".").trim()) || 0
@@ -213,7 +214,8 @@
 
             function currentDelivery() {
                 const checked = document.querySelector('input[name="delivery_method"]:checked');
-                return checked ? checked.value : "address";
+                // CHANGED: if nothing is selected, return null
+                return checked ? checked.value : null;
             }
 
             function shipBGN() {
@@ -226,10 +228,23 @@
 
             function recalc() {
                 const q = toNum(qtyInput?.value || 1);
+                const delivery = currentDelivery();
+
+                if (!delivery) {
+                    // CHANGED: no delivery chosen -> hide total row, clear shipping line, show base price
+                    if (totalWrap) totalWrap.style.display = "none";
+                    if (shipLine) shipLine.textContent = "";
+                    if (outBGN) outBGN.textContent = fmt(pBGN * q);
+                    if (outEUR) outEUR.textContent = fmt(pEUR * q);
+                    return;
+                }
+
+                // delivery chosen -> show total row
                 const sBGN = shipBGN(), sEUR = shipEUR();
                 if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
                 if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
                 if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
+                if (totalWrap) totalWrap.style.display = "";
             }
 
             dmRadios.forEach(r => r.addEventListener("change", recalc));
