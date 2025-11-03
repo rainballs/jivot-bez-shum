@@ -268,7 +268,7 @@ def build_create_label_json(
         declared_value_bgn: float = 0.0,
         payer: str = "receiver",
         label_format: str = "10x9",
-        cd_template: str | None = None,  # <— NEW
+        cd_template: str | None = None,  # from settings
 ) -> dict:
     payer = (payer or "receiver").upper()
     cod_bgn = float(cod_bgn or 0.0)
@@ -280,6 +280,7 @@ def build_create_label_json(
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
         "payer": payer,
+        # you can keep this, Econt tolerates it
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -303,7 +304,7 @@ def build_create_label_json(
         },
     }
 
-    # sender office vs address
+    # sender: office or address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
@@ -332,14 +333,25 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # ✅ COD ONLY if cod_bgn > 0
-    if cod_bgn > 0.0:
-        payload["cdAmount"] = cod_bgn
-        payload["cdCurrency"] = "BGN"
-        # Econt says minimal is: cdAmount, cdCurrency, cdPayOptionsTemplate
-        # https://www.econt.com/developers/39-nalozhen-platezh.html
+    # === THIS is the important part: services ===
+    services = {}
+
+    # declared value also lives nicely in services in their examples
+    if declared_value_bgn and declared_value_bgn > 0:
+        services["declaredValueAmount"] = float(declared_value_bgn)
+        services["declaredValueCurrency"] = "BGN"
+
+    # COD ONLY if > 0
+    if cod_bgn > 0:
+        services["cdAmount"] = float(cod_bgn)
+        services["cdCurrency"] = "BGN"
+        services["cdType"] = "get"
         if cd_template:
-            payload["cdPayOptionsTemplate"] = cd_template
+            # matches the doc: cdPayOptionsTemplate
+            services["cdPayOptionsTemplate"] = cd_template
+
+    if services:
+        payload["services"] = services
 
     return payload
 

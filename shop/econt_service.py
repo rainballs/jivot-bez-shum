@@ -15,15 +15,12 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     overrides = overrides or {}
     d = settings.ECONT["DEFAULTS"]
 
-    # -------- receiver --------
-    receiver_name = (
-            getattr(order, "full_name", "") or
-            f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
-    )
-    receiver_phone = getattr(order, "phone", "")
-    receiver_city = getattr(order, "city", "")
+    # receiver
+    receiver_name = order.full_name or f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
+    receiver_phone = order.phone or ""
+    receiver_city = order.city or ""
 
-    receiver_office_code = getattr(order, "econt_office_code", "") or overrides.get("receiver_office_code")
+    receiver_office_code = (order.econt_office_code or "") or overrides.get("receiver_office_code")
 
     r_street = overrides.get("receiver_street")
     r_num = overrides.get("receiver_num")
@@ -32,18 +29,10 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
-    # -------- money --------
-    total_bgn = float(getattr(order, "total_bgn", 0.0) or 0.0)
-
-    is_cod = getattr(order, "payment_method", None) == PaymentMethod.COD
-    if is_cod:
-        cod_bgn = total_bgn
-    else:
-        cod_bgn = 0.0
-
-    declared_bgn = total_bgn
-    payer = "sender"
-    weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
+    # MONEY
+    total_bgn = float(order.total_bgn or 0.0)  # <- your admin screenshot
+    is_cod = (getattr(order, "payment_method", None) == PaymentMethod.COD)
+    cod_bgn = total_bgn if is_cod else 0.0
 
     payload = build_create_label_json(
         sender_name=d["sender_name"],
@@ -64,13 +53,13 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         receiver_floor=r_floor,
         receiver_apartment=r_apartment,
 
-        weight_kg=weight_kg,
+        weight_kg=float(getattr(order, "total_weight_kg", 0.800) or 0.800),
         parcels=1,
-        cod_bgn=cod_bgn,  # ← only >0 on COD
-        declared_value_bgn=declared_bgn,
-        payer=payer,
+        cod_bgn=cod_bgn,  # <-- ONLY >0 when COD
+        declared_value_bgn=total_bgn,  # <-- always show product value
+        payer="sender",  # <-- you pay delivery
         label_format=d.get("label_format", "10x9"),
-        cd_template=d.get("cd_template"),  # ← REQUIRED for COD
+        cd_template=d.get("cd_template"),  # <-- REQUIRED by Econt for COD
     )
 
     client = EcontClient()
