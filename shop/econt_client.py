@@ -265,7 +265,7 @@ def build_create_label_json(
         weight_kg: float = 0.8,
         parcels: int = 1,
         cod_bgn: float = 0.0,
-        declared_value_bgn: float = 0.0,
+        declared_value_bgn: float = float(Order.total_bgn),
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:

@@ -55,7 +55,7 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     else:
         # cash on delivery OR order not yet paid
         cod_bgn = total_bgn
-        payer = "receiver"  # receiver pays courier on delivery
+        payer = "sender"  # receiver pays courier on delivery
 
     # declared value = value of the shipment, usually the order total
     declared_bgn = total_bgn
