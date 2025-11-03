@@ -73,14 +73,20 @@
                     <!-- Delivery choice only (details on next step) -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="radio-row">
+                            <!-- CHANGED: removed auto-checked and made the group required -->
                             <label class="radio">
-                                <input type="radio" name="delivery_method" value="address"
-                                       {% if form.initial.delivery_method == "address" or not form.initial.delivery_method %}checked{% endif %}>
+                                <input
+                                        type="radio"
+                                        name="delivery_method"
+                                        value="address"
+                                        required>  <!-- CHANGED -->
                                 <span>Доставка до адрес</span>
                             </label>
                             <label class="radio" style="margin-left:1.25rem">
-                                <input type="radio" name="delivery_method" value="office"
-                                       {% if form.initial.delivery_method == "office" %}checked{% endif %}>
+                                <input
+                                        type="radio"
+                                        name="delivery_method"
+                                        value="office">  <!-- CHANGED -->
                                 <span>Доставка до офис/АПС</span>
                             </label>
                         </div>
