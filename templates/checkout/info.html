@@ -302,26 +302,73 @@
             const form = document.querySelector('form.checkout-grid-2col');
             if (!form) return;
 
-            // when a field is invalid -> mark it
+            // highlight invalid fields
             form.addEventListener('invalid', function (e) {
-                const target = e.target;
-                target.classList.add('is-invalid');
-            }, true); // useCapture = true so it catches all
+                e.target.classList.add('is-invalid');
+            }, true);
 
-            // when user fixes it -> remove mark
+            // remove highlight when user fixes
             form.addEventListener('input', function (e) {
-                if (e.target.classList.contains('is-invalid')) {
-                    if (e.target.checkValidity()) {
-                        e.target.classList.remove('is-invalid');
-                    }
+                if (e.target.classList.contains('is-invalid') && e.target.checkValidity()) {
+                    e.target.classList.remove('is-invalid');
                 }
             });
 
-            // on submit, force browser to show its own popups
+            // show browser popups
             form.addEventListener('submit', function (e) {
                 if (!form.checkValidity()) {
                     e.preventDefault();
-                    form.reportValidity();   // shows the native “Please fill out…” bubbles
+                    form.reportValidity();
+                }
+            });
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.querySelector('form.checkout-grid-2col');
+            if (!form) return;
+
+            form.addEventListener('submit', function (e) {
+                // hidden originals
+                const hidName = document.querySelector('.sr-only [name="full_name"]');
+                const hidEmail = document.querySelector('.sr-only [name="email"]');
+                const hidPhone = document.querySelector('.sr-only [name="phone"]');
+
+                // visible equivalents
+                const visName = document.querySelector('[name="billing_full_name"]');
+                const visEmail = document.querySelector('[name="billing_email"]');
+                const visPhone = document.querySelector('[name="billing_phone"]');
+
+                function need(val) {
+                    return !val || !String(val).trim();
+                }
+
+                // check one by one
+                if (hidName && need(hidName.value)) {
+                    e.preventDefault();
+                    alert("You need to fill in this field!");
+                    if (visName) {
+                        visName.classList.add('is-invalid');
+                        visName.focus();
+                    }
+                    return;
+                }
+
+                if (hidEmail && need(hidEmail.value)) {
+                    e.preventDefault();
+                    alert("You need to fill in this field!");
+                    if (visEmail) {
+                        visEmail.classList.add('is-invalid');
+                        visEmail.focus();
+                    }
+                    return;
+                }
+
+                if (hidPhone && need(hidPhone.value)) {
+                    e.preventDefault();
+                    alert("You need to fill in this field!");
+                    if (visPhone) {
+                        visPhone.classList.add('is-invalid');
+                        visPhone.focus();
+                    }
                 }
             });
         });
