@@ -1,4 +1,6 @@
 # shop/econt_service.py
+import base64
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -12,14 +14,36 @@ from .models import PaymentMethod
 
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
-    overrides = overrides or {}
-    d = settings.ECONT["DEFAULTS"]
+    """
+    Create Econt label for this order.
 
-    # receiver
-    receiver_name = order.full_name or f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
+    Rules (your rules):
+    - delivery ALWAYS paid by sender
+    - COD ONLY when order.payment_method is COD
+    - COD amount = order.total_bgn
+    - declared value = order.total_bgn
+    """
+    overrides = overrides or {}
+
+    # 1) get defaults from settings ----------------------------------------------------
+    d = settings.ECONT["DEFAULTS"]
+    sender_name = d.get("sender_name")
+    sender_phone = d.get("sender_phone")
+    sender_city = d.get("sender_city")
+    sender_address = d.get("sender_address")
+    sender_office = d.get("sender_office")  # may be None
+    label_format = d.get("label_format", "10x9")
+    cd_template = d.get("cd_template")  # MAY be None – that’s ok, we just won’t send it
+
+    # 2) receiver data -----------------------------------------------------------------
+    receiver_name = (
+            order.full_name
+            or f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
+    )
     receiver_phone = order.phone or ""
     receiver_city = order.city or ""
 
+    # office vs address – values from form (overrides) have priority
     receiver_office_code = (order.econt_office_code or "") or overrides.get("receiver_office_code")
 
     r_street = overrides.get("receiver_street")
@@ -29,17 +53,32 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
-    # MONEY
-    total_bgn = float(order.total_bgn or 0.0)  # <- your admin screenshot
-    is_cod = (getattr(order, "payment_method", None) == PaymentMethod.COD)
+    # 3) money -------------------------------------------------------------------------
+    # you said this field is DEFINITELY there:
+    total_bgn = float(order.total_bgn or 0.0)
+
+    # detect COD robustly
+    pm = getattr(order, "payment_method", None)
+    is_cod = False
+    if pm == PaymentMethod.COD:
+        is_cod = True
+    else:
+        # if your DB stores "cod" / "COD"
+        if isinstance(pm, str) and pm.lower() == "cod":
+            is_cod = True
+
     cod_bgn = total_bgn if is_cod else 0.0
 
+    # 4) other shipment stuff ----------------------------------------------------------
+    weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
+
+    # 5) build the label payload (this is what goes into "label": {...}) ---------------
     payload = build_create_label_json(
-        sender_name=d["sender_name"],
-        sender_phone=d["sender_phone"],
-        sender_city=d["sender_city"],
-        sender_address=d["sender_address"],
-        sender_office_code=(d.get("sender_office") or None),
+        sender_name=sender_name,
+        sender_phone=sender_phone,
+        sender_city=sender_city,
+        sender_address=sender_address,
+        sender_office_code=(sender_office or None),
 
         receiver_name=receiver_name,
         receiver_phone=receiver_phone,
@@ -53,39 +92,48 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         receiver_floor=r_floor,
         receiver_apartment=r_apartment,
 
-        weight_kg=float(getattr(order, "total_weight_kg", 0.800) or 0.800),
+        weight_kg=weight_kg,
         parcels=1,
-        cod_bgn=cod_bgn,  # <-- ONLY >0 when COD
-        declared_value_bgn=total_bgn,  # <-- always show product value
-        payer="sender",  # <-- you pay delivery
-        label_format=d.get("label_format", "10x9"),
-        cd_template=d.get("cd_template"),  # <-- REQUIRED by Econt for COD
+        cod_bgn=cod_bgn,  # ← ONLY > 0 when order is COD
+        declared_value_bgn=total_bgn,  # ← always
+        payer="sender",  # ← you wanted sender to pay delivery
+        label_format=label_format,
+        cd_template=cd_template,  # ← Econt expects this for NP profile
     )
 
+    # 6) DEBUG: print the exact JSON we send -------------------------------------------
+    outgoing = {"mode": "create", "label": payload}
+    # this will go to your gunicorn/journalctl, so you can check if cdAmount is there
+    print("ECONT ▶ OUTGOING JSON:\n", json.dumps(outgoing, ensure_ascii=False, indent=2))
+
+    # 7) call Econt --------------------------------------------------------------------
     client = EcontClient()
     try:
         res = client.create_label(payload)
     except EcontError as e:
+        # Econt returned an error (bad office, bad city, bad COD template, etc.)
         err = f"Econt error: {e}"
         order.econt_errors = err
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "shipment_num": None, "saved_pdf": False, "error": err}
     except Exception as e:
+        # network/transport error
         err = f"Econt transport error: {e}"
         order.econt_errors = err
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "shipment_num": None, "saved_pdf": False, "error": err}
 
+    # 8) parse response + save pdf -----------------------------------------------------
     shipment_num = res.get("shipmentNumber") or res.get("num") or res.get("shipment_num")
     pdf_bytes = None
     if "pdfBase64" in res:
-        import base64
         try:
             pdf_bytes = base64.b64decode(res["pdfBase64"])
         except Exception:
             pdf_bytes = None
 
     saved_pdf = False
+    from django.db import transaction  # make sure this is imported
     with transaction.atomic():
         if shipment_num:
             order.econt_shipment_num = shipment_num
