@@ -298,5 +298,32 @@
             [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', applyState));
             applyState();
         });
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.querySelector('form.checkout-grid-2col');
+            if (!form) return;
+
+            // when a field is invalid -> mark it
+            form.addEventListener('invalid', function (e) {
+                const target = e.target;
+                target.classList.add('is-invalid');
+            }, true); // useCapture = true so it catches all
+
+            // when user fixes it -> remove mark
+            form.addEventListener('input', function (e) {
+                if (e.target.classList.contains('is-invalid')) {
+                    if (e.target.checkValidity()) {
+                        e.target.classList.remove('is-invalid');
+                    }
+                }
+            });
+
+            // on submit, force browser to show its own popups
+            form.addEventListener('submit', function (e) {
+                if (!form.checkValidity()) {
+                    e.preventDefault();
+                    form.reportValidity();   // shows the native “Please fill out…” bubbles
+                }
+            });
+        });
     </script>
 {% endblock %}
