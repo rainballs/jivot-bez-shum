@@ -90,6 +90,8 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
 
     client = EcontClient()
     try:
+        import json
+        print(json.dumps({"mode": "create", "label": payload}, ensure_ascii=False, indent=2))
         res = client.create_label(payload)
     except EcontError as e:
         err = f"Econt error: {e}"
