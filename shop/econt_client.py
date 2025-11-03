@@ -265,7 +265,7 @@ def build_create_label_json(
         weight_kg: float = 0.8,
         parcels: int = 1,
         cod_bgn: float = 0.0,
-        declared_value_bgn: float = float(Order.total_bgn),
+        declared_value_bgn: float = 0.0,
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
@@ -304,6 +304,13 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
+        "payment": {
+            "cdAmount": float(declared_value_bgn),
+            "cdCurrency": "BGN",
+            "cdType": "get",
+            "side": "RECEIVER",
+            "method": "CASH",
+        },
     }
 
     # Sender: office OR address
@@ -338,10 +345,13 @@ def build_create_label_json(
     # COD only if > 0
     cod_bgn = float(cod_bgn or 0.0)
     if cod_bgn > 0:
-        payload["cdAmount"] = cod_bgn
-        payload["cdCurrency"] = "BGN"  # <-- add this
-        # optional, but good for clarity
-        payload["cdType"] = "get"  # <- collect on delivery
+        payload["payment"] = {
+            "cdAmount": cod_bgn,
+            "cdCurrency": "BGN",
+            "cdType": "get",
+            "side": "RECEIVER",
+            "method": "CASH",
+        }
 
     return payload
 
