@@ -20,8 +20,7 @@
                         </div>
                     {% endif %}
 
-                    <!-- We render your original contact fields, but visually hide them.
-                         JS will keep them in sync with the visible billing fields. -->
+                    <!-- hidden original fields (we'll strip "required" from them in JS) -->
                     <div class="sr-only">
                         <label>Име и фамилия {{ form.full_name }}</label>
                         <label>Имейл {{ form.email }}</label>
@@ -30,7 +29,7 @@
 
                     <h3 style="margin-top:.25rem">Адрес за фактуриране</h3>
 
-                    <!-- Visible, unified trio (these drive the hidden form fields) -->
+                    <!-- Visible main fields -->
                     <div class="field-grid">
                         <label>Име и фамилия (фактура) {{ form.billing_full_name }}</label>
                         {% for e in form.billing_full_name.errors %}
@@ -60,7 +59,7 @@
                                 <div class="error">{{ e }}</div>{% endfor %}
                         </div>
 
-                        <!-- SAME-AS DELIVERY (wrapper gets hidden/disabled for office) -->
+                        <!-- SAME-AS DELIVERY -->
                         <div id="same_box_wrap" style="margin-top:.75rem">
                             <label class="checkbox">
                                 {{ form.ship_same_as_billing }} <span>Използвай същия адрес за доставка</span>
@@ -70,23 +69,22 @@
                         </div>
                     </div>
 
-                    <!-- Delivery choice only (details on next step) -->
+                    <!-- Delivery choice -->
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="radio-row">
-                            <!-- CHANGED: removed auto-checked and made the group required -->
                             <label class="radio">
                                 <input
                                         type="radio"
                                         name="delivery_method"
                                         value="address"
-                                        required>  <!-- CHANGED -->
+                                        required>
                                 <span>Доставка до адрес</span>
                             </label>
                             <label class="radio" style="margin-left:1.25rem">
                                 <input
                                         type="radio"
                                         name="delivery_method"
-                                        value="office">  <!-- CHANGED -->
+                                        value="office">
                                 <span>Доставка до офис/АПС</span>
                             </label>
                         </div>
@@ -96,7 +94,8 @@
                     </div>
 
                     {% if form.non_field_errors %}
-                        <div class="error">{{ form.non_field_errors }}</div>{% endif %}
+                        <div class="error">{{ form.non_field_errors }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- RIGHT: summary -->
@@ -128,6 +127,7 @@
                             <div class="pay-tiles">{{ pay_form.payment_method }}</div>
                         </div>
 
+                        <!-- hidden until delivery is chosen -->
                         <div class="total-row" data-total-wrap style="display:none">
                             <div>Крайна сума:</div>
                             <div class="total">
@@ -168,7 +168,7 @@
             margin: .25rem 0;
         }
 
-        /* visually-hidden but present for form submit & JS sync */
+        /* visually hidden */
         .sr-only {
             position: absolute !important;
             left: -10000px !important;
@@ -189,188 +189,171 @@
             width: 18px;
             height: 18px;
         }
+
+        /* highlight invalid */
+        .is-invalid {
+            border: 1px solid #b02f27 !important;
+            box-shadow: 0 0 0 2px rgba(176, 47, 39, .12);
+        }
     </style>
 
     <script>
-        // --- Shipping preview (unchanged) ---
         document.addEventListener("DOMContentLoaded", function () {
-            const qtyInput = document.querySelector('input[name="quantity"]');
-            const outBGN = document.querySelector("[data-total-bgn]");
-            const outEUR = document.querySelector("[data-total-eur]");
-            const shipLine = document.querySelector("[data-ship-line]");
-            const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
-            const totalWrap = document.querySelector("[data-total-wrap]");   // CHANGED
-
-            function toNum(s) {
-                return parseFloat(String(s).replace(",", ".").trim()) || 0
-            }
-
-            function fmt(n) {
-                return (Math.round(n * 100) / 100).toFixed(2)
-            }
-
-            const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
-            const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
-
-            function currentDelivery() {
-                const checked = document.querySelector('input[name="delivery_method"]:checked');
-                // CHANGED: if nothing is selected, return null
-                return checked ? checked.value : null;
-            }
-
-            function shipBGN() {
-                return currentDelivery() === "address" ? 9.00 : 7.00
-            }
-
-            function shipEUR() {
-                return shipBGN() / 1.95583
-            }
-
-            function recalc() {
-                const q = toNum(qtyInput?.value || 1);
-                const delivery = currentDelivery();
-
-                if (!delivery) {
-                    // CHANGED: no delivery chosen -> hide total row, clear shipping line, show base price
-                    if (totalWrap) totalWrap.style.display = "none";
-                    if (shipLine) shipLine.textContent = "";
-                    if (outBGN) outBGN.textContent = fmt(pBGN * q);
-                    if (outEUR) outEUR.textContent = fmt(pEUR * q);
-                    return;
-                }
-
-                // delivery chosen -> show total row
-                const sBGN = shipBGN(), sEUR = shipEUR();
-                if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
-                if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
-                if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
-                if (totalWrap) totalWrap.style.display = "";
-            }
-
-            dmRadios.forEach(r => r.addEventListener("change", recalc));
-            if (qtyInput) qtyInput.addEventListener("input", recalc);
-            recalc();
-        });
-
-        // --- Unify: visible billing trio -> hidden original fields (live sync) ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const visName = document.querySelector('input[name="billing_full_name"]');
-            const visEmail = document.querySelector('input[name="billing_email"]');
-            const visPhone = document.querySelector('input[name="billing_phone"]');
-
-            const hidName = document.querySelector('input[name="full_name"]');
-            const hidEmail = document.querySelector('input[name="email"]');
-            const hidPhone = document.querySelector('input[name="phone"]');
-
-            function sync() {
-                if (hidName && visName) hidName.value = visName.value;
-                if (hidEmail && visEmail) hidEmail.value = visEmail.value;
-                if (hidPhone && visPhone) hidPhone.value = visPhone.value;
-            }
-
-            [visName, visEmail, visPhone].forEach(el => el && el.addEventListener('input', sync));
-            sync(); // initial
-        });
-
-        // --- Hide/disable "same address" when 'office' is selected ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
-            const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
-            const sameWrap = document.getElementById('same_box_wrap');
-            const sameBox = document.querySelector('input[name="ship_same_as_billing"]');
-
-            function applyState() {
-                const office = rbOffice && rbOffice.checked;
-                if (office) {
-                    if (sameWrap) sameWrap.style.display = 'none';
-                    if (sameBox) {
-                        sameBox.checked = false;
-                        sameBox.disabled = true;
-                    }
-                } else {
-                    if (sameWrap) sameWrap.style.display = '';
-                    if (sameBox) {
-                        sameBox.disabled = false; /* default remains whatever user chose */
-                    }
-                }
-            }
-
-            [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', applyState));
-            applyState();
-        });
-        document.addEventListener('DOMContentLoaded', function () {
             const form = document.querySelector('form.checkout-grid-2col');
-            if (!form) return;
 
-            // highlight invalid fields
-            form.addEventListener('invalid', function (e) {
-                e.target.classList.add('is-invalid');
-            }, true);
+            /* ====== 1) shipping preview + show total only after delivery ====== */
+            (function setupShipping() {
+                const qtyInput = document.querySelector('input[name="quantity"]');
+                const outBGN = document.querySelector("[data-total-bgn]");
+                const outEUR = document.querySelector("[data-total-eur]");
+                const shipLine = document.querySelector("[data-ship-line]");
+                const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
+                const totalWrap = document.querySelector("[data-total-wrap]");
 
-            // remove highlight when user fixes
-            form.addEventListener('input', function (e) {
-                if (e.target.classList.contains('is-invalid') && e.target.checkValidity()) {
-                    e.target.classList.remove('is-invalid');
+                function toNum(s) {
+                    return parseFloat(String(s).replace(",", ".").trim()) || 0
                 }
-            });
 
-            // show browser popups
-            form.addEventListener('submit', function (e) {
-                if (!form.checkValidity()) {
-                    e.preventDefault();
-                    form.reportValidity();
+                function fmt(n) {
+                    return (Math.round(n * 100) / 100).toFixed(2)
                 }
-            });
-        });
-        document.addEventListener('DOMContentLoaded', function () {
-            const form = document.querySelector('form.checkout-grid-2col');
-            if (!form) return;
 
-            form.addEventListener('submit', function (e) {
-                // hidden originals
+                const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
+                const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
+
+                function currentDelivery() {
+                    const checked = document.querySelector('input[name="delivery_method"]:checked');
+                    return checked ? checked.value : null;
+                }
+
+                function shipBGN() {
+                    return currentDelivery() === "address" ? 9.00 : 7.00;
+                }
+
+                function shipEUR() {
+                    return shipBGN() / 1.95583;
+                }
+
+                function recalc() {
+                    const q = toNum(qtyInput?.value || 1);
+                    const delivery = currentDelivery();
+
+                    if (!delivery) {
+                        if (totalWrap) totalWrap.style.display = "none";
+                        if (shipLine) shipLine.textContent = "";
+                        if (outBGN) outBGN.textContent = fmt(pBGN * q);
+                        if (outEUR) outEUR.textContent = fmt(pEUR * q);
+                        return;
+                    }
+
+                    const sBGN = shipBGN(), sEUR = shipEUR();
+                    if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
+                    if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
+                    if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
+                    if (totalWrap) totalWrap.style.display = "";
+                }
+
+                dmRadios.forEach(r => r.addEventListener("change", recalc));
+                if (qtyInput) qtyInput.addEventListener("input", recalc);
+                recalc();
+            })();
+
+            /* ====== 2) sync visible billing -> hidden originals ====== */
+            (function syncHidden() {
+                const visName = document.querySelector('input[name="billing_full_name"]');
+                const visEmail = document.querySelector('input[name="billing_email"]');
+                const visPhone = document.querySelector('input[name="billing_phone"]');
+
                 const hidName = document.querySelector('.sr-only [name="full_name"]');
                 const hidEmail = document.querySelector('.sr-only [name="email"]');
                 const hidPhone = document.querySelector('.sr-only [name="phone"]');
 
-                // visible equivalents
-                const visName = document.querySelector('[name="billing_full_name"]');
-                const visEmail = document.querySelector('[name="billing_email"]');
-                const visPhone = document.querySelector('[name="billing_phone"]');
-
-                function need(val) {
-                    return !val || !String(val).trim();
+                function sync() {
+                    if (hidName && visName) hidName.value = visName.value;
+                    if (hidEmail && visEmail) hidEmail.value = visEmail.value;
+                    if (hidPhone && visPhone) hidPhone.value = visPhone.value;
                 }
 
-                // check one by one
-                if (hidName && need(hidName.value)) {
-                    e.preventDefault();
-                    alert("You need to fill in this field!");
-                    if (visName) {
-                        visName.classList.add('is-invalid');
-                        visName.focus();
-                    }
-                    return;
-                }
+                [visName, visEmail, visPhone].forEach(el => el && el.addEventListener('input', sync));
+                sync();
+            })();
 
-                if (hidEmail && need(hidEmail.value)) {
-                    e.preventDefault();
-                    alert("You need to fill in this field!");
-                    if (visEmail) {
-                        visEmail.classList.add('is-invalid');
-                        visEmail.focus();
-                    }
-                    return;
-                }
+            /* ====== 3) show/hide "same address" depending on delivery ====== */
+            (function toggleSameAddress() {
+                const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
+                const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
+                const sameWrap = document.getElementById('same_box_wrap');
+                const sameBox = document.querySelector('input[name="ship_same_as_billing"]');
 
-                if (hidPhone && need(hidPhone.value)) {
-                    e.preventDefault();
-                    alert("You need to fill in this field!");
-                    if (visPhone) {
-                        visPhone.classList.add('is-invalid');
-                        visPhone.focus();
+                function applyState() {
+                    const office = rbOffice && rbOffice.checked;
+                    if (office) {
+                        if (sameWrap) sameWrap.style.display = 'none';
+                        if (sameBox) {
+                            sameBox.checked = false;
+                            sameBox.disabled = true;
+                        }
+                    } else {
+                        if (sameWrap) sameWrap.style.display = '';
+                        if (sameBox) {
+                            sameBox.disabled = false;
+                        }
                     }
                 }
-            });
+
+                [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', applyState));
+                applyState();
+            })();
+
+            /* ====== 4) FIX REQUIRED FIELDS ======
+               - remove required from hidden originals
+               - add required to visible fields
+            */
+            (function fixRequired() {
+                // hidden ones: make them NOT required
+                const hiddenNames = ['full_name', 'email', 'phone'];
+                hiddenNames.forEach(name => {
+                    const el = document.querySelector('.sr-only [name="' + name + '"]');
+                    if (el) el.removeAttribute('required');
+                });
+
+                // visible ones: make them required
+                const visibleRequired = [
+                    'billing_full_name',
+                    'billing_email',
+                    'billing_phone',
+                    'billing_city',
+                    'billing_street',
+                    'billing_postcode'
+                ];
+                visibleRequired.forEach(name => {
+                    const el = document.querySelector('[name="' + name + '"]');
+                    if (el) el.required = true;
+                });
+            })();
+
+            /* ====== 5) validation UI ====== */
+            if (form) {
+                // highlight invalid
+                form.addEventListener('invalid', function (e) {
+                    e.target.classList.add('is-invalid');
+                }, true);
+
+                // remove on input
+                form.addEventListener('input', function (e) {
+                    if (e.target.classList.contains('is-invalid') && e.target.checkValidity()) {
+                        e.target.classList.remove('is-invalid');
+                    }
+                });
+
+                // final gate: show native popups
+                form.addEventListener('submit', function (e) {
+                    if (!form.checkValidity()) {
+                        e.preventDefault();
+                        form.reportValidity();
+                    }
+                });
+            }
         });
     </script>
 {% endblock %}
