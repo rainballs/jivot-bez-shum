@@ -13,15 +13,16 @@ from .models import PaymentMethod
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
     """
-    Creates an Econt label (JSON API) using settings.ECONT.
-    Business rules:
-    - if order.paid == True -> COD 0.00, courier paid by SENDER
-    - if order.paid == False or payment_method == COD -> COD = order.total_bgn, courier paid by RECEIVER
+    Build and send label to Econt.
+    Rules (your rules):
+    - delivery is ALWAYS paid by sender
+    - COD is sent ONLY when order.payment_method == PaymentMethod.COD
+    - declaredValue is ALWAYS order.total_bgn
     """
     overrides = overrides or {}
-    d = settings.ECONT["DEFAULTS"]
+    cfg = settings.ECONT["DEFAULTS"]
 
-    # --------- 1) Receiver data ---------
+    # ----- receiver basics -----
     receiver_name = (
             getattr(order, "full_name", "") or
             f"{getattr(order, 'first_name', '')} {getattr(order, 'last_name', '')}".strip()
@@ -29,10 +30,9 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     receiver_phone = getattr(order, "phone", "")
     receiver_city = getattr(order, "city", "")
 
-    # office vs address
+    # office vs address (overrides come from the POST in econt_submit)
     receiver_office_code = getattr(order, "econt_office_code", "") or overrides.get("receiver_office_code")
 
-    # structured address
     r_street = overrides.get("receiver_street")
     r_num = overrides.get("receiver_num")
     r_postcode = overrides.get("receiver_postcode")
@@ -40,36 +40,33 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
-    # --------- 2) Payment / COD rules ---------
+    # ----- money -----
+    # your model uses total_bgn, so use it
     total_bgn = float(getattr(order, "total_bgn", 0.0) or 0.0)
 
-    # decide paid / not paid
-    is_paid = bool(getattr(order, "paid", False))
-    pm = getattr(order, "payment_method", None)
-    is_cod_payment = (pm == PaymentMethod.COD)
-
-    if is_paid and not is_cod_payment:
-        # card/stripe/etc already paid
-        cod_bgn = 0.0
-        payer = "sender"  # merchant pays courier
-    else:
-        # cash on delivery OR order not yet paid
+    # COD ONLY when user selected COD
+    is_cod = getattr(order, "payment_method", None) == PaymentMethod.COD
+    if is_cod:
         cod_bgn = total_bgn
-        payer = "sender"  # receiver pays courier on delivery
+    else:
+        cod_bgn = 0.0
 
-    # declared value = value of the shipment, usually the order total
+    # declared value -> always the order value (so it shows up)
     declared_bgn = total_bgn
 
-    # fallback weight
+    # delivery payer -> ALWAYS sender (your requirement)
+    payer = "sender"
+
+    # fallback weight (you had 0.8 all over)
     weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
 
-    # --------- 3) Build payload ---------
+    # ----- build payload -----
     payload = build_create_label_json(
-        sender_name=d["sender_name"],
-        sender_phone=d["sender_phone"],
-        sender_city=d["sender_city"],
-        sender_address=d["sender_address"],
-        sender_office_code=(d.get("sender_office") or None),
+        sender_name=cfg["sender_name"],
+        sender_phone=cfg["sender_phone"],
+        sender_city=cfg["sender_city"],
+        sender_address=cfg["sender_address"],
+        sender_office_code=(cfg.get("sender_office") or None),
 
         receiver_name=receiver_name,
         receiver_phone=receiver_phone,
@@ -85,10 +82,10 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
 
         weight_kg=weight_kg,
         parcels=1,
-        cod_bgn=cod_bgn,  # <-- our rule above
-        declared_value_bgn=declared_bgn,
-        payer=payer,  # <-- our rule above
-        label_format=d.get("label_format", "10x9"),
+        cod_bgn=cod_bgn,  # ← ONLY >0 on COD
+        declared_value_bgn=declared_bgn,  # ← always show value
+        payer=payer,  # ← always sender
+        label_format=cfg.get("label_format", "10x9"),
     )
 
     client = EcontClient()
@@ -108,8 +105,8 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     shipment_num = res.get("shipmentNumber") or res.get("num") or res.get("shipment_num")
     pdf_bytes = None
     if "pdfBase64" in res:
+        import base64
         try:
-            import base64
             pdf_bytes = base64.b64decode(res["pdfBase64"])
         except Exception:
             pdf_bytes = None

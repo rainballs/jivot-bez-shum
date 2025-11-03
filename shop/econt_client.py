@@ -269,25 +269,27 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
-    # If you really want declared value only when not paid:
-    # (remove if you prefer to always send declared value)
-    # NOTE: don't reference Order class here — use the parameters you pass in.
-    # keep declared_value_bgn as-is
-
+    """
+    Build EXACT JSON for
+      POST .../Shipments/LabelService.createLabel.json
+    We add "payment" ONLY if cod_bgn > 0 (== user selected COD).
+    """
     payer = (payer or "receiver").upper()
+    cod_bgn = float(cod_bgn or 0.0)
 
-    payload = {
+    payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,  # "RECEIVER" / "SENDER"
+        "payer": payer,  # "SENDER" / "RECEIVER"
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
-        "senderAgent": {"name": "Филип Стоянов", "phones": [sender_phone]},
+        # agent can stay — Econt tolerates it
+        "senderAgent": {"name": sender_name, "phones": [sender_phone]},
         "senderAddress": {
             "city": {
                 "country": {"code3": "BGR"},
@@ -304,26 +306,19 @@ def build_create_label_json(
                 "postCode": receiver_postcode,
             }
         },
-        "payment": {
-            "cdAmount": float(declared_value_bgn),
-            "cdCurrency": "BGN",
-            "cdType": "get",
-            "side": "RECEIVER",
-            "method": "CASH",
-        },
     }
 
-    # Sender: office OR address
+    # --- sender: office OR address ---
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # Compute a proper string date once
+    # --- delivery date (Econt style) ---
     delivery_day = _next_workday(date.today()).isoformat()
     payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # Route: office vs door
+    # --- receiver: office vs door ---
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -342,14 +337,14 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # COD only if > 0
-    cod_bgn = float(cod_bgn or 0.0)
+    # --- COD: ONLY if user really chose COD (cod_bgn > 0) ---
     if cod_bgn > 0:
+        # this is the shape Econt expects for COD in JSON
         payload["payment"] = {
             "cdAmount": cod_bgn,
             "cdCurrency": "BGN",
-            "cdType": "get",
-            "side": "RECEIVER",
+            "cdType": "get",  # collect on delivery
+            "side": "RECEIVER",  # receiver brings the money
             "method": "CASH",
         }
 
