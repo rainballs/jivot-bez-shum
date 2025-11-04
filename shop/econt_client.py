@@ -331,7 +331,6 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # === services (declared + COD) ===
     services: dict = {}
 
     if declared_value_bgn and declared_value_bgn > 0:
@@ -339,16 +338,22 @@ def build_create_label_json(
         services["declaredValueCurrency"] = "BGN"
 
     if cod_bgn > 0:
-        # choose which office should pay out the cash
+        # pick office to pay out at
         cod_office = receiver_office_code or sender_office_code
 
         services["cdAmount"] = float(cod_bgn)
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
+
+        # 🔴 THIS is the part Econt complained about
         services["cdPayOptions"] = {
-            "method": "office",  # pay out at office
-            "officeCode": str(cod_office) if cod_office else "",  # the office we picked
-            "departamentNum": 1,  # required in the class spec
+            "method": "office",  # you wanted office payout
+            "officeCode": str(cod_office) if cod_office else "",
+            "departamentNum": 1,  # required in their class
+            "client": {  # <-- add client here
+                "name": sender_name,  # who will receive the COD
+                "phones": [sender_phone],
+            },
         }
 
     if services:
