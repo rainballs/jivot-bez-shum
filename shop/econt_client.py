@@ -268,7 +268,6 @@ def build_create_label_json(
         declared_value_bgn: float = 0.0,
         payer: str = "receiver",
         label_format: str = "10x9",
-        cd_template: str | None = None,  # from settings
 ) -> dict:
     payer = (payer or "receiver").upper()
     cod_bgn = float(cod_bgn or 0.0)
@@ -280,7 +279,6 @@ def build_create_label_json(
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
         "payer": payer,
-        # you can keep this, Econt tolerates it
         "declaredValue": float(declared_value_bgn),
         "label": {"format": label_format},
 
@@ -304,17 +302,17 @@ def build_create_label_json(
         },
     }
 
-    # sender: office or address
+    # --- sender: office or address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # delivery date
+    # --- delivery date
     delivery_day = _next_workday(date.today()).isoformat()
     payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
 
-    # receiver: office vs door
+    # --- receiver: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
@@ -333,22 +331,25 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
-    # === THIS is the important part: services ===
-    services = {}
+    # === services (declared + COD) ===
+    services: dict = {}
 
-    # declared value also lives nicely in services in their examples
     if declared_value_bgn and declared_value_bgn > 0:
         services["declaredValueAmount"] = float(declared_value_bgn)
         services["declaredValueCurrency"] = "BGN"
 
-    # COD ONLY if > 0
     if cod_bgn > 0:
+        # choose which office should pay out the cash
+        cod_office = receiver_office_code or sender_office_code
+
         services["cdAmount"] = float(cod_bgn)
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
-        if cd_template:
-            # matches the doc: cdPayOptionsTemplate
-            services["cdPayOptionsTemplate"] = cd_template
+        services["cdPayOptions"] = {
+            "method": "office",  # pay out at office
+            "officeCode": str(cod_office) if cod_office else "",  # the office we picked
+            "departamentNum": 1,  # required in the class spec
+        }
 
     if services:
         payload["services"] = services
