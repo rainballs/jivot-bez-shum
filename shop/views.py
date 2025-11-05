@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from .utils import send_order_notification, maybe_send_order_email
 from .econt_service import create_econt_label
+from .models import Order, OrderItem, Product, DeliveryMethod, PaymentMethod as OrderPaymentMethod
 
 import stripe
 
