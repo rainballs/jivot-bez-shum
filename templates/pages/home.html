@@ -26,18 +26,18 @@
                     Ако търсиш изцеление, разбиране и ново начало, тази книга е за теб.
                     </strong>
                 </p>
-                {#                <div class="price-row">#}
-                {#                    {% if product %}#}
-                {#                        <div class="price-card">#}
-                {#                            <div class="price">{{ product.price_bgn }} лв</div>#}
-                {#                            <div class="meta">вкл. ДДС</div>#}
-                {#                        </div>#}
-                {#                        <div class="price-card">#}
-                {#                            <div class="price">€ {{ product.price_eur }}</div>#}
-                {#                            <div class="meta">EEA цена</div>#}
-                {#                        </div>#}
-                {#                    {% endif %}#}
-                {#                </div>#}
+                                <div class="price-row">
+                                    {% if product %}
+                                        <div class="price-card">
+                                            <div class="price">{{ product.price_bgn }} лв</div>
+                                            <div class="meta">вкл. ДДС</div>
+                                        </div>
+                                        <div class="price-card">
+                                            <div class="price">€ {{ product.price_eur }}</div>
+                                            <div class="meta">EEA цена</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
                 <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Купи сега</a>
             </div>
             <div class="hero-art">
