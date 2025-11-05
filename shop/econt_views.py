@@ -260,7 +260,6 @@ def econt_submit(request):
     order.save()
 
     result = create_econt_label(order, overrides=overrides)
-    maybe_send_order_email(order)
 
     if not result.get("ok"):
         msg = result.get("error") or "Неуспешно създаване на товарителница."
@@ -268,7 +267,9 @@ def econt_submit(request):
             msg += " (проверете съвпадението град ↔ офис или попълнете улица и №)."
         messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect(back_name)
-
+    # label is OK → reload order so we see the label fields the service saved
+    order.refresh_from_db()
+    maybe_send_order_email(order)
     # messages.success(request, "Товарителницата е създадена успешно.")
     return redirect("thank_you")
 
