@@ -69,7 +69,8 @@
                 <aside class="checkout-aside">
                     <div class="card soft">
                         <h3 class="mb-0">Съвет</h3>
-                        <p class="small muted">Изберете град и Офис на ЕКОНТ. Моля попълнете данните на български език!</p>
+                        <p class="small muted">Изберете град и Офис на ЕКОНТ. Моля попълнете данните на български
+                            език!</p>
                         {% if order and order.econt_label_pdf %}
                             <p class="mt"><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">Принтирай
                                 товарителница</a></p>
@@ -165,11 +166,11 @@
             const cityInput = $('#city_input');
             const cityBox = $('#city_suggest');
             const cityIdField = $('#city_id');
-            const cityNameOut = $('#city_name');     // <-- hidden field that will be POST-ed
+            const cityNameOut = $('#city_name');     // hidden field that will be POST-ed
 
             const officeList = $('#offices_list');
             const officeSearch = $('#office_search');
-            const officeCode = $('#office_code');   // <-- hidden field that will be POST-ed
+            const officeCode = $('#office_code');   // hidden field that will be POST-ed
             const submitBtn = $('#submit_btn');
             const pickedInfo = $('#picked_info');
 
@@ -183,17 +184,24 @@
                 t = setTimeout(fn, ms);
             };
 
+            // ---------- CITY SUGGEST (now case-insensitive on the client) ----------
             function renderCitySuggest() {
                 const q = (cityInput.value || '').trim();
+                const qLower = q.toLowerCase();
                 if (!q) {
                     cityBox.style.display = 'none';
                     return;
                 }
-                cityBox.innerHTML = cities.map(c => `
-      <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
-        ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
-      </div>`).join('');
-                cityBox.style.display = cities.length ? 'block' : 'none';
+
+                // filter here, so typing "бургас" still shows "Бургас"
+                const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(qLower));
+
+                cityBox.innerHTML = filtered.map(c => `
+          <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
+            ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+          </div>`).join('');
+
+                cityBox.style.display = filtered.length ? 'block' : 'none';
             }
 
             function searchCities() {
@@ -218,12 +226,13 @@
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
-                cityNameOut.value = name;       // <-- THIS makes sure POST['city'] has the picked name
+                cityNameOut.value = name;       // THIS is what gets submitted
                 cityBox.style.display = 'none';
                 loadOffices(id);
                 updateSubmitState();
             }
 
+            // ---------- OFFICES ----------
             function loadOffices(cityID) {
                 officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
                 fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
@@ -255,18 +264,25 @@
                     return;
                 }
                 officeList.innerHTML = filtered.map(o => `
-      <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
-           data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
-        <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
-        <div class="muted small">${o.address || ''}</div>
-      </div>`).join('');
+          <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
+               data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
+            <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
+            <div class="muted small">${o.address || ''}</div>
+          </div>`).join('');
             }
 
+            // 🔴 CHANGED: when we pick an office, also set the office search input
             function pickOffice(code, name, addr) {
                 pickedOffice = {code, name, addr};
-                officeCode.value = code;        // <-- THIS is what your view reads as receiver_office_code
+                officeCode.value = code;
                 pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
                 pickedInfo.style.display = 'block';
+
+                // show selection in the search box
+                if (officeSearch) {
+                    officeSearch.value = `${name} (#${code})`;
+                }
+
                 renderOffices();
                 updateSubmitState();
             }
@@ -276,13 +292,15 @@
                 submitBtn.disabled = !ok;
             }
 
-            // events
+            // ---------- EVENTS ----------
             cityInput.addEventListener('input', () => debounced(searchCities, 250));
             cityInput.addEventListener('focus', () => {
                 if (cities.length) cityBox.style.display = 'block';
             });
             document.addEventListener('click', (e) => {
-                if (!cityBox.contains(e.target) && e.target !== cityInput) cityBox.style.display = 'none';
+                if (!cityBox.contains(e.target) && e.target !== cityInput) {
+                    cityBox.style.display = 'none';
+                }
             });
             cityBox.addEventListener('click', (e) => {
                 const item = e.target.closest('.suggest-item');
@@ -297,7 +315,7 @@
                 pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
             });
 
-            // Prefill if you arrived with a city already stored on the order
+            // Prefill if page loads with a city already
             document.addEventListener('DOMContentLoaded', () => {
                 const preset = (cityInput.value || '').trim();
                 if (preset) {
@@ -305,10 +323,12 @@
                         .then(r => r.json())
                         .then(data => {
                             const items = data.ok ? (data.items || []) : [];
-                            const match = items.find(c => c.name === preset) || items[0];
+                            // try to match ignoring case
+                            const match = items.find(c => c.name.toLowerCase() === preset.toLowerCase()) || items[0];
                             if (match) pickCity(match.id, match.name);
                         })
                         .catch(() => {
+                            updateSubmitState();
                         });
                 } else {
                     updateSubmitState();

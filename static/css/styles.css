@@ -2894,3 +2894,8 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
     text-decoration: none;
     width: fit-content;
 }
+
+
+@media (max-width: 480px) {
+    width: auto;
+}
