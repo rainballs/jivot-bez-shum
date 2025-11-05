@@ -1,6 +1,7 @@
 import logging
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+from .models import PaymentMethod
 from django.conf import settings
 
 from django.conf import settings
@@ -70,25 +71,26 @@ def send_order_notification(order, event="created"):
 def maybe_send_order_email(order):
     """
     Send email ONLY if:
-    - we have econt label (order.econt_label_pdf or whatever you store)
-    - AND payment is OK (COD always OK, card only if paid)
+    - we have econt label
+    - AND payment is OK (COD always OK, card/apple/google only if paid)
     """
-    # 1) shipping / label must exist
+    # 1) label present?
     has_label = bool(getattr(order, "econt_label_pdf", None)) or bool(getattr(order, "econt_label_id", None))
     if not has_label:
-        return  # not ready
+        return
 
-    # 2) payment method must be chosen
+    # 2) payment method present?
     pay_method = getattr(order, "payment_method", None)
     if not pay_method:
         return
 
-    # 3) payment rules
-    if pay_method == "cash":  # COD
+    # 3) rules based on your actual choices
+    if pay_method == PaymentMethod.COD:
+        # COD is fine right after label
         send_order_notification(order, event="created")
         return
 
-    if pay_method == "card":
+    if pay_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
         if getattr(order, "paid", False):
             send_order_notification(order, event="created")
-        # else: do nothing, we’ll try again from webhook
+        # else: wait for Stripe/webhook
