@@ -178,13 +178,27 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {
-        "console": {"class": "logging.StreamHandler"},
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    # this is the *root* logger → everything goes to console at INFO+
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
     },
     "loggers": {
-        "econt": {"handlers": ["console"], "level": "ERROR"},  # we use .error to force-print
-        "stripe": {"handlers": ["console"], "level": "ERROR"},
-        "level": "INFO",
-        # test stripe logging response
-
+        # your Econt debug
+        "econt": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # your stripe debug
+        "stripe": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
