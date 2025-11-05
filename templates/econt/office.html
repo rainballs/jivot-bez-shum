@@ -166,11 +166,11 @@
             const cityInput = $('#city_input');
             const cityBox = $('#city_suggest');
             const cityIdField = $('#city_id');
-            const cityNameOut = $('#city_name');     // hidden field that will be POST-ed
+            const cityNameOut = $('#city_name');
 
             const officeList = $('#offices_list');
             const officeSearch = $('#office_search');
-            const officeCode = $('#office_code');   // hidden field that will be POST-ed
+            const officeCode = $('#office_code');
             const submitBtn = $('#submit_btn');
             const pickedInfo = $('#picked_info');
 
@@ -184,7 +184,6 @@
                 t = setTimeout(fn, ms);
             };
 
-            // ---------- CITY SUGGEST (now case-insensitive on the client) ----------
             function renderCitySuggest() {
                 const q = (cityInput.value || '').trim();
                 const qLower = q.toLowerCase();
@@ -193,7 +192,6 @@
                     return;
                 }
 
-                // filter here, so typing "бургас" still shows "Бургас"
                 const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(qLower));
 
                 cityBox.innerHTML = filtered.map(c => `
@@ -223,17 +221,37 @@
                     });
             }
 
+            // 👇 we'll call this from several places
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
-                cityNameOut.value = name;       // this is the value sent to Django
+                cityNameOut.value = name;
                 cityBox.style.display = 'none';
-                cityInput.blur();               // 👈 close it for real
+                cityInput.blur();                 // close it
                 loadOffices(id);
                 updateSubmitState();
             }
 
-            // ---------- OFFICES ----------
+            // try to pick best match from current list
+            function tryPickTypedCity() {
+                const typed = (cityInput.value || '').trim().toLowerCase();
+                if (!typed || !cities.length) return false;
+
+                // exact (case-insensitive)
+                let match = cities.find(c => (c.name || '').toLowerCase() === typed);
+
+                // or starts with
+                if (!match) {
+                    match = cities.find(c => (c.name || '').toLowerCase().startsWith(typed));
+                }
+
+                if (match) {
+                    pickCity(match.id, match.name);
+                    return true;
+                }
+                return false;
+            }
+
             function loadOffices(cityID) {
                 officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
                 fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
@@ -272,14 +290,12 @@
           </div>`).join('');
             }
 
-            // 🔴 CHANGED: when we pick an office, also set the office search input
             function pickOffice(code, name, addr) {
                 pickedOffice = {code, name, addr};
                 officeCode.value = code;
                 pickedInfo.textContent = `Избран офис: ${name} (#${code})${addr ? ' — ' + addr : ''}`;
                 pickedInfo.style.display = 'block';
 
-                // show selection in the search box
                 if (officeSearch) {
                     officeSearch.value = `${name} (#${code})`;
                 }
@@ -293,16 +309,40 @@
                 submitBtn.disabled = !ok;
             }
 
-            // ---------- EVENTS ----------
+            // ===== events =====
             cityInput.addEventListener('input', () => debounced(searchCities, 250));
+
+            // show list on focus if we have data
             cityInput.addEventListener('focus', () => {
                 if (cities.length) cityBox.style.display = 'block';
             });
+
+            // 👉 NEW: Enter should pick the first suitable city
+            cityInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!tryPickTypedCity()) {
+                        cityBox.style.display = 'none';
+                    }
+                }
+            });
+
+            // 👉 NEW: on blur, also try to pick
+            cityInput.addEventListener('blur', () => {
+                // small timeout so click on suggestion still works
+                setTimeout(() => {
+                    if (!tryPickTypedCity()) {
+                        cityBox.style.display = 'none';
+                    }
+                }, 100);
+            });
+
             document.addEventListener('click', (e) => {
                 if (!cityBox.contains(e.target) && e.target !== cityInput) {
                     cityBox.style.display = 'none';
                 }
             });
+
             cityBox.addEventListener('click', (e) => {
                 const item = e.target.closest('.suggest-item');
                 if (!item) return;
@@ -316,7 +356,7 @@
                 pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
             });
 
-            // Prefill if page loads with a city already
+            // prefill
             document.addEventListener('DOMContentLoaded', () => {
                 const preset = (cityInput.value || '').trim();
                 if (preset) {
@@ -324,7 +364,6 @@
                         .then(r => r.json())
                         .then(data => {
                             const items = data.ok ? (data.items || []) : [];
-                            // try to match ignoring case
                             const match = items.find(c => c.name.toLowerCase() === preset.toLowerCase()) || items[0];
                             if (match) pickCity(match.id, match.name);
                         })
