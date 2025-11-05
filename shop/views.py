@@ -10,9 +10,8 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedire
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from .utils import send_order_notification, maybe_send_order_email
+from .utils import send_order_notification
 from .econt_service import create_econt_label
-from .models import Order, OrderItem, Product, DeliveryMethod, PaymentMethod as OrderPaymentMethod
 
 import stripe
 
@@ -109,7 +108,7 @@ def checkout_info(request):
 
             # delivery method radio (address/office) from the template
             dm = request.POST.get("delivery_method", "address")
-            from .models import DeliveryMethod  # you can move this to the top if you want
+            from .models import DeliveryMethod
             order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
 
             # chosen payment method
@@ -122,6 +121,7 @@ def checkout_info(request):
                 order.phone = order.billing_phone or order.phone
                 order.city = order.billing_city or order.city
                 order.postal_code = order.billing_postcode or order.postal_code
+                # keep only the street in address_line; the house number is asked on the next page
                 order.address_line = order.billing_street or order.address_line
 
             order.quantity = info_form.cleaned_data["quantity"]
@@ -129,23 +129,28 @@ def checkout_info(request):
             order.save()
             qty = info_form.cleaned_data["quantity"]
 
-            # (yes, this is your original second save – leaving it as you wanted)
+            # Create order with billing (invoice) details
             order: Order = info_form.save(commit=False)
             order.quantity = qty
             order.paid = False
 
+            # Delivery method (radio on this page)
             dm = request.POST.get("delivery_method", "address")
             order.delivery_method = (
                 DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
             )
 
+            # If user picked office, never carry this flag forward
             if order.delivery_method == DeliveryMethod.TO_OFFICE:
                 order.ship_same_as_billing = False
             else:
                 order.ship_same_as_billing = bool(request.POST.get("ship_same_as_billing"))
 
+            # Payment method (separate form)
             order.payment_method = pay_form.cleaned_data["payment_method"]
 
+            # Optional: prefill display-only shipping fields from billing (handy on the next screen)
+            # We DO NOT finalize shipping address here—user can change it on the address page.
             if order.ship_same_as_billing:
                 order.full_name = order.billing_full_name
                 order.email = order.billing_email
@@ -172,16 +177,11 @@ def checkout_info(request):
                 "total_bgn", "total_eur", "paid", "payment_method"
             ])
 
-            # 👇 keep this commented – email is sent later by maybe_send_order_email
-            # send_order_notification(order, event="created")
+            send_order_notification(order, event="created")
             request.session["current_order_id"] = order.id
 
             # Branch by payment
-            if order.payment_method in {
-                OrderPaymentMethod.CARD,
-                OrderPaymentMethod.APPLE_PAY,
-                OrderPaymentMethod.GOOGLE_PAY,
-            }:
+            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 return redirect("stripe_create_session")
 
             # COD → go to proper Econt page
@@ -192,13 +192,13 @@ def checkout_info(request):
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
+        # Reasonable defaults
         info_form = CheckoutInfoForm(initial={
             "quantity": 1,
             "ship_same_as_billing": True,
         })
-        # default payment
-        pay_form = PaymentMethodForm(initial={"payment_method": OrderPaymentMethod.COD})
-        #                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # Card by default
+        pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.COD})
 
     return render(
         request,
@@ -321,7 +321,9 @@ def stripe_webhook(request):
                 order = Order.objects.get(pk=order_id)
                 order.paid = True
                 order.save(update_fields=["paid"])
-                maybe_send_order_email(order)
+
+                from .utils import send_order_notification
+                send_order_notification(order, event="paid")
                 # Card paid → no COD
                 _ = create_econt_label(order)
             except Order.DoesNotExist:
