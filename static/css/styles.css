@@ -2852,6 +2852,7 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
     text-transform: uppercase;
     margin-bottom: 1rem;
     font-size: 0.9rem;
+    text-align: center;
 }
 
 .price-row {
