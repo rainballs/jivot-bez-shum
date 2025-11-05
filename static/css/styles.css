@@ -2789,3 +2789,31 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
         color: #000;
     }
 }
+
+.price-row {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.price-card {
+    background: #111; /* keep your current look */
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 1.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-width: 140px;
+}
+
+.price-old {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.45);
+    text-decoration: line-through;
+}
+
+.price {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+}
