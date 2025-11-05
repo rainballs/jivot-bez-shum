@@ -2829,3 +2829,67 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
     color: rgba(255, 255, 255, 0.65); /* match your dark bg */
     text-transform: uppercase;
 }
+
+.price-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* space between prices and button */
+    margin-top: 1.5rem;
+}
+
+.price-block {
+    display: inline-block;
+}
+
+.price-pretitle {
+    display: inline-block;
+    background: rgba(199, 57, 47, 0.15);
+    color: #c7392f;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.price-row {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.price-card {
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 1.1rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 140px;
+}
+
+.price-old {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.45);
+    text-decoration: line-through;
+}
+
+.price {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.hero-cta {
+    display: inline-block;
+    background: #c7392f;
+    color: #fff;
+    padding: 0.9rem 2.7rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    width: fit-content;
+}

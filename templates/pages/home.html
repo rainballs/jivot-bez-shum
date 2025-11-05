@@ -22,31 +22,32 @@
                     <strong>и промених живота си.</strong><br>
                     „Живот без шум“ не е просто книга.<br>Това е пътеводител към вътрешно спокойствие<br> и свобода от
                     хроничните състояния<br> като тинитус, тревожност и безсъние.<br> Тя разкрива как надеждата и
-                    промяната
-                    започват отвътре, дори когато медицината мълчи.<br>
+                    промяната започват отвътре, дори когато медицината мълчи.<br>
                     Ако търсиш изцеление, разбиране и ново начало, тази книга е за теб.
-                    </strong>
                 </p>
-                <div class="price-block">
-                    <p class="price-pretitle">Preorder — Промо цена до 30.11.2025</p>
 
-                    <div class="price-row">
-                        {% if product %}
-                            <div class="price-card">
-                                <!-- top: old/regular price -->
-                                <div class="price-old">24,99 лв</div>
-                                <!-- bottom: sale/preorder price -->
-                                <div class="price">{{ product.price_bgn }} лв</div>
-                            </div>
-                            <div class="price-card">
-                                <div class="price-old">€ 12,77</div>
-                                <div class="price">€ {{ product.price_eur }}</div>
-                            </div>
-                        {% endif %}
+                <div class="price-actions">
+                    <div class="price-block">
+                        <p class="price-pretitle">PREORDER — ПРОМО ЦЕНА ДО 30.11.2025</p>
+
+                        <div class="price-row">
+                            {% if product %}
+                                <div class="price-card">
+                                    <div class="price-old">24,99 лв</div>
+                                    <div class="price">{{ product.price_bgn }} лв</div>
+                                </div>
+                                <div class="price-card">
+                                    <div class="price-old">€ 12,77</div>
+                                    <div class="price">€ {{ product.price_eur }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
+
+                    <a href="{% url 'checkout_info' %}" class="hero-cta">Купи сега</a>
                 </div>
-                <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Купи сега</a>
             </div>
+
             <div class="hero-art">
                 <img src="{% static 'images/book.svg' %}" alt="Книга Живот без шум">
             </div>
