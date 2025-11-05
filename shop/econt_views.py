@@ -11,6 +11,8 @@ import json
 from django.views.decorators.http import require_http_methods
 import logging
 import stripe
+
+from .utils import send_order_notification
 from .views import get_single_product
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -266,6 +268,7 @@ def econt_submit(request):
         return redirect(back_name)
 
     # messages.success(request, "Товарителницата е създадена успешно.")
+    send_order_notification(order, event="created")
     return redirect("thank_you")
 
 

@@ -177,7 +177,6 @@ def checkout_info(request):
                 "total_bgn", "total_eur", "paid", "payment_method"
             ])
 
-            send_order_notification(order, event="created")
             request.session["current_order_id"] = order.id
 
             # Branch by payment
