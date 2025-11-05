@@ -26,7 +26,7 @@ class CheckoutInfoForm(forms.ModelForm):
     # Billing (invoice) section + toggle (names match your Order fields)
     billing_full_name = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Име и фамилия (за фактура)"}),
+        widget=forms.TextInput(attrs={"placeholder": "Име и фамилия "}),
         label="Име и фамилия (фактура)",
     )
     billing_email = forms.EmailField(
@@ -41,17 +41,17 @@ class CheckoutInfoForm(forms.ModelForm):
     )
     billing_city = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Град (фактура)"}),
+        widget=forms.TextInput(attrs={"placeholder": "Град "}),
         label="Град (фактура)",
     )
     billing_street = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "ул. / бул., №, вх., ет., ап. (фактура)"}),
+        widget=forms.TextInput(attrs={"placeholder": "ул. / бул., №, вх., ет., ап. "}),
         label="Адрес (фактура)",
     )
     billing_postcode = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Пощ. код (фактура)"}),
+        widget=forms.TextInput(attrs={"placeholder": "Пощ. код "}),
         label="Пощ. код (фактура)",
     )
     ship_same_as_billing = forms.BooleanField(

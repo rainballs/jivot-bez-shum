@@ -31,30 +31,30 @@
 
                     <!-- Visible main fields -->
                     <div class="field-grid">
-                        <label>Име и фамилия (фактура) {{ form.billing_full_name }}</label>
+                        <label>Име и фамилия {{ form.billing_full_name }}</label>
                         {% for e in form.billing_full_name.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
 
-                        <label>Имейл (фактура) {{ form.billing_email }}</label>
+                        <label>Имейл {{ form.billing_email }}</label>
                         {% for e in form.billing_email.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
 
-                        <label>Телефон (фактура) {{ form.billing_phone }}</label>
+                        <label>Телефон {{ form.billing_phone }}</label>
                         {% for e in form.billing_phone.errors %}
                             <div class="error">{{ e }}</div>{% endfor %}
                     </div>
 
                     <div class="card soft p" style="margin-top:1rem">
                         <div class="field-grid">
-                            <label>Град (фактура) {{ form.billing_city }}</label>
+                            <label>Град {{ form.billing_city }}</label>
                             {% for e in form.billing_city.errors %}
                                 <div class="error">{{ e }}</div>{% endfor %}
 
-                            <label>Адрес (фактура) {{ form.billing_street }}</label>
+                            <label>Адрес {{ form.billing_street }}</label>
                             {% for e in form.billing_street.errors %}
                                 <div class="error">{{ e }}</div>{% endfor %}
 
-                            <label>Пощ. код (фактура) {{ form.billing_postcode }}</label>
+                            <label>Пощ. код {{ form.billing_postcode }}</label>
                             {% for e in form.billing_postcode.errors %}
                                 <div class="error">{{ e }}</div>{% endfor %}
                         </div>
