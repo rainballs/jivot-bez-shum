@@ -226,8 +226,9 @@
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
-                cityNameOut.value = name;       // THIS is what gets submitted
+                cityNameOut.value = name;       // this is the value sent to Django
                 cityBox.style.display = 'none';
+                cityInput.blur();               // 👈 close it for real
                 loadOffices(id);
                 updateSubmitState();
             }
