@@ -1,13 +1,12 @@
-# shop/utils.py (or wherever your mail helpers live)
-from django.conf import settings
-from django.core.mail import EmailMessage
-from django.template.loader import render_to_string
 import logging
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
-def send_order_emails(order, event="created"):
+def send_order_notification(order, event="created"):
     site_url = getattr(settings, "SITE_URL", "http://127.0.0.1:8000")
     subject_status = "PAID" if getattr(order, "paid", False) else "UNPAID"
 
