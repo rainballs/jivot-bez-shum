@@ -11,6 +11,7 @@ import requests
 from django.conf import settings
 from .econt_client import EcontClient, EcontError, build_create_label_json
 from .models import PaymentMethod
+from typing import List, Dict
 
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
@@ -173,9 +174,13 @@ def get_cities(country_code: str = "BGR", name_query: str = "") -> list[dict]:
     return cities
 
 
-def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> list[dict]:
+def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> List[Dict]:
     """
     Calls getOffices with {"countryCode":"BGR", "cityID": <int>}.
+
+    We EXCLUDE APS/MPS because they don't support COD and Econt returns 517
+    if you try to create a COD shipment to them.
+
     Returns compact list:
     [{"code":"9709","name":"Шумен","address":"Шумен бул. Мадара №1"}, ...]
     """
@@ -183,10 +188,17 @@ def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> list[dict
     payload = {"countryCode": country_code, "cityID": int(city_id)}
     data = _post_json(url, payload)
 
-    offices = []
+    offices: List[Dict] = []
     for o in data.get("offices", []):
+        # raw flags from Econt
+        is_aps = o.get("isAPS")
+        is_mps = o.get("isMPS")
+
+        # 1) skip lockers / machines
+        if is_aps or is_mps:
+            continue
+
         addr = o.get("address") or {}
-        # Build a human readable one-liner address
         parts = [
             addr.get("city", {}).get("name") or "",
             addr.get("quarter") or "",
@@ -195,9 +207,14 @@ def get_offices_by_city_id(city_id: int, country_code: str = "BGR") -> list[dict
             addr.get("other") or "",
         ]
         pretty = " ".join(p for p in parts if p).strip()
+
         offices.append({
             "code": o.get("code"),
             "name": o.get("name"),
             "address": pretty,
+            # keep flags just in case you want them in frontend later
+            "isAPS": is_aps,
+            "isMPS": is_mps,
         })
+
     return offices

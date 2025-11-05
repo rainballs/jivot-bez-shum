@@ -184,6 +184,7 @@
                 t = setTimeout(fn, ms);
             };
 
+            // ---------- CITY ----------
             function renderCitySuggest() {
                 const q = (cityInput.value || '').trim();
                 const qLower = q.toLowerCase();
@@ -191,14 +192,11 @@
                     cityBox.style.display = 'none';
                     return;
                 }
-
                 const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(qLower));
-
                 cityBox.innerHTML = filtered.map(c => `
           <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
             ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
           </div>`).join('');
-
                 cityBox.style.display = filtered.length ? 'block' : 'none';
             }
 
@@ -221,30 +219,24 @@
                     });
             }
 
-            // 👇 we'll call this from several places
             function pickCity(id, name) {
                 cityIdField.value = id;
                 cityInput.value = name;
                 cityNameOut.value = name;
                 cityBox.style.display = 'none';
-                cityInput.blur();                 // close it
+                cityInput.blur();
                 loadOffices(id);
                 updateSubmitState();
             }
 
-            // try to pick best match from current list
             function tryPickTypedCity() {
                 const typed = (cityInput.value || '').trim().toLowerCase();
                 if (!typed || !cities.length) return false;
 
-                // exact (case-insensitive)
                 let match = cities.find(c => (c.name || '').toLowerCase() === typed);
-
-                // or starts with
                 if (!match) {
                     match = cities.find(c => (c.name || '').toLowerCase().startsWith(typed));
                 }
-
                 if (match) {
                     pickCity(match.id, match.name);
                     return true;
@@ -252,12 +244,16 @@
                 return false;
             }
 
+            // ---------- OFFICES ----------
             function loadOffices(cityID) {
                 officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
                 fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
                     .then(r => r.json())
                     .then(data => {
-                        offices = data.ok ? (data.items || []) : [];
+                        // 🔴 FILTER HERE: drop APS (and MPS if you want)
+                        const raw = data.ok ? (data.items || []) : [];
+                        offices = raw.filter(o => !o.isAPS);  // keep only normal offices
+
                         pickedOffice = null;
                         officeCode.value = '';
                         pickedInfo.style.display = 'none';
@@ -276,10 +272,10 @@
                 const filtered = offices.filter(o =>
                     (o.name || '').toLowerCase().includes(q) ||
                     (o.address || '').toLowerCase().includes(q) ||
-                    (o.code || '').toLowerCase().includes(q)
+                    (o.code || '').toString().toLowerCase().includes(q)
                 );
                 if (!filtered.length) {
-                    officeList.innerHTML = `<div class="small muted">Няма резултати.</div>`;
+                    officeList.innerHTML = `<div class="small muted">Няма резултати (Еконтоматите са скрити).</div>`;
                     return;
                 }
                 officeList.innerHTML = filtered.map(o => `
@@ -309,15 +305,11 @@
                 submitBtn.disabled = !ok;
             }
 
-            // ===== events =====
+            // ---------- EVENTS ----------
             cityInput.addEventListener('input', () => debounced(searchCities, 250));
-
-            // show list on focus if we have data
             cityInput.addEventListener('focus', () => {
                 if (cities.length) cityBox.style.display = 'block';
             });
-
-            // 👉 NEW: Enter should pick the first suitable city
             cityInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -326,23 +318,18 @@
                     }
                 }
             });
-
-            // 👉 NEW: on blur, also try to pick
             cityInput.addEventListener('blur', () => {
-                // small timeout so click on suggestion still works
                 setTimeout(() => {
                     if (!tryPickTypedCity()) {
                         cityBox.style.display = 'none';
                     }
                 }, 100);
             });
-
             document.addEventListener('click', (e) => {
                 if (!cityBox.contains(e.target) && e.target !== cityInput) {
                     cityBox.style.display = 'none';
                 }
             });
-
             cityBox.addEventListener('click', (e) => {
                 const item = e.target.closest('.suggest-item');
                 if (!item) return;
@@ -356,7 +343,7 @@
                 pickOffice(it.dataset.code, it.dataset.name, it.dataset.addr);
             });
 
-            // prefill
+            // prefill city from order
             document.addEventListener('DOMContentLoaded', () => {
                 const preset = (cityInput.value || '').trim();
                 if (preset) {
