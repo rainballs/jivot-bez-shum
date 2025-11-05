@@ -2817,3 +2817,15 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
     font-weight: 700;
     color: #fff;
 }
+
+.price-block {
+    display: inline-block; /* so it hugs the cards */
+}
+
+.price-pretitle {
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.75rem;
+    color: rgba(255, 255, 255, 0.65); /* match your dark bg */
+    text-transform: uppercase;
+}

@@ -27,19 +27,23 @@
                     Ако търсиш изцеление, разбиране и ново начало, тази книга е за теб.
                     </strong>
                 </p>
-                <div class="price-row">
-                    {% if product %}
-                        <div class="price-card">
-                            <!-- top: old/regular price -->
-                            <div class="price-old">24,99 лв</div>
-                            <!-- bottom: sale/preorder price -->
-                            <div class="price">{{ product.price_bgn }} лв</div>
-                        </div>
-                        <div class="price-card">
-                            <div class="price-old">€ 12,77</div>
-                            <div class="price">€ {{ product.price_eur }}</div>
-                        </div>
-                    {% endif %}
+                <div class="price-block">
+                    <p class="price-pretitle">Preorder — Промо цена до 30.11.2025</p>
+
+                    <div class="price-row">
+                        {% if product %}
+                            <div class="price-card">
+                                <!-- top: old/regular price -->
+                                <div class="price-old">24,99 лв</div>
+                                <!-- bottom: sale/preorder price -->
+                                <div class="price">{{ product.price_bgn }} лв</div>
+                            </div>
+                            <div class="price-card">
+                                <div class="price-old">€ 12,77</div>
+                                <div class="price">€ {{ product.price_eur }}</div>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
                 <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-lg">Купи сега</a>
             </div>
