@@ -27,7 +27,7 @@
 {% with items=order.items.all %}
 {% if items %}
 {% for item in items %}
-- {{ item.product.name }} x {{ item.quantity }} → {{ item.price }} лв
+- {{ item.product.name }} x {{ item.quantity }} → {{ item.unit_price_bgn }} лв
 {% endfor %}
 {% else %}
 (няма артикули намерени)
@@ -41,8 +41,7 @@
 Доставка: {{ order.shipping_bgn }} лв
 Общо за плащане: {{ order.total_bgn }} лв
 
-Ако не ти изглежда правилно или имаш въпрос,
-пиши ни като отговориш на този имейл.
+За допълнителни въпроси моля пишете ни като отговорите на този имейл.
 
 Поздрави,
 Екипът на {{ site_url }}
