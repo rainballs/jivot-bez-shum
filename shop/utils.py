@@ -3,6 +3,8 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,3 +65,30 @@ def send_order_notification(order, event="created"):
             )
         except Exception:
             logger.exception("Failed to send customer order email for order %s", order.id)
+
+
+def maybe_send_order_email(order):
+    """
+    Send email ONLY if:
+    - we have econt label (order.econt_label_pdf or whatever you store)
+    - AND payment is OK (COD always OK, card only if paid)
+    """
+    # 1) shipping / label must exist
+    has_label = bool(getattr(order, "econt_label_pdf", None)) or bool(getattr(order, "econt_label_id", None))
+    if not has_label:
+        return  # not ready
+
+    # 2) payment method must be chosen
+    pay_method = getattr(order, "payment_method", None)
+    if not pay_method:
+        return
+
+    # 3) payment rules
+    if pay_method == "cash":  # COD
+        send_order_notification(order, event="created")
+        return
+
+    if pay_method == "card":
+        if getattr(order, "paid", False):
+            send_order_notification(order, event="created")
+        # else: do nothing, we’ll try again from webhook

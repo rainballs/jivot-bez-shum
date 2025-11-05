@@ -10,7 +10,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedire
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from .utils import send_order_notification
+from .utils import send_order_notification, maybe_send_order_email
 from .econt_service import create_econt_label
 
 import stripe
@@ -177,7 +177,7 @@ def checkout_info(request):
                 "total_bgn", "total_eur", "paid", "payment_method"
             ])
 
-            send_order_notification(order, event="created")
+            # send_order_notification(order, event="created")
             request.session["current_order_id"] = order.id
 
             # Branch by payment
@@ -321,9 +321,10 @@ def stripe_webhook(request):
                 order = Order.objects.get(pk=order_id)
                 order.paid = True
                 order.save(update_fields=["paid"])
+                maybe_send_order_email(order)
 
-                from .utils import send_order_notification
-                send_order_notification(order, event="paid")
+                from .utils import maybe_send_order_email
+                maybe_send_order_email(order)
                 # Card paid → no COD
                 _ = create_econt_label(order)
             except Order.DoesNotExist:

@@ -11,6 +11,8 @@ import json
 from django.views.decorators.http import require_http_methods
 import logging
 import stripe
+
+from .utils import maybe_send_order_email
 from .views import get_single_product
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -125,8 +127,9 @@ def econt_collect(request):
         order.paid = True
         order.save(update_fields=["paid"])
         try:
-            from .utils import send_order_notification
-            send_order_notification(order, event="paid")
+            from .utils import maybe_send_order_email
+            maybe_send_order_email(order)
+
         except Exception as e:
             logger.error("send_order_notification failed for order %s: %s", order.pk, e)
 
@@ -257,6 +260,7 @@ def econt_submit(request):
     order.save()
 
     result = create_econt_label(order, overrides=overrides)
+    maybe_send_order_email(order)
 
     if not result.get("ok"):
         msg = result.get("error") or "Неуспешно създаване на товарителница."
@@ -351,8 +355,8 @@ def _ensure_paid_from_stripe(request):
         order.paid = True
         order.save(update_fields=["paid"])
         try:
-            from .utils import send_order_notification
-            send_order_notification(order, event="paid")
+            from .utils import maybe_send_order_email
+            maybe_send_order_email(order)
         except Exception:
             pass
 
