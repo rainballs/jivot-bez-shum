@@ -207,10 +207,9 @@ def econt_submit(request):
 
     # Basic fields
     order.full_name = (request.POST.get("full_name") or order.full_name or "").strip()
-    order.phone = (request.POST.get("phone") or order.phone or "").strip()  # <- singular
-    order.city = (request.POST.get("city") or order.city or "").strip()  # <- now posted from office.html
+    order.phone = (request.POST.get("phone") or order.phone or "").strip()
+    order.city = (request.POST.get("city") or order.city or "").strip()
 
-    # Mode comes from hidden input on each page
     to_office = request.POST.get("to_office") == "1"
     back_name = "econt_collect_office" if to_office else "econt_collect_address"
 
@@ -222,7 +221,6 @@ def econt_submit(request):
     r_floor = (request.POST.get("receiver_floor") or "").strip()
     r_apartment = (request.POST.get("receiver_apartment") or "").strip()
 
-    # Minimal sanity checks
     if not order.full_name:
         messages.error(request, "Моля, въведете име и фамилия.")
         return redirect(back_name)
@@ -259,6 +257,7 @@ def econt_submit(request):
 
     order.save()
 
+    # 1) create label
     result = create_econt_label(order, overrides=overrides)
 
     if not result.get("ok"):
@@ -267,10 +266,23 @@ def econt_submit(request):
             msg += " (проверете съвпадението град ↔ офис или попълнете улица и №)."
         messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect(back_name)
-    # label is OK → reload order so we see the label fields the service saved
-    order.refresh_from_db()
+
+    # 2) pull shipment number from the JSON Econt returns
+    label_data = result.get("label") or result
+    shipment_num = None
+    if isinstance(label_data, dict):
+        shipment_num = label_data.get("shipmentNumber")
+
+    if shipment_num:
+        order.econt_shipment_num = shipment_num
+        order.save(update_fields=["econt_shipment_num"])
+
+    # 3) now we KNOW econt worked –> try send email
+    print(f"DEBUG VIEW: calling maybe_send_order_email for order {order.id} "
+          f"(pay={order.payment_method}, ship={order.econt_shipment_num})")
+
     maybe_send_order_email(order)
-    # messages.success(request, "Товарителницата е създадена успешно.")
+
     return redirect("thank_you")
 
 
