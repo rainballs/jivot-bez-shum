@@ -103,65 +103,34 @@ def checkout_info(request):
         pay_form = PaymentMethodForm(request.POST)
 
         if info_form.is_valid() and pay_form.is_valid():
-            # inside your checkout_info POST branch, after info_form.is_valid() and pay_form.is_valid()
+            # 1) create ONE order object
             order = info_form.save(commit=False)
 
-            # delivery method radio (address/office) from the template
+            # delivery method from radio
             dm = request.POST.get("delivery_method", "address")
-            from .models import DeliveryMethod
-            order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+            from .models import DeliveryMethod, PaymentMethod, OrderItem  # or put these at top of file
+            order.delivery_method = (
+                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+            )
 
-            # chosen payment method
+            # payment method
             order.payment_method = pay_form.cleaned_data["payment_method"]
 
-            # mirror billing → shipping if user wants same address
+            # mirror billing → shipping if requested
             if order.ship_same_as_billing:
                 order.full_name = order.billing_full_name or order.full_name
                 order.email = order.billing_email or order.email
                 order.phone = order.billing_phone or order.phone
                 order.city = order.billing_city or order.city
                 order.postal_code = order.billing_postcode or order.postal_code
-                # keep only the street in address_line; the house number is asked on the next page
                 order.address_line = order.billing_street or order.address_line
 
-            order.quantity = info_form.cleaned_data["quantity"]
-            order.paid = False
-            order.save()
             qty = info_form.cleaned_data["quantity"]
-
-            # Create order with billing (invoice) details
-            order: Order = info_form.save(commit=False)
             order.quantity = qty
-            order.paid = False
-
-            # Delivery method (radio on this page)
-            dm = request.POST.get("delivery_method", "address")
-            order.delivery_method = (
-                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-            )
-
-            # If user picked office, never carry this flag forward
-            if order.delivery_method == DeliveryMethod.TO_OFFICE:
-                order.ship_same_as_billing = False
-            else:
-                order.ship_same_as_billing = bool(request.POST.get("ship_same_as_billing"))
-
-            # Payment method (separate form)
-            order.payment_method = pay_form.cleaned_data["payment_method"]
-
-            # Optional: prefill display-only shipping fields from billing (handy on the next screen)
-            # We DO NOT finalize shipping address here—user can change it on the address page.
-            if order.ship_same_as_billing:
-                order.full_name = order.billing_full_name
-                order.email = order.billing_email
-                order.phone = order.billing_phone
-                order.city = order.billing_city
-                order.address_line = order.billing_street
-                order.postal_code = order.billing_postcode
-
+            order.paid = False  # always false here
             order.save()
 
-            # One line item (book)
+            # 2) create line item
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -170,34 +139,33 @@ def checkout_info(request):
                 unit_price_eur=product.price_eur,
             )
 
-            # Totals (shipping derived from delivery_method)
+            # 3) totals
             order.recompute_totals()
             order.save(update_fields=[
                 "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
                 "total_bgn", "total_eur", "paid", "payment_method"
             ])
 
-            # send_order_notification(order, event="created")
+            # 4) remember order in session
             request.session["current_order_id"] = order.id
 
-            # Branch by payment
+            # 5) branch by payment
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 return redirect("stripe_create_session")
 
-            # COD → go to proper Econt page
+            # COD → go straight to econt
             if order.delivery_method == DeliveryMethod.TO_ADDRESS:
                 return redirect("econt_collect_address")
             else:
                 return redirect("econt_collect_office")
 
+        # forms invalid
         messages.error(request, "Моля, коригирайте грешките във формата.")
     else:
-        # Reasonable defaults
         info_form = CheckoutInfoForm(initial={
             "quantity": 1,
             "ship_same_as_billing": True,
         })
-        # Card by default
         pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.COD})
 
     return render(
@@ -321,9 +289,6 @@ def stripe_webhook(request):
                 order = Order.objects.get(pk=order_id)
                 order.paid = True
                 order.save(update_fields=["paid"])
-                maybe_send_order_email(order)
-
-                from .utils import maybe_send_order_email
                 maybe_send_order_email(order)
                 # Card paid → no COD
                 _ = create_econt_label(order)
