@@ -93,10 +93,21 @@
                         </p>
                     </div>
 
+                    <!-- INLINE ECONT GOES HERE -->
+                    <div id="delivery-inline"
+                         data-order-id="{% if order %}{{ order.id }}{% else %}{% endif %}"
+                         data-url-address="{% url 'econt_partial_address' %}"
+                         data-url-office="{% url 'econt_partial_office' %}"
+                         data-url-submit="{% url 'econt_submit_inline' %}"
+                         style="margin-top:1rem;">
+                        <p class="small muted">Изберете начин на доставка, за да попълните данните.</p>
+                    </div>
+
                     {% if form.non_field_errors %}
                         <div class="error">{{ form.non_field_errors }}</div>
                     {% endif %}
                 </div>
+
 
                 <!-- RIGHT: summary -->
                 <aside class="checkout-summary">
@@ -140,10 +151,10 @@
                             * към сумата се начислява доставка: 9.00 лв (до адрес) или 7.00 лв (офис/АПС).
                         </p>
 
-                        <div class="actions actions-right">
-                            <a href="/" class="btn btn-secondary">Назад</a>
-                            <button class="btn btn-primary">Завърши поръчката</button>
-                        </div>
+                        {#                        <div class="actions actions-right">#}
+                        {#                            <a href="/" class="btn btn-secondary">Назад</a>#}
+                        {#                            <button class="btn btn-primary">Завърши поръчката</button>#}
+                        {#                        </div>#}
                     </div>
                 </aside>
             </form>
@@ -201,6 +212,23 @@
         document.addEventListener("DOMContentLoaded", function () {
             const form = document.querySelector('form.checkout-grid-2col');
 
+            // helper: take values from the big top form and append them to fd
+            function appendTopFields(fd) {
+                const bf = document.querySelector('input[name="billing_full_name"]');
+                const be = document.querySelector('input[name="billing_email"]');
+                const bp = document.querySelector('input[name="billing_phone"]');
+                const bc = document.querySelector('input[name="billing_city"]');
+                const bs = document.querySelector('input[name="billing_street"]');
+                const bpc = document.querySelector('input[name="billing_postcode"]');
+
+                if (bf) fd.append("billing_full_name", bf.value);
+                if (be) fd.append("billing_email", be.value);
+                if (bp) fd.append("billing_phone", bp.value);
+                if (bc) fd.append("billing_city", bc.value);
+                if (bs) fd.append("billing_street", bs.value);
+                if (bpc) fd.append("billing_postcode", bpc.value);
+            }
+
             /* ====== 1) shipping preview + show total only after delivery ====== */
             (function setupShipping() {
                 const qtyInput = document.querySelector('input[name="quantity"]');
@@ -211,11 +239,11 @@
                 const totalWrap = document.querySelector("[data-total-wrap]");
 
                 function toNum(s) {
-                    return parseFloat(String(s).replace(",", ".").trim()) || 0
+                    return parseFloat(String(s).replace(",", ".").trim()) || 0;
                 }
 
                 function fmt(n) {
-                    return (Math.round(n * 100) / 100).toFixed(2)
+                    return (Math.round(n * 100) / 100).toFixed(2);
                 }
 
                 const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
@@ -305,19 +333,14 @@
                 applyState();
             })();
 
-            /* ====== 4) FIX REQUIRED FIELDS ======
-               - remove required from hidden originals
-               - add required to visible fields
-            */
+            /* ====== 4) FIX REQUIRED FIELDS ====== */
             (function fixRequired() {
-                // hidden ones: make them NOT required
                 const hiddenNames = ['full_name', 'email', 'phone'];
                 hiddenNames.forEach(name => {
                     const el = document.querySelector('.sr-only [name="' + name + '"]');
                     if (el) el.removeAttribute('required');
                 });
 
-                // visible ones: make them required
                 const visibleRequired = [
                     'billing_full_name',
                     'billing_email',
@@ -334,19 +357,17 @@
 
             /* ====== 5) validation UI ====== */
             if (form) {
-                // highlight invalid
                 form.addEventListener('invalid', function (e) {
                     e.target.classList.add('is-invalid');
                 }, true);
 
-                // remove on input
                 form.addEventListener('input', function (e) {
                     if (e.target.classList.contains('is-invalid') && e.target.checkValidity()) {
                         e.target.classList.remove('is-invalid');
                     }
                 });
 
-                // final gate: show native popups
+                // we keep this but you removed the bottom buttons so it will only fire on explicit submit
                 form.addEventListener('submit', function (e) {
                     if (!form.checkValidity()) {
                         e.preventDefault();
@@ -354,6 +375,369 @@
                     }
                 });
             }
+
+            /* ======================================================================
+   6) INLINE ECONT BLOCK (load address/office when radio changes)
+   ====================================================================== */
+            const inlineBox = document.getElementById("delivery-inline");
+            if (!inlineBox) return;
+
+            const urlAddress = inlineBox.dataset.urlAddress;
+            const urlOffice = inlineBox.dataset.urlOffice;
+            const urlSubmit = inlineBox.dataset.urlSubmit;
+
+// NEW: get order id from data-attr
+            const orderId = inlineBox.dataset.orderId || "";
+
+// your two radios
+            const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
+            const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
+
+// csrf helper
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            const csrftoken = getCookie('csrftoken');
+
+// ------------ load partial (GET) ------------
+            function loadPartial(baseUrl) {
+                if (!baseUrl) {
+                    inlineBox.innerHTML = "<p class='small muted'>Няма URL за този тип доставка.</p>";
+                    return;
+                }
+
+                inlineBox.innerHTML = "<p class='small muted'>Зареждане…</p>";
+
+                // IMPORTANT: append order_id if we have it
+                let url = baseUrl;
+                if (orderId) {
+                    url += (baseUrl.indexOf("?") === -1 ? "?" : "&") + "order_id=" + encodeURIComponent(orderId);
+                }
+
+                fetch(url, {credentials: "same-origin"})
+                    .then(r => r.json())
+                    .then(data => {
+                        inlineBox.innerHTML = data.html || "<p class='small muted'>Няма активна поръчка.</p>";
+                        if (!data.ok) return;
+
+                        // wire address submit
+                        if (baseUrl === urlAddress) {
+                            const btn = inlineBox.querySelector("#btn-inline-address-submit");
+                            if (btn) {
+                                btn.addEventListener("click", function () {
+                                    const fd = new FormData();
+                                    fd.append("to_office", "0");
+                                    if (orderId) fd.append("order_id", orderId);   // ← send it on POST too
+                                    inlineBox.querySelectorAll("input[name]").forEach(inp => fd.append(inp.name, inp.value));
+
+                                    // NEW: add top-of-page fields
+                                    appendTopFields(fd);
+
+                                    fetch(urlSubmit, {
+                                        method: "POST",
+                                        headers: {"X-CSRFToken": csrftoken},
+                                        body: fd,
+                                        credentials: "same-origin"
+                                    })
+                                        .then(r => r.json())
+                                        .then(json => {
+                                            if (!json.ok) {
+                                                alert(json.error || "Грешка.");
+                                                return;
+                                            }
+                                            if (json.next === "thankyou") {
+                                                window.location.href = json.redirect || "/checkout/thank-you/";
+                                            } else if (json.next === "stripe") {
+                                                window.location.href = json.redirect;
+                                            } else {
+                                                alert("Данните за доставка са записани.");
+                                            }
+                                        });
+                                });
+                            }
+                        }
+
+                        // wire office
+                        if (baseUrl === urlOffice) {
+                            setupOfficeInline(inlineBox, urlSubmit, csrftoken, orderId);
+                        }
+                    })
+                    .catch(() => {
+                        inlineBox.innerHTML = "<p class='small muted'>Грешка при зареждане.</p>";
+                    });
+            }
+
+            // simplified version of your previous office setup
+            function setupOfficeInline(root, submitUrl, csrftoken) {
+                const cityInput = root.querySelector(".city-input");
+                const cityBox = root.querySelector(".city-suggest");
+                const cityNameOut = root.querySelector(".city-name");
+                const officeList = root.querySelector(".offices-list");
+                const officeSearch = root.querySelector(".office-search");
+                const officeCode = root.querySelector(".office-code");
+                const pickedInfo = root.querySelector(".picked-info");
+                const submitBtn = root.querySelector("#btn-inline-office-submit");
+
+                let cities = [];
+                let offices = [];
+                let t;
+
+                const debounced = (fn, ms = 250) => {
+                    clearTimeout(t);
+                    t = setTimeout(fn, ms);
+                };
+
+                function renderCitySuggest() {
+                    const q = (cityInput.value || '').trim().toLowerCase();
+                    if (!q) {
+                        cityBox.style.display = 'none';
+                        return;
+                    }
+                    const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(q));
+                    cityBox.innerHTML = filtered.map(c => `
+                <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
+                    ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+                </div>`).join('');
+                    cityBox.style.display = filtered.length ? 'block' : 'none';
+                }
+
+                function searchCities() {
+                    const q = (cityInput.value || '').trim();
+                    if (!q) {
+                        cities = [];
+                        renderCitySuggest();
+                        return;
+                    }
+                    fetch(`/api/econt/cities/?q=${encodeURIComponent(q)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            cities = data.ok ? (data.items || []) : [];
+                            renderCitySuggest();
+                        })
+                        .catch(() => {
+                            cities = [];
+                            renderCitySuggest();
+                        });
+                }
+
+                function pickCity(id, name) {
+                    cityInput.value = name;
+                    cityNameOut.value = name;
+                    cityBox.style.display = 'none';
+                    loadOffices(id);
+                    updateSubmitState();
+                }
+
+                function loadOffices(cityID) {
+                    officeList.innerHTML = `<div class="small muted">Зареждане на офиси…</div>`;
+                    fetch(`/api/econt/offices/?cityID=${encodeURIComponent(cityID)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const raw = data.ok ? (data.items || []) : [];
+                            offices = raw.filter(o => !o.isAPS);
+                            officeCode.value = '';
+                            pickedInfo.style.display = 'none';
+                            renderOffices();
+                            updateSubmitState();
+                        })
+                        .catch(() => {
+                            offices = [];
+                            officeList.innerHTML = `<div class="small muted">Грешка при зареждането.</div>`;
+                            updateSubmitState();
+                        });
+                }
+
+                function renderOffices() {
+                    const q = (officeSearch.value || '').toLowerCase();
+                    const filtered = offices.filter(o =>
+                        (o.name || '').toLowerCase().includes(q) ||
+                        (o.address || '').toLowerCase().includes(q) ||
+                        (o.code || '').toString().toLowerCase().includes(q)
+                    );
+                    if (!filtered.length) {
+                        officeList.innerHTML = `<div class="small muted">Няма резултати.</div>`;
+                        return;
+                    }
+                    officeList.innerHTML = filtered.map(o => `
+                <div class="office-item" data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
+                    <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
+                    <div class="muted small">${o.address || ''}</div>
+                </div>`).join('');
+                }
+
+                function updateSubmitState() {
+                    const ok = !!cityNameOut.value.trim() && !!officeCode.value.trim();
+                    if (submitBtn) submitBtn.disabled = !ok;
+                }
+
+                cityInput.addEventListener('input', () => debounced(searchCities, 200));
+                cityBox.addEventListener('click', (e) => {
+                    const item = e.target.closest('.suggest-item');
+                    if (!item) return;
+                    pickCity(item.dataset.id, item.dataset.name);
+                });
+
+                officeSearch.addEventListener('input', renderOffices);
+                officeList.addEventListener('click', (e) => {
+                    const it = e.target.closest('.office-item');
+                    if (!it) return;
+                    officeCode.value = it.dataset.code;
+                    pickedInfo.textContent = `Избран офис: ${it.dataset.name} (#${it.dataset.code}) ${it.dataset.addr || ''}`;
+                    pickedInfo.style.display = 'block';
+                    updateSubmitState();
+                });
+
+                if (submitBtn) {
+                    submitBtn.addEventListener("click", function () {
+                        const fd = new FormData();
+                        fd.append("to_office", "1");
+                        if (orderId) fd.append("order_id", orderId);
+
+                        // 1) everything inside the office partial
+                        root.querySelectorAll("input[name]").forEach(inp => fd.append(inp.name, inp.value));
+
+                        // 2) grab the top/billing fields LIVE
+                        const topName = document.querySelector('input[name="billing_full_name"]');
+                        const topEmail = document.querySelector('input[name="billing_email"]');
+                        const topPhone = document.querySelector('input[name="billing_phone"]');
+                        const topCity = document.querySelector('input[name="billing_city"]');
+                        const topStreet = document.querySelector('input[name="billing_street"]');
+                        const topPost = document.querySelector('input[name="billing_postcode"]');
+
+                        if (topName) fd.set("billing_full_name", topName.value);
+                        if (topEmail) fd.set("billing_email", topEmail.value);
+                        if (topPhone) fd.set("billing_phone", topPhone.value);
+                        if (topCity) fd.set("billing_city", topCity.value);
+                        if (topStreet) fd.set("billing_street", topStreet.value);
+                        if (topPost) fd.set("billing_postcode", topPost.value);
+
+                        // also set generic fields, so econt_submit_inline can pick them up
+                        if (topName) fd.set("full_name", topName.value);
+                        if (topPhone) fd.set("phone", topPhone.value);
+                        if (topCity) fd.set("city", topCity.value);
+
+                        fetch(submitUrl, {
+                            method: "POST",
+                            headers: {"X-CSRFToken": csrftoken},
+                            body: fd,
+                            credentials: "same-origin"
+                        })
+                            .then(r => r.json())
+                            .then(json => {
+                                if (!json.ok) {
+                                    alert(json.error || "Грешка.");
+                                    return;
+                                }
+                                if (json.next === "thankyou") {
+                                    window.location.href = json.redirect || "/checkout/thank-you/";
+                                } else if (json.next === "stripe") {
+                                    window.location.href = json.redirect;
+                                } else {
+                                    alert("Данните за доставка са записани.");
+                                }
+                            });
+                    });
+                }
+
+                updateSubmitState();
+            }
+
+            function onDeliveryChange() {
+                if (rbAddress && rbAddress.checked) {
+                    loadPartial(urlAddress);
+                } else if (rbOffice && rbOffice.checked) {
+                    loadPartial(urlOffice);
+                } else {
+                    inlineBox.innerHTML = "<p class='small muted'>Изберете начин на доставка.</p>";
+                }
+            }
+
+            if (rbAddress) rbAddress.addEventListener("change", onDeliveryChange);
+            if (rbOffice) rbOffice.addEventListener("change", onDeliveryChange);
+
+            // run once in case a value is preselected
+            onDeliveryChange();
         });
+
+        function postCheckoutSave(data) {
+            const csrftoken = getCookie('csrftoken');
+            fetch("{% url 'checkout_save_inline' %}", {
+                method: "POST",
+                headers: {"X-CSRFToken": csrftoken},
+                body: data,
+                credentials: "same-origin"
+            }).catch(() => {
+            });
+        }
+
+        // 7) autosave payment & delivery to the order, so the inline knows what to do
+        (function setupAutosave() {
+            const csrftoken = (function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            })('csrftoken');
+
+            const payRadios = document.querySelectorAll('.pay-tiles input[type="radio"]');
+            const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
+            const qtyInput = document.querySelector('input[name="quantity"]');
+
+            function postInline(data) {
+                fetch("/checkout/save-inline/", {
+                    method: "POST",
+                    headers: {"X-CSRFToken": csrftoken},
+                    body: data,
+                    credentials: "same-origin"
+                });
+            }
+
+            // payment → card / cod
+            payRadios.forEach(r => {
+                r.addEventListener('change', () => {
+                    const fd = new FormData();
+                    fd.append("payment_method", r.value);   // "card" or "cod"
+                    postInline(fd);
+                });
+            });
+
+            // delivery → address / office
+            dmRadios.forEach(r => {
+                r.addEventListener('change', () => {
+                    const fd = new FormData();
+                    fd.append("delivery_method", r.value);  // "address" or "office"
+                    postInline(fd);
+                });
+            });
+
+            // quantity
+            if (qtyInput) {
+                qtyInput.addEventListener('input', () => {
+                    const fd = new FormData();
+                    fd.append("quantity", qtyInput.value || "1");
+                    postInline(fd);
+                });
+            }
+        })();
     </script>
 {% endblock %}

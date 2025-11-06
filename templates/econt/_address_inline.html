@@ -1,0 +1,54 @@
+{# no extends #}
+<div class="card soft p">
+    <input type="hidden" name="to_office" value="0">
+    <div class="field-grid">
+        <label>Име и фамилия
+            <input type="text" name="full_name"
+                   value="{{ prefill.full_name }}"
+                   required>
+        </label>
+        <label>Телефон
+            <input type="text" name="phone"
+                   value="{{ prefill.phone }}"
+                   required>
+        </label>
+        <label>Град
+            <input type="text" name="city"
+                   value="{{ prefill.city }}"
+                   required>
+        </label>
+    </div>
+
+    <div class="field-grid" style="margin-top:1rem">
+        <label>Улица / булевард
+            <input type="text" name="receiver_street"
+                   value="{{ prefill.receiver_street }}"
+                   required>
+        </label>
+        <label>№
+            <input type="text" name="receiver_num"
+                   value="{{ prefill.receiver_num }}"
+                   required>
+        </label>
+        <label>Пощ. код
+            <input type="text" name="receiver_postcode"
+                   value="{{ prefill.receiver_postcode }}">
+        </label>
+    </div>
+
+    <div class="field-grid">
+        <label>Вход
+            <input type="text" name="receiver_entrance">
+        </label>
+        <label>Етаж
+            <input type="text" name="receiver_floor">
+        </label>
+        <label>Апартамент
+            <input type="text" name="receiver_apartment">
+        </label>
+    </div>
+
+    <div class="actions" style="margin-top:1rem">
+        <button type="button" class="btn btn-primary" id="btn-inline-address-submit">Запази доставка</button>
+    </div>
+</div>

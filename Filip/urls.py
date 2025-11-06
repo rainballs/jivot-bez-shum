@@ -23,6 +23,14 @@ urlpatterns = [
     path("delivery/econt/address/", econt_views.econt_collect_address, name="econt_collect_address"),
     path("delivery/econt/office/", econt_views.econt_collect_office, name="econt_collect_office"),
     path("econt/submit/", econt_views.econt_submit, name="econt_submit"),
+
+    # inline econt
+    path("econt/partial/address/", econt_views.econt_partial_address, name="econt_partial_address"),
+    path("econt/partial/office/", econt_views.econt_partial_office, name="econt_partial_office"),
+    path("econt/submit-inline/", econt_views.econt_submit_inline, name="econt_submit_inline"),
+
+    path("checkout/inline-update/", views.checkout_inline_update, name="checkout_inline_update"),
+    path("checkout/save-inline/", views.checkout_save_inline, name="checkout_save_inline"),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

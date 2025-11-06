@@ -269,8 +269,22 @@ def build_create_label_json(
         payer: str = "receiver",
         label_format: str = "10x9",
 ) -> dict:
+    """
+    Builds the JSON Econt wants. Now a bit more defensive: makes sure
+    receiver name/phone/city/postcode aren’t empty, because their API
+    complains with 517.
+    """
     payer = (payer or "receiver").upper()
     cod_bgn = float(cod_bgn or 0.0)
+
+    # ---- 1) defensive fallbacks ----
+    # Econt really hates empty receiver name/phone.
+    safe_receiver_name = receiver_name.strip() if receiver_name else "Получател"
+    safe_receiver_phone = receiver_phone.strip() if receiver_phone else sender_phone  # fall back to sender
+    safe_receiver_city = receiver_city.strip() if receiver_city else sender_city
+
+    # postcode: for office you had "null" in the log → give at least sender’s
+    safe_receiver_postcode = (receiver_postcode or "").strip() or "8000"
 
     payload: dict = {
         "shipmentType": "PACK",
@@ -288,16 +302,17 @@ def build_create_label_json(
             "city": {
                 "country": {"code3": "BGR"},
                 "name": sender_city,
-                "postCode": "8000",
+                "postCode": "8000",  # your old code
             }
         },
 
-        "receiverClient": {"name": receiver_name, "phones": [receiver_phone]},
+        # ← here are the fixed values
+        "receiverClient": {"name": safe_receiver_name, "phones": [safe_receiver_phone]},
         "receiverAddress": {
             "city": {
                 "country": {"code3": "BGR"},
-                "name": receiver_city,
-                "postCode": receiver_postcode,
+                "name": safe_receiver_city,
+                "postCode": safe_receiver_postcode,
             }
         },
     }
@@ -331,6 +346,7 @@ def build_create_label_json(
         if receiver_apartment:
             ra["apartment"] = receiver_apartment
 
+    # --- services (declared value, COD) ---
     services: dict = {}
 
     if declared_value_bgn and declared_value_bgn > 0:
@@ -338,20 +354,18 @@ def build_create_label_json(
         services["declaredValueCurrency"] = "BGN"
 
     if cod_bgn > 0:
-        # pick office to pay out at
         cod_office = receiver_office_code or sender_office_code
 
         services["cdAmount"] = float(cod_bgn)
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
 
-        # 🔴 THIS is the part Econt complained about
         services["cdPayOptions"] = {
-            "method": "office",  # you wanted office payout
+            "method": "office",
             "officeCode": str(cod_office) if cod_office else "",
-            "departamentNum": 1,  # required in their class
-            "client": {  # <-- add client here
-                "name": sender_name,  # who will receive the COD
+            "departamentNum": 1,
+            "client": {
+                "name": sender_name,
                 "phones": [sender_phone],
             },
         }

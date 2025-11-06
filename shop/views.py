@@ -3,15 +3,17 @@ import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 
+import re
 from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from .utils import send_order_notification
 from .econt_service import create_econt_label
+from django.views.decorators.http import require_POST
 
 import stripe
 
@@ -82,6 +84,8 @@ def stripe_checkout_line_items(order: Order, product: Product):
 
 def _get_current_order(request):
     oid = request.session.get("current_order_id")
+    if not oid:
+        oid = request.GET.get("order_id") or request.POST.get("order_id")
     return Order.objects.filter(pk=oid).first() if oid else None
 
 
@@ -99,110 +103,110 @@ def checkout_info(request):
         return redirect("home")
 
     if request.method == "POST":
+        # your old POST stays the same
         info_form = CheckoutInfoForm(request.POST)
         pay_form = PaymentMethodForm(request.POST)
 
         if info_form.is_valid() and pay_form.is_valid():
-            # inside your checkout_info POST branch, after info_form.is_valid() and pay_form.is_valid()
             order = info_form.save(commit=False)
 
-            # delivery method radio (address/office) from the template
             dm = request.POST.get("delivery_method", "address")
-            from .models import DeliveryMethod
-            order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-
-            # chosen payment method
+            order.delivery_method = (
+                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+            )
             order.payment_method = pay_form.cleaned_data["payment_method"]
 
-            # mirror billing → shipping if user wants same address
             if order.ship_same_as_billing:
                 order.full_name = order.billing_full_name or order.full_name
                 order.email = order.billing_email or order.email
                 order.phone = order.billing_phone or order.phone
                 order.city = order.billing_city or order.city
                 order.postal_code = order.billing_postcode or order.postal_code
-                # keep only the street in address_line; the house number is asked on the next page
                 order.address_line = order.billing_street or order.address_line
 
             order.quantity = info_form.cleaned_data["quantity"]
             order.paid = False
             order.save()
-            qty = info_form.cleaned_data["quantity"]
 
-            # Create order with billing (invoice) details
-            order: Order = info_form.save(commit=False)
-            order.quantity = qty
-            order.paid = False
-
-            # Delivery method (radio on this page)
-            dm = request.POST.get("delivery_method", "address")
-            order.delivery_method = (
-                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-            )
-
-            # If user picked office, never carry this flag forward
-            if order.delivery_method == DeliveryMethod.TO_OFFICE:
-                order.ship_same_as_billing = False
-            else:
-                order.ship_same_as_billing = bool(request.POST.get("ship_same_as_billing"))
-
-            # Payment method (separate form)
-            order.payment_method = pay_form.cleaned_data["payment_method"]
-
-            # Optional: prefill display-only shipping fields from billing (handy on the next screen)
-            # We DO NOT finalize shipping address here—user can change it on the address page.
-            if order.ship_same_as_billing:
-                order.full_name = order.billing_full_name
-                order.email = order.billing_email
-                order.phone = order.billing_phone
-                order.city = order.billing_city
-                order.address_line = order.billing_street
-                order.postal_code = order.billing_postcode
-
-            order.save()
-
-            # One line item (book)
+            # line item
             OrderItem.objects.create(
                 order=order,
                 product=product,
-                quantity=qty,
+                quantity=order.quantity,
                 unit_price_bgn=product.price_bgn,
                 unit_price_eur=product.price_eur,
             )
 
-            # Totals (shipping derived from delivery_method)
+            # totals
             order.recompute_totals()
             order.save(update_fields=[
-                "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
-                "total_bgn", "total_eur", "paid", "payment_method"
+                "subtotal_bgn", "subtotal_eur",
+                "shipping_bgn", "shipping_eur",
+                "total_bgn", "total_eur",
+                "paid", "payment_method"
             ])
 
+            # remember
             request.session["current_order_id"] = order.id
 
-            # Branch by payment
-            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
-                return redirect("stripe_create_session")
-
-            # COD → go to proper Econt page
-            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
-                return redirect("econt_collect_address")
-            else:
-                return redirect("econt_collect_office")
+            # re-render same page
+            return render(
+                request,
+                "checkout/info.html",
+                {
+                    "product": product,
+                    "form": info_form,
+                    "pay_form": pay_form,
+                    "order": order,
+                },
+            )
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
-    else:
-        # Reasonable defaults
-        info_form = CheckoutInfoForm(initial={
-            "quantity": 1,
-            "ship_same_as_billing": True,
+        return render(request, "checkout/info.html", {
+            "product": product,
+            "form": info_form,
+            "pay_form": pay_form,
         })
-        # Card by default
-        pay_form = PaymentMethodForm(initial={"payment_method": PaymentMethod.COD})
+
+    # ←–––––––––––––––––––––––––––––––––––––––––––––
+    # GET branch: if we DON'T have an order yet, create a normal one,
+    # using the same product and the same shipping logic.
+    # This keeps your totals correct.
+    # ––––––––––––––––––––––––––––––––––––––––––––→
+    order = _get_current_order(request)
+    if not order:
+        # create a real order, not a dummy
+        order = Order.objects.create(
+            quantity=1,
+            delivery_method=DeliveryMethod.TO_ADDRESS,
+            payment_method=PaymentMethod.COD,
+            paid=False,
+        )
+        # create line item so recompute_totals works the same
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=1,
+            unit_price_bgn=product.price_bgn,
+            unit_price_eur=product.price_eur,
+        )
+        order.recompute_totals()
+        order.save()
+        request.session["current_order_id"] = order.id
+
+    # build forms from the order
+    info_form = CheckoutInfoForm(instance=order)
+    pay_form = PaymentMethodForm(initial={"payment_method": order.payment_method})
 
     return render(
         request,
         "checkout/info.html",
-        {"product": product, "form": info_form, "pay_form": pay_form},
+        {
+            "product": product,
+            "form": info_form,
+            "pay_form": pay_form,
+            "order": order,
+        },
     )
 
 
@@ -247,6 +251,9 @@ def checkout_payment(request):
 
 
 # ---------- Stripe integration ----------
+from django.urls import reverse
+
+
 def stripe_create_checkout_session(request):
     order = _get_current_order(request)
     if not order:
@@ -256,9 +263,8 @@ def stripe_create_checkout_session(request):
         messages.error(request, "Няма наличен продукт.")
         return redirect("home")
 
-    # Decide the success page up front based on the chosen delivery method
-    success_name = "econt_collect_address" if order.delivery_method == DeliveryMethod.TO_ADDRESS else "econt_collect_office"
-    success_url = _site_url(request) + reverse(success_name) + "?session_id={CHECKOUT_SESSION_ID}"
+    # NEW: always go to thank_you after Stripe succeeds
+    success_url = _site_url(request) + reverse("thank_you") + "?session_id={CHECKOUT_SESSION_ID}"
 
     try:
         session = stripe.checkout.Session.create(
@@ -269,15 +275,15 @@ def stripe_create_checkout_session(request):
                 "order_id": str(order.id),
                 "delivery_method": str(order.delivery_method),
             },
-            success_url=success_url,  # ⬅️ go to address/office page
+            success_url=success_url,  # ⬅️ now to thank_you
             cancel_url=stripe_cancel_url(request),
             currency="bgn",
             customer_email=order.email or None,
         )
     except Exception as e:
         messages.error(request, f"Грешка при свързване със Stripe: {e}")
-        # On error, send user to the *intended* delivery page too
-        return redirect(success_name)
+        # fallback: still show thank_you, or you can send to checkout_info
+        return redirect("thank_you")
 
     request.session["stripe_session_id"] = session.id
     return HttpResponseRedirect(session.url)
@@ -289,28 +295,13 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
-    logger.error("logging...")
-
     if not secret:
         return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-        logger.error("✅ Stripe event received: %s", event["type"])
-        logger.error("Full payload: %s", json.dumps(event, indent=4))
-    except ValueError as e:
-        logger.error("Invalid payload: %s", e)
+        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+    except (ValueError, stripe.error.SignatureVerificationError):
         return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
-        logger.error("Signature verification failed: %s", e)
-        return HttpResponse(status=400)
-
-        # Process successful payment
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        logger.info("💰 Payment completed for session %s", session.get("id"))
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
@@ -318,22 +309,224 @@ def stripe_webhook(request):
         if order_id:
             try:
                 order = Order.objects.get(pk=order_id)
+            except Order.DoesNotExist:
+                return HttpResponse(status=200)
+
+            if not order.paid:
                 order.paid = True
                 order.save(update_fields=["paid"])
+                try:
+                    send_order_notification(order, event="paid")
+                except Exception:
+                    pass
 
-                from .utils import send_order_notification
-                send_order_notification(order, event="paid")
-                # Card paid → no COD
-                _ = create_econt_label(order)
-            except Order.DoesNotExist:
-                pass
+            # optional: create econt label ONLY if delivery data is already there
+            # (i.e. user used the inline form)
+            if order.city and (order.econt_office_code or order.address_line):
+                try:
+                    create_econt_label(order)
+                except Exception:
+                    pass
 
     return HttpResponse(status=200)
 
 
+def _split_street_num(line: str) -> tuple[str, str]:
+    """
+    Same logic as in econt_views: "ul Oborishte 70" -> ("ul Oborishte", "70")
+    """
+    if not line:
+        return "", ""
+    s = line.strip()
+
+    m = re.search(r'(?:№\s*)(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+    if not m:
+        m = re.search(r'\s(\d+[A-Za-zА-Яа-я\-\/]*)\s*$', s)
+
+    if m:
+        num = m.group(1)
+        street = s[:m.start(1)].rstrip(' ,№')
+        return street.strip(), num.strip()
+
+    return s, ""
+
+
 def thank_you(request):
+    """
+    Final page after checkout.
+    If Stripe sent us back with ?session_id=..., verify it and mark the order .paid = True
+    so the admin doesn’t stay with a red X.
+    """
+    session_id = request.GET.get("session_id")
     order = _get_current_order(request)
-    if order:
-        # Optionally clear the session so refresh doesn't reuse it
-        request.session.pop("current_order_id", None)
+
+    if session_id and settings.STRIPE_SECRET_LIVE_KEY:
+        try:
+            sess = stripe.checkout.Session.retrieve(
+                session_id,
+                api_key=settings.STRIPE_SECRET_LIVE_KEY,
+                expand=["payment_intent"],
+            )
+            # metadata should contain order_id because we put it in stripe_create_checkout_session
+            meta = sess.get("metadata") or {}
+            stripe_order_id = meta.get("order_id")
+
+            if sess.get("payment_status") == "paid" and stripe_order_id:
+                try:
+                    paid_order = Order.objects.get(pk=stripe_order_id)
+                except Order.DoesNotExist:
+                    paid_order = None
+                else:
+                    if not paid_order.paid:
+                        paid_order.paid = True
+                        paid_order.save(update_fields=["paid"])
+                        try:
+                            send_order_notification(paid_order, event="paid")
+                        except Exception:
+                            pass
+                    order = paid_order
+                    request.session["current_order_id"] = paid_order.pk
+        except Exception as e:
+            logger.error("Stripe verify on thank_you failed: %s", e)
+
+        # 2) try to create Econt label NOW (only for card flow)
+        if order:
+            overrides = {}
+
+            if order.delivery_method == DeliveryMethod.TO_OFFICE:
+                # we expect this to be filled in econt_submit_inline earlier
+                if order.econt_office_code:
+                    overrides["receiver_office_code"] = order.econt_office_code
+
+            else:  # TO_ADDRESS
+                # take whatever we have on the order and split it
+                street_line = (
+                        (order.address_line or "")
+                        or (getattr(order, "billing_street", "") or "")
+                )
+                street, num = _split_street_num(street_line)
+
+                overrides["receiver_street"] = street
+                if num:
+                    overrides["receiver_num"] = num
+
+                # postcode – try both names
+                postcode = (
+                        getattr(order, "postal_code", "")
+                        or getattr(order, "billing_postcode", "")
+                        or getattr(order, "billing_postal_code", "")
+                )
+                if postcode:
+                    overrides["receiver_postcode"] = postcode
+
+            # only call Econt if we actually have something meaningful
+            try:
+                create_econt_label(order, overrides=overrides)
+            except Exception as e:
+                # don't break the thank-you page
+                logger.error("Econt label after Stripe failed for order %s: %s", order.pk, e)
+
+    # clear session so refresh doesn’t reuse the same order
+    request.session.pop("current_order_id", None)
+
     return render(request, "checkout/thank_you.html", {"order": order})
+
+
+@require_POST
+def checkout_inline_update(request):
+    """
+    Lightweight AJAX updater for current order:
+    - payment_method
+    - delivery_method
+    - quantity
+    """
+    order = _get_current_order(request)
+    if not order:
+        return JsonResponse({"ok": False, "error": "No current order"}, status=404)
+
+    pm = request.POST.get("payment_method")
+    dm = request.POST.get("delivery_method")
+    qty = request.POST.get("quantity")
+
+    changed = False
+
+    if pm:
+        order.payment_method = pm
+        changed = True
+
+    if dm:
+        from .models import DeliveryMethod
+        order.delivery_method = (
+            DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+        )
+        changed = True
+
+    if qty:
+        try:
+            q = int(qty)
+            if q > 0:
+                order.quantity = q
+                # if you want totals to be recomputed here:
+                order.recompute_totals()
+                changed = True
+        except ValueError:
+            pass
+
+    if changed:
+        order.save()
+
+    return JsonResponse({"ok": True})
+
+
+def _get_current_order(request):
+    oid = request.session.get("current_order_id")
+    return Order.objects.filter(pk=oid).first() if oid else None
+
+
+@require_POST
+def checkout_save_inline(request):
+    """
+    Called from JS on the checkout page whenever the user changes
+    top fields (billing, payment, delivery).
+    """
+    order = _get_current_order(request)
+    if not order:
+        order = Order.objects.create()
+        request.session["current_order_id"] = order.pk
+
+    # billing
+    for field in [
+        "billing_full_name",
+        "billing_email",
+        "billing_phone",
+        "billing_city",
+        "billing_street",
+        "billing_postcode",
+    ]:
+        val = request.POST.get(field)
+        if val is not None:
+            setattr(order, field, val)
+
+    # “use same address”
+    same = request.POST.get("ship_same_as_billing")
+    if same is not None:
+        order.ship_same_as_billing = (same == "true")
+
+    # delivery
+    dm = request.POST.get("delivery_method")
+    if dm == "address":
+        order.delivery_method = DeliveryMethod.TO_ADDRESS
+    elif dm == "office":
+        order.delivery_method = DeliveryMethod.TO_OFFICE
+
+    # payment
+    pm = request.POST.get("payment_method")
+    if pm:
+        # adapt names if yours are different
+        if pm == "card":
+            order.payment_method = PaymentMethod.CARD
+        else:
+            order.payment_method = PaymentMethod.COD
+
+    order.save()
+    return JsonResponse({"ok": True})

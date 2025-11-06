@@ -1,0 +1,43 @@
+<div class="card soft p">
+    <input type="hidden" name="to_office" value="1">
+
+    <!-- HIDDEN: these will be filled from order (and can be overwritten from JS) -->
+    <input type="hidden" name="full_name" value="{{ order.full_name|default_if_none:'' }}">
+    <input type="hidden" name="phone" value="{{ order.phone|default_if_none:'' }}">
+    <input type="hidden" name="billing_full_name" value="{{ order.billing_full_name|default_if_none:'' }}">
+    <input type="hidden" name="billing_email" value="{{ order.billing_email|default_if_none:'' }}">
+    <input type="hidden" name="billing_phone" value="{{ order.billing_phone|default_if_none:'' }}">
+    <input type="hidden" name="billing_city" value="{{ order.billing_city|default_if_none:'' }}">
+    <input type="hidden" name="billing_street" value="{{ order.billing_street|default_if_none:'' }}">
+    <input type="hidden" name="billing_postcode" value="{{ order.billing_postcode|default_if_none:'' }}">
+
+    <div class="field-grid">
+        <label>Град (изберете от списъка)
+            <input type="text" class="city-input"
+                   value="{{ order.city|default_if_none:'' }}"
+                   autocomplete="on"
+                   placeholder="Започнете да пишете…">
+            <div class="city-suggest autocomplete" style="display:none"></div>
+            <input type="hidden" class="city-id" value="">
+            <input type="hidden" name="city" class="city-name" value="{{ order.city|default_if_none:'' }}">
+        </label>
+    </div>
+
+    <div class="card soft p" style="margin-top:1rem">
+        <label>Търсене в офисите
+            <input type="text" class="office-search" placeholder="име, адрес…" autocomplete="on">
+        </label>
+
+        <div class="offices-list mt">
+            <div class="small muted">Изберете град, за да заредите офисите.</div>
+        </div>
+
+        <input type="hidden" name="receiver_office_code" class="office-code"
+               value="{{ order.econt_office_code|default:'' }}">
+        <div class="picked-info small muted" style="display:none;margin-top:.5rem;"></div>
+    </div>
+
+    <div class="actions mt">
+        <button type="button" class="btn btn-primary" id="btn-inline-office-submit" disabled>Запази доставка</button>
+    </div>
+</div>

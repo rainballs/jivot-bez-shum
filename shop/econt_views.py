@@ -11,13 +11,15 @@ import json
 from django.views.decorators.http import require_http_methods
 import logging
 import stripe
+from django.urls import reverse
 
 from .utils import send_order_notification
 from .views import get_single_product
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
 from .econt_service import get_cities, get_offices_by_city_id
 import re
+from django.template.loader import render_to_string
+from django.views.decorators.http import require_GET, require_POST
 
 
 def _split_street_num(line: str) -> tuple[str, str]:
@@ -362,3 +364,194 @@ def _ensure_paid_from_stripe(request):
     request.session["current_order_id"] = order.pk
     request.session["stripe_session_id"] = sess.get("id")
     return order, None
+
+
+@require_GET
+def econt_partial_address(request):
+    """Return the address form HTML for the current order (from session)."""
+    order = _get_current_order(request)
+    if not order:
+        # no order in session – tell JS to show the message
+        html = "<p class='small muted'>Няма активна поръчка.</p>"
+        return JsonResponse({"ok": False, "html": html})
+
+    # -------- prefill (same idea as econt_collect_address) --------
+    prefill = {
+        "full_name": order.full_name or "",
+        "phone": order.phone or "",
+        "city": order.city or "",
+        "receiver_street": "",
+        "receiver_num": "",
+        "receiver_postcode": order.postal_code or "",
+    }
+
+    # if the user ticked "използвай същия адрес…" on info.html
+    if getattr(order, "ship_same_as_billing", False):
+        prefill["full_name"] = order.billing_full_name or prefill["full_name"]
+        prefill["phone"] = order.billing_phone or prefill["phone"]
+        prefill["city"] = order.billing_city or prefill["city"]
+        prefill["receiver_postcode"] = (
+                getattr(order, "billing_postcode", "")
+                or getattr(order, "billing_postal_code", "")
+                or prefill["receiver_postcode"]
+        )
+
+        street, num = _split_street_num(
+            (getattr(order, "billing_street", "") or getattr(order, "billing_address_line", ""))
+        )
+        prefill["receiver_street"] = street
+        prefill["receiver_num"] = num
+
+    # render partial
+    html = render_to_string(
+        "econt/_address_inline.html",
+        {"order": order, "prefill": prefill},
+        request=request,
+    )
+    return JsonResponse({"ok": True, "html": html})
+
+
+@require_GET
+def econt_partial_office(request):
+    """Return the office form HTML for the current order (from session)."""
+    order = _get_current_order(request)
+    if not order:
+        html = "<p class='small muted'>Няма активна поръчка.</p>"
+        return JsonResponse({"ok": False, "html": html})
+
+    html = render_to_string("econt/_office_inline.html", {"order": order}, request=request)
+    return JsonResponse({"ok": True, "html": html})
+
+
+@require_POST
+def econt_submit_inline(request):
+    order = _get_current_order(request)
+    if not order:
+        return JsonResponse({"ok": False, "error": "Няма активна поръчка."}, status=400)
+
+    to_office = request.POST.get("to_office") == "1"
+
+    # 1) what came from the tiny inline form
+    post_full_name = (request.POST.get("full_name") or "").strip()
+    post_phone = (request.POST.get("phone") or "").strip()
+    post_city = (request.POST.get("city") or "").strip()
+
+    # 2) what we sent silently from the big/top form
+    b_full_name = (request.POST.get("billing_full_name") or "").strip()
+    b_email = (request.POST.get("billing_email") or "").strip()
+    b_phone = (request.POST.get("billing_phone") or "").strip()
+    b_city = (request.POST.get("billing_city") or "").strip()
+    b_street = (request.POST.get("billing_street") or "").strip()
+    b_postcode = (request.POST.get("billing_postcode") or "").strip()
+
+    # 3) build final values with priority:
+    # inline -> billing just sent -> already on order -> old billing on order
+    full_name = (
+            post_full_name
+            or b_full_name
+            or (order.full_name or "")
+            or (getattr(order, "billing_full_name", "") or "")
+    ).strip()
+
+    phone = (
+            post_phone
+            or b_phone
+            or (order.phone or "")
+            or (getattr(order, "billing_phone", "") or "")
+    ).strip()
+
+    city = (
+            post_city
+            or b_city
+            or (order.city or "")
+            or (getattr(order, "billing_city", "") or "")
+    ).strip()
+
+    # 4) write back so the order stays in sync for future partials
+    order.full_name = full_name or order.full_name
+    order.phone = phone or order.phone
+    order.city = city or order.city
+    order.email = b_email or order.email  # <-- this fixes "Ще се свържем с вас на ."
+    order.billing_full_name = b_full_name or order.billing_full_name
+    order.billing_phone = b_phone or order.billing_phone
+    order.billing_city = b_city or order.billing_city
+    order.billing_street = b_street or order.billing_street
+    order.billing_postcode = b_postcode or order.billing_postcode
+
+    # also refresh billing fields on the order if we just received them
+    if b_full_name:
+        order.billing_full_name = b_full_name
+    if b_email:
+        order.billing_email = b_email
+    if b_phone:
+        order.billing_phone = b_phone
+    if b_city:
+        order.billing_city = b_city
+    if b_street:
+        order.billing_street = b_street
+    if b_postcode:
+        order.billing_postcode = b_postcode
+
+    # 5) read address / office specific stuff
+    office_code = (request.POST.get("receiver_office_code") or "").strip()
+    r_street = (request.POST.get("receiver_street") or "").strip()
+    r_num = (request.POST.get("receiver_num") or "").strip()
+    r_postcode = (request.POST.get("receiver_postcode") or "").strip()
+    r_entrance = (request.POST.get("receiver_entrance") or "").strip()
+    r_floor = (request.POST.get("receiver_floor") or "").strip()
+    r_apartment = (request.POST.get("receiver_apartment") or "").strip()
+
+    # if you want to keep the hard UI validations, uncomment these:
+    # if not full_name:
+    #     return JsonResponse({"ok": False, "error": "Моля, въведете име и фамилия горе в формата."})
+    # if not phone:
+    #     return JsonResponse({"ok": False, "error": "Моля, въведете телефон горе в формата."})
+    # if not city:
+    #     return JsonResponse({"ok": False, "error": "Моля, въведете град."})
+
+    overrides = {}
+
+    if to_office:
+        if not office_code:
+            return JsonResponse({"ok": False, "error": "Изберете офис."})
+        overrides["receiver_office_code"] = office_code
+        order.econt_office_code = office_code
+        order.delivery_method = DeliveryMethod.TO_OFFICE
+    else:
+        if not r_street or not r_num:
+            return JsonResponse({"ok": False, "error": "Попълнете „Улица“ и „№“."})
+        overrides.update({
+            "receiver_street": r_street,
+            "receiver_num": r_num,
+            "receiver_postcode": r_postcode or None,
+            "receiver_entrance": r_entrance or None,
+            "receiver_floor": r_floor or None,
+            "receiver_apartment": r_apartment or None,
+        })
+        order.econt_office_code = ""
+        order.delivery_method = DeliveryMethod.TO_ADDRESS
+
+    # 6) persist everything we collected
+    order.save()
+
+    # 7) branch by payment
+    if order.payment_method == PaymentMethod.COD:
+        res = create_econt_label(order, overrides=overrides)
+        if not res.get("ok"):
+            return JsonResponse({"ok": False, "error": res.get("error") or "Грешка при Еконт."})
+        try:
+            send_order_notification(order, event="created")
+        except Exception:
+            pass
+        return JsonResponse({
+            "ok": True,
+            "next": "thankyou",
+            "redirect": reverse("thank_you"),
+        })
+
+    # CARD → to Stripe
+    return JsonResponse({
+        "ok": True,
+        "next": "stripe",
+        "redirect": reverse("stripe_create_session"),
+    })
