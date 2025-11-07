@@ -358,17 +358,17 @@
 
                 [rbAddress, rbOffice].forEach(el => el && el.addEventListener('change', applyState));
                 applyState();
-            })();
 
-            // ✦ NEW: when user ticks it and delivery=address → copy now
-            if (sameBox) {
-                sameBox.addEventListener('change', function () {
-                    const addressSelected = rbAddress && rbAddress.checked;
-                    if (sameBox.checked && addressSelected) {
-                        copyBillingToDelivery();
-                    }
-                });
-            }
+                // ✅ now it's in the right scope
+                if (sameBox) {
+                    sameBox.addEventListener('change', function () {
+                        const addressSelected = rbAddress && rbAddress.checked;
+                        if (sameBox.checked && addressSelected) {
+                            copyBillingToDelivery();
+                        }
+                    });
+                }
+            })();
 
             /* ====== 4) FIX REQUIRED FIELDS ====== */
             (function fixRequired() {
