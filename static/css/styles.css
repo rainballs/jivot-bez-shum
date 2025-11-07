@@ -2899,3 +2899,22 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
 @media (max-width: 480px) {
     width: auto;
 }
+
+@media (max-width: 768px) {
+    /* make the wrapper stack */
+    .checkout-grid-2col {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    /* show summary FIRST on mobile */
+    .checkout-summary {
+        order: 1;
+    }
+
+    /* show the big form (where "Запази доставка" lives) AFTER it */
+    .checkout-main {
+        order: 2;
+    }
+}
