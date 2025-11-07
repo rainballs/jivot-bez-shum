@@ -209,6 +209,33 @@
     </style>
 
     <script>
+
+        // ✦ NEW: copy billing fields → inline delivery form
+        function copyBillingToDelivery() {
+            const inlineBox = document.getElementById("delivery-inline");
+            if (!inlineBox) return;
+
+            // billing fields (top)
+            const bf = document.querySelector('input[name="billing_full_name"]');
+            const bp = document.querySelector('input[name="billing_phone"]');
+            const bc = document.querySelector('input[name="billing_city"]');
+            const bs = document.querySelector('input[name="billing_street"]');
+            const bpc = document.querySelector('input[name="billing_postcode"]');
+
+            // delivery fields (inside the loaded partial)
+            const df_name = inlineBox.querySelector('input[name="full_name"]');
+            const df_phone = inlineBox.querySelector('input[name="phone"]');
+            const df_city = inlineBox.querySelector('input[name="city"]');
+            const df_street = inlineBox.querySelector('input[name="receiver_street"]');
+            const df_postcode = inlineBox.querySelector('input[name="receiver_postcode"]');
+
+            if (df_name && bf) df_name.value = bf.value;
+            if (df_phone && bp) df_phone.value = bp.value;
+            if (df_city && bc) df_city.value = bc.value;
+            if (df_street && bs) df_street.value = bs.value;   // your billing_street is 1 field, so we drop it here as-is
+            if (df_postcode && bpc) df_postcode.value = bpc.value;
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
             const form = document.querySelector('form.checkout-grid-2col');
 
@@ -333,6 +360,16 @@
                 applyState();
             })();
 
+            // ✦ NEW: when user ticks it and delivery=address → copy now
+            if (sameBox) {
+                sameBox.addEventListener('change', function () {
+                    const addressSelected = rbAddress && rbAddress.checked;
+                    if (sameBox.checked && addressSelected) {
+                        copyBillingToDelivery();
+                    }
+                });
+            }
+
             /* ====== 4) FIX REQUIRED FIELDS ====== */
             (function fixRequired() {
                 const hiddenNames = ['full_name', 'email', 'phone'];
@@ -432,6 +469,10 @@
                         inlineBox.innerHTML = data.html || "<p class='small muted'>Няма активна поръчка.</p>";
                         if (!data.ok) return;
 
+                        const sameBox = document.querySelector('input[name="ship_same_as_billing"]');
+                        if (sameBox && sameBox.checked && baseUrl === urlAddress) {
+                            copyBillingToDelivery();
+                        }
                         // wire address submit
                         if (baseUrl === urlAddress) {
                             const btn = inlineBox.querySelector("#btn-inline-address-submit");
