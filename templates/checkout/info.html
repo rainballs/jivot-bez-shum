@@ -210,30 +210,103 @@
 
     <script>
 
+        // parse a single-line BG address into parts
+        function splitAddressBG(raw) {
+            const out = {
+                street: "",
+                num: "",
+                entrance: "",
+                floor: "",
+                apartment: ""
+            };
+            if (!raw) return out;
+
+            let s = raw.trim();
+
+            // 1) apartment
+            const aptRe = /\b(ап\.?|апартамент)\s*([0-9A-Za-z-]+)/i;
+            const aptMatch = s.match(aptRe);
+            if (aptMatch) {
+                out.apartment = aptMatch[2];
+                s = s.replace(aptMatch[0], "").trim();
+            }
+
+            // 2) entrance
+            const entRe = /\b(вх\.?|вход)\s*([0-9A-Za-z-]+)/i;
+            const entMatch = s.match(entRe);
+            if (entMatch) {
+                out.entrance = entMatch[2];
+                s = s.replace(entMatch[0], "").trim();
+            }
+
+            // 3) floor
+            const floorRe = /\b(ет\.?|етаж)\s*([0-9]+)/i;
+            const floorMatch = s.match(floorRe);
+            if (floorMatch) {
+                out.floor = floorMatch[2];
+                s = s.replace(floorMatch[0], "").trim();
+            }
+
+            // 4) number with № / No
+            const numRe = /\b(№|No\.?|номер)\s*([0-9A-Za-z-]+)/i;
+            const numMatch = s.match(numRe);
+            if (numMatch) {
+                out.num = numMatch[2];
+                s = s.replace(numMatch[0], "").trim();
+            } else {
+                // 5) otherwise: try last word as number
+                const parts = s.split(/[ ,]+/).filter(Boolean);
+                const last = parts[parts.length - 1];
+                if (last && /^[0-9]+[A-Za-zА-Яа-я-]*$/.test(last)) {
+                    out.num = last;
+                    parts.pop();
+                    s = parts.join(" ");
+                }
+            }
+
+            // whatever is left is street
+            out.street = s.trim();
+
+            return out;
+        }
+
         // ✦ NEW: copy billing fields → inline delivery form
         function copyBillingToDelivery() {
             const inlineBox = document.getElementById("delivery-inline");
             if (!inlineBox) return;
 
-            // billing fields (top)
+            // billing (top)
             const bf = document.querySelector('input[name="billing_full_name"]');
             const bp = document.querySelector('input[name="billing_phone"]');
             const bc = document.querySelector('input[name="billing_city"]');
             const bs = document.querySelector('input[name="billing_street"]');
             const bpc = document.querySelector('input[name="billing_postcode"]');
 
-            // delivery fields (inside the loaded partial)
+            // delivery (bottom/inline)
             const df_name = inlineBox.querySelector('input[name="full_name"]');
             const df_phone = inlineBox.querySelector('input[name="phone"]');
             const df_city = inlineBox.querySelector('input[name="city"]');
             const df_street = inlineBox.querySelector('input[name="receiver_street"]');
+            const df_num = inlineBox.querySelector('input[name="receiver_num"]');
             const df_postcode = inlineBox.querySelector('input[name="receiver_postcode"]');
+            const df_entrance = inlineBox.querySelector('input[name="receiver_entrance"]');
+            const df_floor = inlineBox.querySelector('input[name="receiver_floor"]');
+            const df_apartment = inlineBox.querySelector('input[name="receiver_apartment"]');
 
             if (df_name && bf) df_name.value = bf.value;
             if (df_phone && bp) df_phone.value = bp.value;
             if (df_city && bc) df_city.value = bc.value;
-            if (df_street && bs) df_street.value = bs.value;   // your billing_street is 1 field, so we drop it here as-is
             if (df_postcode && bpc) df_postcode.value = bpc.value;
+
+            // ✦ NEW: smart address split
+            if (bs) {
+                const parts = splitAddressBG(bs.value);
+                if (df_street) df_street.value = parts.street;
+                if (df_num) df_num.value = parts.num;
+                if (df_entrance) df_entrance.value = parts.entrance;
+                if (df_floor) df_floor.value = parts.floor;
+                if (df_apartment) df_apartment.value = parts.apartment;
+            }
         }
 
         document.addEventListener("DOMContentLoaded", function () {
