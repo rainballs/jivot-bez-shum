@@ -325,8 +325,8 @@ def build_create_label_json(
 
     # --- delivery date
     delivery_day = _next_workday(date.today()).isoformat()
-    payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
-
+    # payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
+    payload["sendDate"] = delivery_day
     # --- receiver: office vs door
     if receiver_office_code:
         payload["service"] = "toOffice"
