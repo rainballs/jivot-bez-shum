@@ -284,7 +284,7 @@ def build_create_label_json(
     safe_receiver_city = receiver_city.strip() if receiver_city else sender_city
 
     # postcode: for office you had "null" in the log → give at least sender’s
-    safe_receiver_postcode = (receiver_postcode or "").strip() or "8000"
+    safe_receiver_postcode = (receiver_postcode or "").strip()
 
     payload: dict = {
         "shipmentType": "PACK",
@@ -331,6 +331,8 @@ def build_create_label_json(
     if receiver_office_code:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
+        # ✅ drop the address to avoid postcode/city mismatch
+        payload.pop("receiverAddress", None)
     else:
         payload["service"] = "toDoor"
         ra = payload["receiverAddress"]
