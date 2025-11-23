@@ -551,12 +551,18 @@
                             const btn = inlineBox.querySelector("#btn-inline-address-submit");
                             if (btn) {
                                 btn.addEventListener("click", function () {
+                                    // 🛡 prevent double-clicks
+                                    if (btn.dataset.busy === "1") return;
+                                    btn.dataset.busy = "1";
+                                    btn.disabled = true;
+                                    const origText = btn.textContent;
+                                    btn.textContent = "Моля, изчакайте…";
+
                                     const fd = new FormData();
                                     fd.append("to_office", "0");
-                                    if (orderId) fd.append("order_id", orderId);   // ← send it on POST too
+                                    if (orderId) fd.append("order_id", orderId);
                                     inlineBox.querySelectorAll("input[name]").forEach(inp => fd.append(inp.name, inp.value));
 
-                                    // NEW: add top-of-page fields
                                     appendTopFields(fd);
 
                                     fetch(urlSubmit, {
@@ -568,16 +574,31 @@
                                         .then(r => r.json())
                                         .then(json => {
                                             if (!json.ok) {
+                                                // error → allow retry
+                                                btn.disabled = false;
+                                                btn.dataset.busy = "0";
+                                                btn.textContent = origText;
                                                 alert(json.error || "Грешка.");
                                                 return;
                                             }
+                                            // success → redirect (no need to re-enable)
                                             if (json.next === "thankyou") {
                                                 window.location.href = json.redirect || "/checkout/thank-you/";
                                             } else if (json.next === "stripe") {
                                                 window.location.href = json.redirect;
                                             } else {
                                                 alert("Данните за доставка са записани.");
+                                                btn.disabled = false;
+                                                btn.dataset.busy = "0";
+                                                btn.textContent = origText;
                                             }
+                                        })
+                                        .catch(() => {
+                                            // network error → allow retry
+                                            btn.disabled = false;
+                                            btn.dataset.busy = "0";
+                                            btn.textContent = origText;
+                                            alert("Възникна грешка. Опитайте отново.");
                                         });
                                 });
                             }
@@ -715,14 +736,20 @@
 
                 if (submitBtn) {
                     submitBtn.addEventListener("click", function () {
+                        // 🛡 prevent double-clicks
+                        if (submitBtn.dataset.busy === "1") return;
+                        submitBtn.dataset.busy = "1";
+                        submitBtn.disabled = true;
+                        const origText = submitBtn.textContent;
+                        submitBtn.textContent = "Моля, изчакайте…";
+
                         const fd = new FormData();
                         fd.append("to_office", "1");
                         if (orderId) fd.append("order_id", orderId);
 
-                        // 1) everything inside the office partial
                         root.querySelectorAll("input[name]").forEach(inp => fd.append(inp.name, inp.value));
 
-                        // 2) grab the top/billing fields LIVE
+                        // billing top fields…
                         const topName = document.querySelector('input[name="billing_full_name"]');
                         const topEmail = document.querySelector('input[name="billing_email"]');
                         const topPhone = document.querySelector('input[name="billing_phone"]');
@@ -737,7 +764,6 @@
                         if (topStreet) fd.set("billing_street", topStreet.value);
                         if (topPost) fd.set("billing_postcode", topPost.value);
 
-                        // also set generic fields, so econt_submit_inline can pick them up
                         if (topName) fd.set("full_name", topName.value);
                         if (topPhone) fd.set("phone", topPhone.value);
                         if (topCity) fd.set("city", topCity.value);
@@ -751,6 +777,9 @@
                             .then(r => r.json())
                             .then(json => {
                                 if (!json.ok) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.dataset.busy = "0";
+                                    submitBtn.textContent = origText;
                                     alert(json.error || "Грешка.");
                                     return;
                                 }
@@ -760,7 +789,16 @@
                                     window.location.href = json.redirect;
                                 } else {
                                     alert("Данните за доставка са записани.");
+                                    submitBtn.disabled = false;
+                                    submitBtn.dataset.busy = "0";
+                                    submitBtn.textContent = origText;
                                 }
+                            })
+                            .catch(() => {
+                                submitBtn.disabled = false;
+                                submitBtn.dataset.busy = "0";
+                                submitBtn.textContent = origText;
+                                alert("Възникна грешка. Опитайте отново.");
                             });
                     });
                 }

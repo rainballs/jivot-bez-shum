@@ -16,6 +16,17 @@ from typing import List, Dict
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
     overrides = overrides or {}
+
+    # 🚨 HARD GUARD: if this order already has a shipment number,
+    # DO NOT create a new label in Econt.
+    if getattr(order, "econt_shipment_num", None):
+        return {
+            "ok": True,
+            "shipment_num": order.econt_shipment_num,
+            "saved_pdf": bool(getattr(order, "econt_label_pdf", None)),
+            "error": None,
+        }
+
     d = settings.ECONT["DEFAULTS"]
 
     # --- receiver data ---
@@ -66,10 +77,8 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         declared_value_bgn=total_bgn,  # always show product value
         payer="sender",
         label_format=d.get("label_format", "10x9"),
-        # ← we do NOT pass cd_template anymore
     )
 
-    # optional: see outgoing JSON
     print("ECONT ▶ OUTGOING JSON:\n", json.dumps({"mode": "create", "label": payload}, ensure_ascii=False, indent=2))
 
     client = EcontClient()
