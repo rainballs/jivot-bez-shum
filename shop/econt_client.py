@@ -270,22 +270,40 @@ def build_create_label_json(
         label_format: str = "10x9",
 ) -> dict:
     """
-    Builds the JSON Econt wants. Now a bit more defensive: makes sure
-    receiver name/phone/city/postcode aren’t empty, because their API
-    complains with 517.
+    Builds the JSON Econt wants.
+
+    ⚠️ NO MORE MAGIC FALLBACKS:
+    - If required receiver fields are missing, we raise ValueError.
+      create_econt_label() will catch it and store econt_errors.
     """
     payer = (payer or "receiver").upper()
     cod_bgn = float(cod_bgn or 0.0)
 
-    # ---- 1) defensive fallbacks ----
-    # Econt really hates empty receiver name/phone.
-    safe_receiver_name = receiver_name.strip() if receiver_name else "Получател"
-    safe_receiver_phone = receiver_phone.strip() if receiver_phone else sender_phone  # fall back to sender
-    safe_receiver_city = receiver_city.strip() if receiver_city else sender_city
+    # --- 0) basic required fields ---
+    rn = (receiver_name or "").strip()
+    rp = (receiver_phone or "").strip()
+    rc = (receiver_city or "").strip()
 
-    # postcode: for office you had "null" in the log → give at least sender’s
-    safe_receiver_postcode = (receiver_postcode or "").strip()
+    if not rn or not rp or not rc:
+        raise ValueError(
+            "Missing mandatory receiver fields: "
+            f"name='{rn}', phone='{rp}', city='{rc}'"
+        )
 
+    # toOffice vs toDoor
+    to_office = bool(receiver_office_code)
+
+    if not to_office:
+        # to address: street + postcode are required
+        rs = (receiver_street or "").strip()
+        rpc = (receiver_postcode or "").strip()
+        if not rs or not rpc:
+            raise ValueError(
+                "Missing address for toDoor shipment: "
+                f"street='{rs}', postcode='{rpc}'"
+            )
+
+    # --- 1) base payload ---
     payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
@@ -302,51 +320,46 @@ def build_create_label_json(
             "city": {
                 "country": {"code3": "BGR"},
                 "name": sender_city,
-                "postCode": "8000",  # your old code
+                "postCode": "8000",  # your fixed sender postcode
             }
         },
 
-        # ← here are the fixed values
-        "receiverClient": {"name": safe_receiver_name, "phones": [safe_receiver_phone]},
-        "receiverAddress": {
-            "city": {
-                "country": {"code3": "BGR"},
-                "name": safe_receiver_city,
-                "postCode": safe_receiver_postcode,
-            }
-        },
+        "receiverClient": {"name": rn, "phones": [rp]},
     }
 
-    # --- sender: office or address
+    # --- sender: office or address ---
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # --- delivery date
+    # --- delivery date ---
     delivery_day = _next_workday(date.today()).isoformat()
-    # payload["delivery"] = {"date": delivery_day, "timeIntervalId": 0}
     payload["sendDate"] = delivery_day
-    # --- receiver: office vs door
-    if receiver_office_code:
+
+    # --- receiver: office vs door ---
+    if to_office:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
-        # ✅ drop the address to avoid postcode/city mismatch
-        payload.pop("receiverAddress", None)
+        # for office we don't need a full address
     else:
         payload["service"] = "toDoor"
-        ra = payload["receiverAddress"]
-        ra["street"] = receiver_street or ""
+        payload["receiverAddress"] = {
+            "city": {
+                "country": {"code3": "BGR"},
+                "name": rc,
+                "postCode": (receiver_postcode or "").strip(),
+            },
+            "street": (receiver_street or "").strip(),
+        }
         if receiver_num:
-            ra["num"] = str(receiver_num)
-        if receiver_postcode:
-            ra["postCode"] = str(receiver_postcode)
+            payload["receiverAddress"]["num"] = str(receiver_num)
         if receiver_entrance:
-            ra["entrance"] = receiver_entrance
+            payload["receiverAddress"]["entrance"] = receiver_entrance
         if receiver_floor:
-            ra["floor"] = receiver_floor
+            payload["receiverAddress"]["floor"] = receiver_floor
         if receiver_apartment:
-            ra["apartment"] = receiver_apartment
+            payload["receiverAddress"]["apartment"] = receiver_apartment
 
     # --- services (declared value, COD) ---
     services: dict = {}
@@ -357,11 +370,9 @@ def build_create_label_json(
 
     if cod_bgn > 0:
         cod_office = receiver_office_code or sender_office_code
-
         services["cdAmount"] = float(cod_bgn)
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
-
         services["cdPayOptions"] = {
             "method": "office",
             "officeCode": str(cod_office) if cod_office else "",
