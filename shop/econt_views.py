@@ -208,8 +208,8 @@ def econt_submit(request):
 
     # Basic fields
     order.full_name = (request.POST.get("full_name") or order.full_name or "").strip()
-    order.phone = (request.POST.get("phone") or order.phone or "").strip()  # <- singular
-    order.city = (request.POST.get("city") or order.city or "").strip()  # <- now posted from office.html
+    order.phone = (request.POST.get("phone") or order.phone or "").strip()
+    order.city = (request.POST.get("city") or order.city or "").strip()
 
     # Mode comes from hidden input on each page
     to_office = request.POST.get("to_office") == "1"
@@ -223,7 +223,7 @@ def econt_submit(request):
     r_floor = (request.POST.get("receiver_floor") or "").strip()
     r_apartment = (request.POST.get("receiver_apartment") or "").strip()
 
-    # Minimal sanity checks
+    # --- minimal sanity checks ---
     if not order.full_name:
         messages.error(request, "Моля, въведете име и фамилия.")
         return redirect(back_name)
@@ -236,17 +236,32 @@ def econt_submit(request):
 
     overrides = {}
 
+    # 👇 combine street + num ONCE so we can save it
+    address_line = ""
+    if r_street and r_num:
+        address_line = f"{r_street} {r_num}"
+    elif r_street:
+        address_line = r_street
+
     if to_office:
         if not office_code:
             messages.error(request, "Въведете код на офис.")
             return redirect(back_name)
+
         overrides["receiver_office_code"] = office_code
         order.econt_office_code = office_code
         order.delivery_method = DeliveryMethod.TO_OFFICE
+
+        # ### NEW: clear real address, keep postcode if present
+        order.address_line = ""  # we ship to office
+        if r_postcode:
+            order.postal_code = r_postcode
+
     else:
         if not r_street or not r_num:
             messages.error(request, "За доставка до адрес попълнете „Улица“ и „№“.")
             return redirect(back_name)
+
         overrides.update({
             "receiver_street": r_street,
             "receiver_num": r_num,
@@ -255,9 +270,16 @@ def econt_submit(request):
             "receiver_floor": r_floor or None,
             "receiver_apartment": r_apartment or None,
         })
+
         order.econt_office_code = ""
         order.delivery_method = DeliveryMethod.TO_ADDRESS
 
+        # ### NEW: persist real shipping fields to the Order
+        order.address_line = address_line
+        if r_postcode:
+            order.postal_code = r_postcode
+
+    # ✅ save ALL shipping info
     order.save()
 
     result = create_econt_label(order, overrides=overrides)
@@ -269,7 +291,6 @@ def econt_submit(request):
         messages.error(request, f"Грешка при Еконт: {msg}")
         return redirect(back_name)
 
-    # messages.success(request, "Товарителницата е създадена успешно.")
     send_order_notification(order, event="created")
     return redirect("thank_you")
 
@@ -511,15 +532,29 @@ def econt_submit_inline(request):
 
     overrides = {}
 
+    address_line = ""
+    if r_street and r_num:
+        address_line = f"{r_street} {r_num}"
+    elif r_street:
+        address_line = r_street
+
     if to_office:
         if not office_code:
             return JsonResponse({"ok": False, "error": "Изберете офис."})
+
         overrides["receiver_office_code"] = office_code
         order.econt_office_code = office_code
         order.delivery_method = DeliveryMethod.TO_OFFICE
+
+        # ### NEW: clear address, keep postcode if present
+        order.address_line = ""
+        if r_postcode:
+            order.postal_code = r_postcode
+
     else:
         if not r_street or not r_num:
             return JsonResponse({"ok": False, "error": "Попълнете „Улица“ и „№“."})
+
         overrides.update({
             "receiver_street": r_street,
             "receiver_num": r_num,
@@ -528,8 +563,14 @@ def econt_submit_inline(request):
             "receiver_floor": r_floor or None,
             "receiver_apartment": r_apartment or None,
         })
+
         order.econt_office_code = ""
         order.delivery_method = DeliveryMethod.TO_ADDRESS
+
+        # ### NEW: persist shipping address
+        order.address_line = address_line
+        if r_postcode:
+            order.postal_code = r_postcode
 
     # 6) persist everything we collected
     order.save()
