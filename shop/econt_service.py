@@ -46,6 +46,38 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     r_floor = overrides.get("receiver_floor")
     r_apartment = overrides.get("receiver_apartment")
 
+    # 🔴 NEW: minimal server-side validation – do NOT call Econt with empty data
+    errors: list[str] = []
+
+    if not (receiver_name or "").strip():
+        errors.append("липсва име на получателя")
+    if not (receiver_phone or "").strip():
+        errors.append("липсва телефон на получателя")
+    if not (receiver_city or "").strip():
+        errors.append("липсва град за доставка")
+
+    to_office = bool(receiver_office_code)
+
+    if to_office:
+        if not (receiver_office_code or "").strip():
+            errors.append("липсва избран офис на Еконт")
+    else:
+        if not (r_street or "").strip():
+            errors.append("липсва улица за доставка до адрес")
+        if not (r_postcode or "").strip():
+            errors.append("липсва пощенски код за доставка до адрес")
+
+    if errors:
+        err = " / ".join(errors)
+        order.econt_errors = err
+        order.save(update_fields=["econt_errors"])
+        return {
+            "ok": False,
+            "shipment_num": None,
+            "saved_pdf": False,
+            "error": err,
+        }
+
     # --- money ---
     total_bgn = float(order.total_bgn or 0.0)
     pm = getattr(order, "payment_method", None)

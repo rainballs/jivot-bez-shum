@@ -126,6 +126,44 @@ def checkout_info(request):
 
             order.quantity = info_form.cleaned_data["quantity"]
             order.paid = False
+
+            # 🔴 NEW: hard validation for Econt before saving the order
+            missing_parts = []
+
+            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                if not (order.full_name or "").strip():
+                    missing_parts.append("име и фамилия")
+                if not (order.phone or "").strip():
+                    missing_parts.append("телефон")
+                if not (order.city or "").strip():
+                    missing_parts.append("град")
+                if not (order.postal_code or "").strip():
+                    missing_parts.append("пощенски код")
+                if not (order.address_line or "").strip():
+                    missing_parts.append("улица и номер")
+
+            else:  # TO_OFFICE
+                if not (order.city or "").strip():
+                    missing_parts.append("град")
+                if not (getattr(order, "econt_office_code", "") or "").strip():
+                    missing_parts.append("офис на Еконт")
+
+            if missing_parts:
+                messages.error(
+                    request,
+                    "За да продължите, попълнете: " + ", ".join(missing_parts) + "."
+                )
+                return render(
+                    request,
+                    "checkout/info.html",
+                    {
+                        "product": product,
+                        "form": info_form,
+                        "pay_form": pay_form,
+                    },
+                )
+
+            # ✅ all required fields for Econt are present – safe to save
             order.save()
 
             # line item
