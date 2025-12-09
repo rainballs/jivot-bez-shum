@@ -72,7 +72,12 @@ class Order(models.Model):
     # optional, if you let user pick office:
     econt_office_code = models.CharField(max_length=16, blank=True, null=True)
 
-    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, blank=True)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CARD,
+        verbose_name=_("Метод на плащане"),
+    )
     paid = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -118,11 +123,24 @@ class Order(models.Model):
         return ", ".join(p for p in parts if p)
 
     def set_shipping_flat(self):
-        """9.00 лв for delivery to address, else 7.00 лв. EUR auto-converted."""
+        """
+        Default доставка: 9.00 лв до адрес, 7.00 лв до офис.
+
+        ВАЖНО:
+        - Ако вече имаме реална цена от Еконт (shipping_bgn > 0),
+          НЕ я пипаме, само синхронизираме EUR.
+        """
+        if self.shipping_bgn and self.shipping_bgn > 0:
+            # вече имаме цена от Еконт → само синхронизираме евро
+            self.shipping_eur = _bgn_to_eur(self.shipping_bgn)
+            return
+
+        # иначе – placeholder 9 / 7 лв (преди да сме говорили с Еконт)
         if self.delivery_method == DeliveryMethod.TO_ADDRESS:
             ship_bgn = Decimal("9.00")
         else:
             ship_bgn = Decimal("7.00")
+
         self.shipping_bgn = ship_bgn
         self.shipping_eur = _bgn_to_eur(ship_bgn)
 
@@ -136,16 +154,16 @@ class Order(models.Model):
         self.total_bgn = sbgn + self.shipping_bgn
         self.total_eur = seur + self.shipping_eur
 
-    def save(self, *args, **kwargs):
-        creating = self.pk is None
-        super().save(*args, **kwargs)  # first save to obtain PK if creating
-        # Only recompute when there are items; skip on the very first save
-        if self.items.exists():
-            self.recompute_totals()
-            super().save(update_fields=[
-                "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
-                "total_bgn", "total_eur"
-            ])
+    # def save(self, *args, **kwargs):
+    #     creating = self.pk is None
+    #     super().save(*args, **kwargs)  # first save to obtain PK if creating
+    #     # Only recompute when there are items; skip on the very first save
+    #     if self.items.exists():
+    #         self.recompute_totals()
+    #         super().save(update_fields=[
+    #             "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
+    #             "total_bgn", "total_eur"
+    #         ])
 
 
 class OrderItem(models.Model):

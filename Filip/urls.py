@@ -12,6 +12,10 @@ urlpatterns = [
     path("checkout/payment/", views.checkout_payment, name="checkout_payment"),  # hidden for now
     path("checkout/thank-you/", views.thank_you, name="thank_you"),
 
+    path("checkout/summary/", views.checkout_summary, name="checkout_summary"),
+    path("checkout/summary/<int:order_id>/", views.checkout_summary, name="checkout_summary_by_id"),
+    path("checkout/confirm-cod/", views.checkout_confirm_cod, name="checkout_confirm_cod"),
+
     # Stripe (disabled for now)
     path("pay/stripe/create-session/", views.stripe_create_checkout_session, name="stripe_create_session"),
     path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),

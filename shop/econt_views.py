@@ -6,7 +6,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.views.decorators.http import require_http_methods, require_GET
 from django.utils.html import escape
 from .models import Order, DeliveryMethod, PaymentMethod
-from .econt_service import create_econt_label
+from .econt_service import create_econt_label, calculate_econt_shipping
 import json
 from django.views.decorators.http import require_http_methods
 import logging
@@ -530,7 +530,7 @@ def econt_submit_inline(request):
     # if not city:
     #     return JsonResponse({"ok": False, "error": "Моля, въведете град."})
 
-    overrides = {}
+    overrides: dict = {}
 
     address_line = ""
     if r_street and r_num:
@@ -572,27 +572,23 @@ def econt_submit_inline(request):
         if r_postcode:
             order.postal_code = r_postcode
 
-    # 6) persist everything we collected
+    # 6) persist everything we collected (address / office)
     order.save()
 
-    # 7) branch by payment
-    if order.payment_method == PaymentMethod.COD:
-        res = create_econt_label(order, overrides=overrides)
-        if not res.get("ok"):
-            return JsonResponse({"ok": False, "error": res.get("error") or "Грешка при Еконт."})
-        try:
-            send_order_notification(order, event="created")
-        except Exception:
-            pass
-        return JsonResponse({
-            "ok": True,
-            "next": "thankyou",
-            "redirect": reverse("thank_you"),
-        })
+    # 7) Ask Econt to CALCULATE shipping (without COD tax)
+    calc = calculate_econt_shipping(order, overrides=overrides)
+    if not calc.get("ok"):
+        return JsonResponse({"ok": False, "error": calc.get("error") or "Грешка при изчисляване на доставка."})
 
-    # CARD → to Stripe
+    ship_bgn = calc["ship_bgn"]
+    order.shipping_bgn = ship_bgn
+    # let the model helper convert to EUR & recompute totals on save
+    order.recompute_totals()  # тук total = стока + доставка (без такса НП)
+    order.save()
+
+    # 8) redirect client-side to the summary page (same for card & COD)
     return JsonResponse({
         "ok": True,
-        "next": "stripe",
-        "redirect": reverse("stripe_create_session"),
+        "next": "summary",
+        "redirect": reverse("checkout_summary"),
     })

@@ -106,6 +106,43 @@ class EcontClient:
 
         return resp.get("label") or resp
 
+    def calculate_label(self, label_payload: dict) -> dict:
+        """
+        Call createLabel in 'calculate' mode.
+        Returns the 'label' block (or root) similar to create_label.
+        """
+        body = {"mode": "calculate", "label": label_payload}
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        log.error("ECONT ▶ CALCULATE %s\n%s", self.create_label_url, data.decode("utf-8"))
+
+        r = self.sess.post(self.create_label_url, data=data, timeout=self.timeout)
+        log.error("ECONT ◀ CALCULATE %s %s\n%s", r.status_code, r.reason, r.text[:2000])
+
+        if r.status_code != 200:
+            raise EcontError(f"HTTP {r.status_code} {r.reason}")
+
+        try:
+            resp = r.json()
+        except Exception:
+            raise EcontError("Non-JSON response from Econt")
+
+        # same error extraction as in create_label
+        err = _first_nonempty(
+            resp.get("error"),
+            resp.get("message"),
+            (resp.get("label") or {}).get("error"),
+        )
+        if not err:
+            errs = resp.get("errors") or (resp.get("label") or {}).get("errors")
+            if isinstance(errs, list) and errs:
+                err = _first_nonempty(
+                    *(str(e.get("message") or e.get("text") or e) for e in errs)
+                )
+        if err:
+            raise EcontError(err)
+
+        return resp.get("label") or resp
+
     def _post_json(self, url: str, payload: dict) -> dict:
         """POST JSON to Econt and return parsed JSON or raise EcontError."""
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -266,20 +303,26 @@ def build_create_label_json(
         parcels: int = 1,
         cod_bgn: float = 0.0,
         declared_value_bgn: float = 0.0,
-        payer: str = "receiver",
+        payer: str = "SENDER",  # default like in the other app
         label_format: str = "10x9",
 ) -> dict:
     """
-    Builds the JSON Econt wants.
+    Build the JSON payload for Econt LabelService (create / calculate).
 
-    ⚠️ NO MORE MAGIC FALLBACKS:
-    - If required receiver fields are missing, we raise ValueError.
-      create_econt_label() will catch it and store econt_errors.
+    - `payer`        → who pays courier service (SENDER / RECEIVER)
+    - `cod_bgn`      → Наложен платеж (only for COD)
+    - `declared_value_bgn` → Обявена стойност (стойност на стоката)
     """
-    payer = (payer or "receiver").upper()
-    cod_bgn = float(cod_bgn or 0.0)
 
-    # --- 0) basic required fields ---
+    # --- normalize basics ---
+    payer_upper = (payer or "SENDER").upper()
+    if payer_upper not in ("SENDER", "RECEIVER"):
+        payer_upper = "SENDER"
+
+    cod_bgn = float(cod_bgn or 0.0)
+    declared_value_bgn = float(declared_value_bgn or 0.0)
+
+    # --- mandatory receiver fields ---
     rn = (receiver_name or "").strip()
     rp = (receiver_phone or "").strip()
     rc = (receiver_city or "").strip()
@@ -290,11 +333,9 @@ def build_create_label_json(
             f"name='{rn}', phone='{rp}', city='{rc}'"
         )
 
-    # toOffice vs toDoor
     to_office = bool(receiver_office_code)
 
     if not to_office:
-        # to address: street + postcode are required
         rs = (receiver_street or "").strip()
         rpc = (receiver_postcode or "").strip()
         if not rs or not rpc:
@@ -303,15 +344,15 @@ def build_create_label_json(
                 f"street='{rs}', postcode='{rpc}'"
             )
 
-    # --- 1) base payload ---
+    # --- base label ---
     payload: dict = {
         "shipmentType": "PACK",
         "service": None,  # set below
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer,
-        "declaredValue": float(declared_value_bgn),
+        "payer": payer_upper,  # ⬅️ *this* is what Econt shows as „платец“
+        "declaredValue": declared_value_bgn,
         "label": {"format": label_format},
 
         "senderClient": {"name": sender_name, "phones": [sender_phone]},
@@ -320,31 +361,30 @@ def build_create_label_json(
             "city": {
                 "country": {"code3": "BGR"},
                 "name": sender_city,
-                "postCode": "8000",  # your fixed sender postcode
+                "postCode": "8000",  # твоя фиксиран пощ. код
             }
         },
 
         "receiverClient": {"name": rn, "phones": [rp]},
     }
 
-    # --- sender: office or address ---
+    # sender: office vs address
     if sender_office_code:
         payload["senderOfficeCode"] = str(sender_office_code)
     else:
         payload["senderAddress"]["street"] = sender_address or ""
 
-    # --- delivery date ---
+    # дата на изпращане (следващ работен ден)
     delivery_day = _next_workday(date.today()).isoformat()
     payload["sendDate"] = delivery_day
 
-    # --- receiver: office vs door ---
+    # --- receiver: офис / адрес ---
     if to_office:
         payload["service"] = "toOffice"
         payload["receiverOfficeCode"] = str(receiver_office_code)
-        # for office we don't need a full address
     else:
         payload["service"] = "toDoor"
-        payload["receiverAddress"] = {
+        addr = {
             "city": {
                 "country": {"code3": "BGR"},
                 "name": rc,
@@ -353,35 +393,40 @@ def build_create_label_json(
             "street": (receiver_street or "").strip(),
         }
         if receiver_num:
-            payload["receiverAddress"]["num"] = str(receiver_num)
+            addr["num"] = str(receiver_num)
         if receiver_entrance:
-            payload["receiverAddress"]["entrance"] = receiver_entrance
+            addr["entrance"] = receiver_entrance
         if receiver_floor:
-            payload["receiverAddress"]["floor"] = receiver_floor
+            addr["floor"] = receiver_floor
         if receiver_apartment:
-            payload["receiverAddress"]["apartment"] = receiver_apartment
+            addr["apartment"] = receiver_apartment
 
-    # --- services (declared value, COD) ---
+        payload["receiverAddress"] = addr
+
+    # --- services (Обявена стойност + НП) ---
     services: dict = {}
 
-    if declared_value_bgn and declared_value_bgn > 0:
-        services["declaredValueAmount"] = float(declared_value_bgn)
+    if declared_value_bgn > 0:
+        services["declaredValueAmount"] = declared_value_bgn
         services["declaredValueCurrency"] = "BGN"
 
     if cod_bgn > 0:
+        # Наложен платеж (само стойност на стоката)
         cod_office = receiver_office_code or sender_office_code
-        services["cdAmount"] = float(cod_bgn)
+        services["cdAmount"] = cod_bgn
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
         services["cdPayOptions"] = {
             "method": "office",
             "officeCode": str(cod_office) if cod_office else "",
             "departamentNum": 1,
-            "client": {
-                "name": sender_name,
-                "phones": [sender_phone],
-            },
+            "client": {"name": sender_name, "phones": [sender_phone]},
         }
+
+        # ➕ точно както в работещия builder:
+        # казваме на Еконт, че получателят плаща в брой тази сума
+        payload["paymentReceiverMethod"] = "CASH"
+        payload["paymentReceiverAmount"] = cod_bgn
 
     if services:
         payload["services"] = services

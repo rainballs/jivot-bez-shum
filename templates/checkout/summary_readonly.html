@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Обобщение на поръчката{% endblock %}
+
+{% block content %}
+    <section class="section">
+        <div class="container">
+            <div class="checkout-grid-2col">
+
+                <!-- LEFT: readonly details -->
+                <div class="checkout-main">
+                    <h2>Обобщение на поръчката</h2>
+
+                    {% if messages %}
+                        <div class="alerts">
+                            {% for m in messages %}
+                                <div class="alert">{{ m }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="card soft p">
+                        <div class="order-meta">
+                            <div><strong>Номер на поръчка:</strong> #{{ order.id }}</div>
+                            <div><strong>Дата:</strong> {{ order.created_at|date:"d.m.Y H:i" }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Получател -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <h3>Данни за получател</h3>
+                        <dl class="summary-dl">
+                            <div>
+                                <dt>Име и фамилия</dt>
+                                <dd>{{ order.full_name }}</dd>
+                            </div>
+                            <div>
+                                <dt>Имейл</dt>
+                                <dd>{{ order.email }}</dd>
+                            </div>
+                            <div>
+                                <dt>Телефон</dt>
+                                <dd>{{ order.phone }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <!-- Фактуриране -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <h3>Адрес за фактуриране</h3>
+                        {% if order.billing_full_name or order.billing_city or order.billing_street %}
+                            <dl class="summary-dl">
+                                <div>
+                                    <dt>Име и фамилия</dt>
+                                    <dd>{{ order.billing_full_name|default:"—" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Имейл</dt>
+                                    <dd>{{ order.billing_email|default:"—" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Телефон</dt>
+                                    <dd>{{ order.billing_phone|default:"—" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Град</dt>
+                                    <dd>{{ order.billing_city|default:"—" }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Адрес</dt>
+                                    <dd>
+                                        {% if order.billing_street %}
+                                            {{ order.billing_street }}
+                                            {% if order.billing_num %} №{{ order.billing_num }}{% endif %}
+                                            {% if order.billing_entrance %}, вх. {{ order.billing_entrance }}{% endif %}
+                                            {% if order.billing_floor %}, ет. {{ order.billing_floor }}{% endif %}
+                                            {% if order.billing_apartment %}, ап.
+                                                {{ order.billing_apartment }}{% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>Пощ. код</dt>
+                                    <dd>{{ order.billing_postcode|default:"—" }}</dd>
+                                </div>
+                            </dl>
+                        {% else %}
+                            <p class="small muted">Не е попълнен отделен адрес за фактуриране.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Доставка -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <h3>Доставка</h3>
+                        <dl class="summary-dl">
+                            <div>
+                                <dt>Метод</dt>
+                                <dd>
+                                    {% if order.delivery_method == "address" %}
+                                        Доставка до адрес
+                                    {% elif order.delivery_method == "office" %}
+                                        Доставка до офис/АПС
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Град</dt>
+                                <dd>{{ order.city|default:"—" }}</dd>
+                            </div>
+
+                            {% if order.delivery_method == "address" %}
+                                <div>
+                                    <dt>Адрес</dt>
+                                    <dd>
+                                        {% if order.address_line %}
+                                            {{ order.address_line }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>Пощенски код</dt>
+                                    <dd>{{ order.postal_code|default:"—" }}</dd>
+                                </div>
+                            {% else %}
+                                <div>
+                                    <dt>Офис</dt>
+                                    <dd>
+                                        {% if order.office_text %}
+                                            {{ order.office_text }}
+                                        {% elif order.econt_office_code %}
+                                            Офис №{{ order.econt_office_code }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                            {% endif %}
+
+                            <div>
+                                <dt>Куриер</dt>
+                                <dd>Еконт</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <!-- Плащане -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <h3>Метод на плащане</h3>
+                        <p>
+                            {% if order.payment_method == "cod" %}
+                                Наложен платеж
+                            {% elif order.payment_method == "card" %}
+                                Плащане с карта
+                            {% elif order.payment_method == "apple_pay" %}
+                                Apple Pay
+                            {% elif order.payment_method == "google_pay" %}
+                                Google Pay
+                            {% else %}
+                                Не е избран
+                            {% endif %}
+                        </p>
+
+                        {% if order.payment_method == "cod" %}
+                            <p class="small muted">
+                                * Показаната цена за доставка е без такса за наложен платеж на Еконт.
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="card soft p" style="margin-top:1rem">
+                        <div class="actions" style="display:flex; gap:.75rem; flex-wrap:wrap;">
+                            <a href="{% url 'checkout_info' %}" class="btn btn-secondary">
+                                Редактирай данните
+                            </a>
+
+                            {% if order.payment_method == "cod" %}
+                                <form method="post" action="{% url 'checkout_confirm_cod' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary">
+                                        Потвърди поръчката (наложен платеж)
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url 'stripe_create_session' %}" class="btn btn-primary">
+                                    Плати с карта
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: summary card -->
+                <aside class="checkout-summary">
+                    <div class="summary-card card">
+                        <div class="summary-head">Резюме</div>
+
+                        <div class="summary-item">
+                            <img src="{% static 'images/book.svg' %}" alt="" class="thumb">
+                            <div>
+                                <div class="title">Живот без шум</div>
+                                <div class="price-row">
+                                    <span class="pill">{{ product.price_bgn }} лв</span>
+                                    <span class="pill">€ {{ product.price_eur }}</span>
+                                </div>
+                                <div class="small muted">Количество: {{ order.quantity }}</div>
+                            </div>
+                        </div>
+
+                        <div class="summary-rows">
+                            <div class="row">
+                                <span>Стойност на стоката</span>
+                                <span>{{ order.subtotal_bgn|floatformat:2 }} лв</span>
+                            </div>
+
+                            {# ДИНОМИЧНА ДОСТАВКА ОТ ЕКОНТ #}
+                            <div class="row">
+                                <span>Доставка (Еконт)</span>
+                                <span>
+        {% if order.shipping_bgn %}
+            {{ order.shipping_bgn|floatformat:2 }} лв
+        {% else %}
+            – лв
+        {% endif %}
+      </span>
+                            </div>
+                        </div>
+
+                        <div class="total-row">
+                            <div>Крайна сума:</div>
+                            <div class="total">
+                                {% if order.total_bgn %}
+                                    {{ order.total_bgn|floatformat:2 }} лв
+                                    <span class="muted">
+          (≈ € {{ order.total_eur|floatformat:2 }})
+        </span>
+                                {% else %}
+                                    {{ product.price_bgn|floatformat:2 }} лв
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <p class="small muted" style="margin-top:6px">
+                            * При наложен платеж куриерът може да начисли допълнителна такса за услугата.
+                        </p>
+
+                        {# ВАЖНО: махаме стария текст за 9/7 лв #}
+                    </div>
+
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <style>
+        .card.soft {
+            background: var(--soft, #f6f6f7);
+            border-radius: 16px;
+            padding: 1rem;
+        }
+
+        .summary-dl {
+            margin: .5rem 0 0;
+        }
+
+        .summary-dl div {
+            margin-bottom: .25rem;
+        }
+
+        .summary-dl dt {
+            font-size: .85rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #777;
+        }
+
+        .summary-dl dd {
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .order-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            font-size: .95rem;
+        }
+    </style>
+{% endblock %}

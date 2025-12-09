@@ -147,9 +147,9 @@
                             </div>
                         </div>
 
-                        <p class="small muted" style="margin-top:6px">
-                            * към сумата се начислява доставка: 9.00 лв (до адрес) или 7.00 лв (офис/АПС).
-                        </p>
+                        {#                        <p class="small muted" style="margin-top:6px">#}
+                        {#                            * към сумата се начислява доставка: 9.00 лв (до адрес) или 7.00 лв (офис/АПС).#}
+                        {#                        </p>#}
 
                         {#                        <div class="actions actions-right">#}
                         {#                            <a href="/" class="btn btn-secondary">Назад</a>#}
@@ -330,12 +330,11 @@
             }
 
             /* ====== 1) shipping preview + show total only after delivery ====== */
-            (function setupShipping() {
+            (function setupSummaryWithoutShipping() {
                 const qtyInput = document.querySelector('input[name="quantity"]');
                 const outBGN = document.querySelector("[data-total-bgn]");
                 const outEUR = document.querySelector("[data-total-eur]");
                 const shipLine = document.querySelector("[data-ship-line]");
-                const dmRadios = document.querySelectorAll('input[name="delivery_method"]');
                 const totalWrap = document.querySelector("[data-total-wrap]");
 
                 function toNum(s) {
@@ -349,39 +348,20 @@
                 const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
                 const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
 
-                function currentDelivery() {
-                    const checked = document.querySelector('input[name="delivery_method"]:checked');
-                    return checked ? checked.value : null;
-                }
+                // винаги показваме total реда
+                if (totalWrap) totalWrap.style.display = "";
 
-                function shipBGN() {
-                    return currentDelivery() === "address" ? 9.00 : 7.00;
-                }
-
-                function shipEUR() {
-                    return shipBGN() / 1.95583;
+                // и казваме, че доставката ще се сметне на следващата стъпка
+                if (shipLine) {
+                    shipLine.textContent = "Цената за доставка ще бъде изчислена на следващата стъпка.";
                 }
 
                 function recalc() {
                     const q = toNum(qtyInput?.value || 1);
-                    const delivery = currentDelivery();
-
-                    if (!delivery) {
-                        if (totalWrap) totalWrap.style.display = "none";
-                        if (shipLine) shipLine.textContent = "";
-                        if (outBGN) outBGN.textContent = fmt(pBGN * q);
-                        if (outEUR) outEUR.textContent = fmt(pEUR * q);
-                        return;
-                    }
-
-                    const sBGN = shipBGN(), sEUR = shipEUR();
-                    if (outBGN) outBGN.textContent = fmt(pBGN * q + sBGN);
-                    if (outEUR) outEUR.textContent = fmt(pEUR * q + sEUR);
-                    if (shipLine) shipLine.textContent = `Доставка: ${fmt(sBGN)} лв / € ${fmt(sEUR)}`;
-                    if (totalWrap) totalWrap.style.display = "";
+                    if (outBGN) outBGN.textContent = fmt(pBGN * q);
+                    if (outEUR) outEUR.textContent = fmt(pEUR * q);
                 }
 
-                dmRadios.forEach(r => r.addEventListener("change", recalc));
                 if (qtyInput) qtyInput.addEventListener("input", recalc);
                 recalc();
             })();
@@ -582,7 +562,9 @@
                                                 return;
                                             }
                                             // success → redirect (no need to re-enable)
-                                            if (json.next === "thankyou") {
+                                            if (json.next === "summary") {
+                                                window.location.href = json.redirect || "/checkout/summary/";
+                                            } else if (json.next === "thankyou") {
                                                 window.location.href = json.redirect || "/checkout/thank-you/";
                                             } else if (json.next === "stripe") {
                                                 window.location.href = json.redirect;
@@ -592,6 +574,7 @@
                                                 btn.dataset.busy = "0";
                                                 btn.textContent = origText;
                                             }
+
                                         })
                                         .catch(() => {
                                             // network error → allow retry
@@ -783,16 +766,19 @@
                                     alert(json.error || "Грешка.");
                                     return;
                                 }
-                                if (json.next === "thankyou") {
+                                if (json.next === "summary") {
+                                    window.location.href = json.redirect || "/checkout/summary/";
+                                } else if (json.next === "thankyou") {
                                     window.location.href = json.redirect || "/checkout/thank-you/";
                                 } else if (json.next === "stripe") {
                                     window.location.href = json.redirect;
                                 } else {
                                     alert("Данните за доставка са записани.");
-                                    submitBtn.disabled = false;
-                                    submitBtn.dataset.busy = "0";
-                                    submitBtn.textContent = origText;
+                                    btn.disabled = false;
+                                    btn.dataset.busy = "0";
+                                    btn.textContent = origText;
                                 }
+
                             })
                             .catch(() => {
                                 submitBtn.disabled = false;

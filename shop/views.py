@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from .utils import send_order_notification
 from .econt_service import create_econt_label
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 import stripe
 
@@ -51,11 +51,22 @@ def _to_minor_units(amount: Decimal) -> int:
 
 
 def _ship_bgn_for(order) -> Decimal:
-    # 9.00 лв for "address", else 7.00 лв
+    """
+    Ако имаме изчислена цена от Еконт (shipping_bgn > 0),
+    ползваме нея. Иначе падаме обратно на 9 / 7 лв.
+    """
+    try:
+        if getattr(order, "shipping_bgn", None):
+            # shipping_bgn е Decimal – просто я връщаме
+            if order.shipping_bgn > 0:
+                return order.shipping_bgn
+    except Exception:
+        pass
+
+    # fallback старото поведение
     try:
         return Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
     except Exception:
-        # fall back safely
         return Decimal("7.00")
 
 
@@ -568,3 +579,63 @@ def checkout_save_inline(request):
 
     order.save()
     return JsonResponse({"ok": True})
+
+
+@require_GET
+def checkout_summary(request, order_id=None):
+    """
+    Read-only view of the current order:
+    - uses current_order_id from session, OR
+    - explicit order_id in the URL (for links from emails/admin, etc.)
+    """
+    order = None
+
+    if order_id is not None:
+        order = get_object_or_404(Order, pk=order_id)
+        # remember it in the session so other flows can reuse it
+        request.session["current_order_id"] = order.pk
+    else:
+        order = _get_current_order(request)
+        if not order:
+            messages.error(request, "Няма активна поръчка.")
+            return redirect("checkout_info")
+
+    # Get product from the items if present, else fall back to your helper
+    item = order.items.first()
+    if item:
+        product = item.product
+    else:
+        product = get_single_product()
+
+    return render(
+        request,
+        "checkout/summary_readonly.html",
+        {
+            "order": order,
+            "product": product,
+        },
+    )
+
+
+@require_POST
+def checkout_confirm_cod(request):
+    order = _get_current_order(request)
+    if not order:
+        messages.error(request, "Няма активна поръчка.")
+        return redirect("checkout_info")
+
+    if order.payment_method != PaymentMethod.COD:
+        messages.error(request, "Тази поръчка не е с наложен платеж.")
+        return redirect("checkout_summary")
+
+    res = create_econt_label(order, overrides={})
+    if not res.get("ok"):
+        messages.error(request, f"Грешка при Еконт: {res.get('error') or 'Неуспешно създаване на товарителница.'}")
+        return redirect("checkout_summary")
+
+    try:
+        send_order_notification(order, event="created")
+    except Exception:
+        pass
+
+    return redirect("thank_you")
