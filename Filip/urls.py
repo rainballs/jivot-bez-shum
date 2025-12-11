@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import path
 from shop import views, econt_views
 
+from django.views.generic import TemplateView
+
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -35,6 +37,27 @@ urlpatterns = [
 
     path("checkout/inline-update/", views.checkout_inline_update, name="checkout_inline_update"),
     path("checkout/save-inline/", views.checkout_save_inline, name="checkout_save_inline"),
+    path(
+        "terms/",
+        TemplateView.as_view(template_name="legal/terms.html"),
+        name="terms",
+    ),
+
+    path(
+        "privacy/",
+        TemplateView.as_view(template_name="legal/privacy.html"),
+        name="privacy",
+    ),
+    path(
+        "delivery-terms/",
+        TemplateView.as_view(template_name="legal/delivery.html"),
+        name="delivery_terms",
+    ),
+    path(
+        "return-policy/",
+        TemplateView.as_view(template_name="legal/returns.html"),
+        name="return_policy",
+    ),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

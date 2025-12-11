@@ -138,6 +138,19 @@
                             <div class="pay-tiles">{{ pay_form.payment_method }}</div>
                         </div>
 
+
+                        <!-- NEW: agree to terms -->
+                        <div class="terms-row">
+                            <label class="checkbox">
+                                <input type="checkbox" id="agree_terms" style="width: 35px">
+                                <span>
+                                    Съгласен съм с
+                                    <a href="{% url 'terms' %}" target="_blank">Общите условия</a>
+                                    и
+                                    <a href="{% url 'privacy' %}" target="_blank">Политиката за поверителност</a>.
+                                </span>
+                            </label>
+                        </div>
                         <!-- hidden until delivery is chosen -->
                         <div class="total-row" data-total-wrap style="display:none">
                             <div>Крайна сума:</div>
@@ -146,6 +159,7 @@
                                 <span data-total-eur>{{ product.price_eur|floatformat:2 }}</span>
                             </div>
                         </div>
+
 
                         {#                        <p class="small muted" style="margin-top:6px">#}
                         {#                            * към сумата се начислява доставка: 9.00 лв (до адрес) или 7.00 лв (офис/АПС).#}
@@ -311,6 +325,23 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             const form = document.querySelector('form.checkout-grid-2col');
+
+            // NEW: terms checkbox + helper to bind buttons to it
+            const termsCheckbox = document.getElementById('agree_terms');
+
+            function hookButtonToTerms(btn) {
+                if (!btn || !termsCheckbox) return;
+
+                const update = () => {
+                    btn.disabled = !termsCheckbox.checked;
+                };
+
+                // initial state
+                update();
+
+                // update on every change
+                termsCheckbox.addEventListener('change', update);
+            }
 
             // helper: take values from the big top form and append them to fd
             function appendTopFields(fd) {
@@ -530,6 +561,8 @@
                         if (baseUrl === urlAddress) {
                             const btn = inlineBox.querySelector("#btn-inline-address-submit");
                             if (btn) {
+
+                                hookButtonToTerms(btn);
                                 btn.addEventListener("click", function () {
                                     // 🛡 prevent double-clicks
                                     if (btn.dataset.busy === "1") return;

@@ -117,10 +117,10 @@
         </nav>
 
         <nav class="footer-legal">
-            <a href="#">Общи условия</a>
-            <a href="#">Политика на поверителност</a>
-            <a href="#">Условия за доставка</a>
-            <a href="#">Политики за връщане</a>
+            <a href="{% url 'terms' %}">Общи условия</a>
+            <a href="{% url 'privacy' %}">Политика на поверителност</a>
+            <a href="{% url 'delivery_terms' %}">Условия за доставка</a>
+            <a href="{% url 'return_policy' %}">Политики за връщане</a>
         </nav>
 
         <div class="footer-socials" aria-label="социални профили">

@@ -1785,6 +1785,22 @@ h3 {
     font-weight: 600;
 }
 
+.terms-row {
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.terms-row a {
+    text-decoration: underline;
+}
+
+/* optional: visually dim disabled buttons */
+button[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .actions-right {
     display: flex;
     justify-content: space-between;
