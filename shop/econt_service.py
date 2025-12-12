@@ -256,9 +256,12 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
     if is_cod and include_cod:
         cod_bgn = float(subtotal)  # НП = стойност на стоката
         payer = "RECEIVER"
+        # 👇 същият COD договор, както при create_econt_label
+        cod_agreement = d.get("cod_agreement_number") or "CD250332"
     else:
         cod_bgn = 0.0
         payer = "SENDER"
+        cod_agreement = None
 
     declared_value_bgn = float(subtotal)
 
@@ -284,6 +287,8 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
         declared_value_bgn=declared_value_bgn,
         payer=payer,
         label_format=d.get("label_format", "10x9"),
+        cod_agreement_number=cod_agreement,  # 👉 вече влиза и при calculate
+        # invoice_num можеш да пропуснеш тук – не е нужно за калкулацията
     )
 
     print(
