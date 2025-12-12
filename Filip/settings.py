@@ -171,6 +171,7 @@ ECONT = {
         "label_format": "10x9",
         # this is the new one — required for COD:
         "cd_template": "DEFAULT",  # put the actual name from e-Econt here
+        "cod_agreement_number": "CD250332",
     },
 }
 

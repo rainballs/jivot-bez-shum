@@ -305,12 +305,14 @@ def build_create_label_json(
         declared_value_bgn: float = 0.0,
         payer: str = "SENDER",  # default like in the other app
         label_format: str = "10x9",
+        cod_agreement_number: str | None = None,
+        invoice_num: str | None = None,  # 👈 НОВО
 ) -> dict:
     """
     Build the JSON payload for Econt LabelService (create / calculate).
 
-    - `payer`        → who pays courier service (SENDER / RECEIVER)
-    - `cod_bgn`      → Наложен платеж (only for COD)
+    - `payer`              → кой плаща куриерската услуга (SENDER / RECEIVER)
+    - `cod_bgn`            → Наложен платеж (само при COD)
     - `declared_value_bgn` → Обявена стойност (стойност на стоката)
     """
 
@@ -351,7 +353,7 @@ def build_create_label_json(
         "packCount": int(parcels),
         "weight": float(weight_kg),
         "shipmentDescription": "Книга",
-        "payer": payer_upper,  # ⬅️ *this* is what Econt shows as „платец“
+        "payer": payer_upper,  # това е „Платец“ в Еконт
         "declaredValue": declared_value_bgn,
         "label": {"format": label_format},
 
@@ -411,20 +413,20 @@ def build_create_label_json(
         services["declaredValueCurrency"] = "BGN"
 
     if cod_bgn > 0:
-        # Наложен платеж (само стойност на стоката)
-        cod_office = receiver_office_code or sender_office_code
+        # Наложен платеж (стойност на стоката)
         services["cdAmount"] = cod_bgn
         services["cdCurrency"] = "BGN"
         services["cdType"] = "get"
-        services["cdPayOptions"] = {
-            "method": "office",
-            "officeCode": str(cod_office) if cod_office else "",
-            "departamentNum": 1,
-            "client": {"name": sender_name, "phones": [sender_phone]},
-        }
 
-        # ➕ точно както в работещия builder:
-        # казваме на Еконт, че получателят плаща в брой тази сума
+        # шаблон / споразумение за изплащане на НП – напр. "CD250332"
+        if cod_agreement_number:
+            services["cdPayOptionsTemplate"] = cod_agreement_number
+
+        # за споразумения „по департамент“ Еконт иска фактура или опис
+        if invoice_num:
+            services["invoiceNum"] = invoice_num
+
+        # получателят плаща НП в брой
         payload["paymentReceiverMethod"] = "CASH"
         payload["paymentReceiverAmount"] = cod_bgn
 

@@ -1,5 +1,6 @@
 # shop/econt_service.py
 import base64
+from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
@@ -108,9 +109,14 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
     if is_cod:
         payer = "RECEIVER"  # клиентът плаща доставка + COD такса
         cod_bgn = float(subtotal)  # НП = стойност на книгите
+
+        cod_agreement = d.get("cod_agreement_number") or "CD250332"
+
+        invoice_num = f"{order.pk} {date.today().strftime('%d.%m.%y')}"
     else:
         payer = "SENDER"  # при карта ти плащаш доставката
         cod_bgn = 0.0
+        cod_agreement = None
 
     declared_value_bgn = float(subtotal)
 
@@ -136,6 +142,8 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         declared_value_bgn=declared_value_bgn,
         payer=payer,  # ⬅️ важен параметър
         label_format=d.get("label_format", "10x9"),
+        cod_agreement_number=cod_agreement,
+        invoice_num=invoice_num,
     )
 
     print("ECONT ▶ OUTGOING JSON:\n",
