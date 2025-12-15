@@ -11,7 +11,7 @@ import requests
 import json
 import requests
 from django.conf import settings
-from .econt_client import EcontClient, EcontError, build_create_label_json
+from .econt_client import EcontClient, EcontError, build_create_label_json, build_packing_list_from_order
 from .models import PaymentMethod, _bgn_to_eur
 from typing import List, Dict
 
@@ -99,6 +99,7 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
             "error": err,
         }
 
+    # --- пари ---
     subtotal = Decimal(str(order.subtotal_bgn or "0")).quantize(Decimal("0.01"))
     pm = getattr(order, "payment_method", None)
     is_cod = (
@@ -106,19 +107,36 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
             or (isinstance(pm, str) and str(pm).lower() == "cod")
     )
 
+    payer: str
+    cod_bgn: float
+    cod_agreement: str | None = None
+    invoice_num: str | None = None
+
     if is_cod:
         payer = "RECEIVER"  # клиентът плаща доставка + COD такса
         cod_bgn = float(subtotal)  # НП = стойност на книгите
 
+        # напр. "CD250332" – взимаме от settings, ако го има
         cod_agreement = d.get("cod_agreement_number") or "CD250332"
 
+        # фактура / опис – примерно "{order_id} DD.MM.YY"
         invoice_num = f"{order.pk} {date.today().strftime('%d.%m.%y')}"
     else:
         payer = "SENDER"  # при карта ти плащаш доставката
         cod_bgn = 0.0
-        cod_agreement = None
 
     declared_value_bgn = float(subtotal)
+
+    # --- данни за Бърз опис / packingList ---
+    # При теб е 1 продукт (книга) → 1 ред
+    qty = getattr(order, "quantity", None) or 1
+    total_weight_kg = float(getattr(order, "total_weight_kg", 0.800) or 0.800)
+    # единична цена = subtotal / qty
+    try:
+        unit_price = float((subtotal / Decimal(qty)).quantize(Decimal("0.01")))
+    except Exception:
+        unit_price = float(subtotal)
+    packing_list = build_packing_list_from_order(order)
 
     payload = build_create_label_json(
         sender_name=d["sender_name"],
@@ -136,18 +154,28 @@ def create_econt_label(order, overrides: dict | None = None) -> dict:
         receiver_entrance=r_entrance,
         receiver_floor=r_floor,
         receiver_apartment=r_apartment,
-        weight_kg=float(getattr(order, "total_weight_kg", 0.800) or 0.800),
+        weight_kg=total_weight_kg,
         parcels=1,
         cod_bgn=cod_bgn,
         declared_value_bgn=declared_value_bgn,
-        payer=payer,  # ⬅️ важен параметър
+        payer=payer,  # ⬅️ кой плаща доставката
         label_format=d.get("label_format", "10x9"),
         cod_agreement_number=cod_agreement,
         invoice_num=invoice_num,
+        sms_notification=True,  # винаги включен SMS
+        # packing_inventory_num="1",  # № артикул
+        # packing_description="Живот без шум - книга",
+        # packing_weight_kg=total_weight_kg,
+        # packing_count=qty,
+        # packing_price_bgn=unit_price,
+        packing_list=packing_list,  # ✅ add this
+        packing_list_type="digital",  # ✅ add this (or omit, default is "digital")
     )
 
-    print("ECONT ▶ OUTGOING JSON:\n",
-          json.dumps({"mode": "create", "label": payload}, ensure_ascii=False, indent=2))
+    print(
+        "ECONT ▶ OUTGOING JSON:\n",
+        json.dumps({"mode": "create", "label": payload}, ensure_ascii=False, indent=2),
+    )
 
     client = EcontClient()
     try:
@@ -264,7 +292,7 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
         cod_agreement = None
 
     declared_value_bgn = float(subtotal)
-
+    packing_list = build_packing_list_from_order(order)
     payload = build_create_label_json(
         sender_name=d["sender_name"],
         sender_phone=d["sender_phone"],
@@ -288,7 +316,10 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
         payer=payer,
         label_format=d.get("label_format", "10x9"),
         cod_agreement_number=cod_agreement,  # 👉 вече влиза и при calculate
+        sms_notification=True,
         # invoice_num можеш да пропуснеш тук – не е нужно за калкулацията
+        packing_list=packing_list,  # ✅ add this
+        packing_list_type="digital",  # ✅ add this (or omit, default is "digital")
     )
 
     print(

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from decimal import Decimal
 from typing import Optional, Tuple
 import base64
 
@@ -306,7 +307,16 @@ def build_create_label_json(
         payer: str = "SENDER",  # default like in the other app
         label_format: str = "10x9",
         cod_agreement_number: str | None = None,
-        invoice_num: str | None = None,  # 👈 НОВО
+        invoice_num: str | None = None,  # 👈 фактура/опис
+        sms_notification: bool = False,  # 👈 SMS известяване
+        # # 👇 данни за „Бърз опис“ / packing list
+        # packing_inventory_num: str | None = None,
+        # packing_description: str | None = None,
+        # packing_weight_kg: float | None = None,
+        # packing_count: int | None = None,
+        # packing_price_bgn: float | None = None,
+        packing_list: list[dict] | None = None,
+        packing_list_type: str | None = "digital",  # "digital" is what you want for “Бърз опис” entered as rows
 ) -> dict:
     """
     Build the JSON payload for Econt LabelService (create / calculate).
@@ -314,6 +324,7 @@ def build_create_label_json(
     - `payer`              → кой плаща куриерската услуга (SENDER / RECEIVER)
     - `cod_bgn`            → Наложен платеж (само при COD)
     - `declared_value_bgn` → Обявена стойност (стойност на стоката)
+    - `packingList`        → ред/ове за бърз опис (инв. №, описание, тегло, бр., цена)
     """
 
     # --- normalize basics ---
@@ -405,7 +416,7 @@ def build_create_label_json(
 
         payload["receiverAddress"] = addr
 
-    # --- services (Обявена стойност + НП) ---
+    # --- services (Обявена стойност + НП + SMS) ---
     services: dict = {}
 
     if declared_value_bgn > 0:
@@ -425,15 +436,104 @@ def build_create_label_json(
         # за споразумения „по департамент“ Еконт иска фактура или опис
         if invoice_num:
             services["invoiceNum"] = invoice_num
+            # това e точно чекчето „Предай ф-ра преди плащане на НП“
+            services["invoiceBeforePayCD"] = True
 
         # получателят плаща НП в брой
         payload["paymentReceiverMethod"] = "CASH"
         payload["paymentReceiverAmount"] = cod_bgn
 
+    if sms_notification:
+        services["smsNotification"] = True
+
     if services:
         payload["services"] = services
 
+    # --- packingList = „Бърз опис“ ---
+    # --- packingList = „Бърз опис“ ---
+    if packing_list:
+        plt = (packing_list_type or "digital").strip().lower()
+        if plt not in ("file", "digital", "loading"):
+            plt = "digital"
+
+        payload["packingListType"] = plt
+        payload["packingList"] = packing_list
+
     return payload
+
+
+def build_packing_list_from_order(order) -> list[dict]:
+    """
+    Builds Econt packingList (array of PackingListElement) from your Order items.
+
+    Expected output item keys:
+      - inventoryNum (string)   -> SKU / index
+      - description (string)    -> product name
+      - weight (double)         -> kg
+      - count (int)             -> qty
+      - price (double)          -> unit price (BGN)
+    """
+
+    # 1) Try to find the related manager with items.
+    # Adjust this if your related name is different.
+    items_manager = None
+    for attr in ("items", "order_items", "orderitem_set"):
+        maybe = getattr(order, attr, None)
+        if maybe is not None and hasattr(maybe, "all"):
+            items_manager = maybe
+            break
+
+    if items_manager is None:
+        # No related items found -> return empty (no packing list)
+        return []
+
+    UNIT_WEIGHT_KG = Decimal("0.400")
+
+    packing = []
+    for idx, it in enumerate(items_manager.all(), start=1):
+        # --- sku / inventory num ---
+        sku = (
+                getattr(it, "sku", None)
+                or getattr(getattr(it, "product", None), "sku", None)
+                or str(idx)
+        )
+
+        # --- name / description ---
+        desc = (
+                getattr(it, "name", None)
+                or getattr(it, "title", None)
+                or getattr(getattr(it, "product", None), "name", None)
+                or str(getattr(it, "product", "Артикул"))
+        )
+
+        # --- qty ---
+        qty = getattr(it, "quantity", None)
+        if qty is None:
+            qty = getattr(it, "qty", 1)
+        qty = int(qty or 1)
+
+        # --- unit price ---
+        unit_price = (
+                getattr(it, "unit_price_bgn", None)
+                or getattr(it, "price_bgn", None)
+                or getattr(it, "price", None)
+                or 0
+        )
+        unit_price = float(unit_price or 0)
+
+        # ✅ HARD FIX: packingList weight = 0.400 * quantity
+        row_weight = (UNIT_WEIGHT_KG * Decimal(qty)).quantize(Decimal("0.001"))
+        row_weight_f = float(row_weight)
+
+        packing.append({
+            "inventoryNum": str(sku),
+            "description": str(desc),
+            "weight": row_weight_f,
+            "count": qty,
+            "price": unit_price,
+        })
+
+    return packing
 
 
 # --- Optional XML helpers (kept only if you still need them somewhere else) ---
