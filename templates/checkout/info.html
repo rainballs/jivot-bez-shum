@@ -123,7 +123,10 @@
                                         <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
                                         <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                     </div>
-                                    <div class="small muted" data-ship-line></div>
+                                    <div class="small muted" data-ship-line>
+                                        Доставка: <span data-ship-eur>—</span> € /
+                                        <span data-ship-bgn>—</span> лв
+                                    </div>
                                 {% endif %}
                             </div>
                         </div>
@@ -360,14 +363,23 @@
                 if (bpc) fd.append("billing_postcode", bpc.value);
             }
 
-            /* ====== 1) shipping preview + show total only after delivery ====== */
-            (function setupSummaryWithoutShipping() {
+            /* ====== 1) shipping preview + total includes delivery ====== */
+            (function setupSummaryWithShipping() {
                 const qtyInput = document.querySelector('input[name="quantity"]');
+
                 const outBGN = document.querySelector("[data-total-bgn]");
                 const outEUR = document.querySelector("[data-total-eur]");
+
                 const shipLine = document.querySelector("[data-ship-line]");
+                const shipEUR = document.querySelector("[data-ship-eur]");
+                const shipBGN = document.querySelector("[data-ship-bgn]");
+
                 const totalWrap = document.querySelector("[data-total-wrap]");
 
+                const rbAddress = document.querySelector('input[name="delivery_method"][value="address"]');
+                const rbOffice = document.querySelector('input[name="delivery_method"][value="office"]');
+
+                // ---- helpers ----
                 function toNum(s) {
                     return parseFloat(String(s).replace(",", ".").trim()) || 0;
                 }
@@ -376,24 +388,69 @@
                     return (Math.round(n * 100) / 100).toFixed(2);
                 }
 
+                // product prices from DOM
                 const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
                 const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
 
-                // винаги показваме total реда
-                if (totalWrap) totalWrap.style.display = "";
+                // fixed conversion rate for display consistency
+                const BGN_PER_EUR = 1.95583;
 
-                // и казваме, че доставката ще се сметне на следващата стъпка
-                if (shipLine) {
-                    shipLine.textContent = "Цената за доставка ще бъде изчислена на следващата стъпка.";
+                function selectedDelivery() {
+                    if (rbAddress?.checked) return "address";
+                    if (rbOffice?.checked) return "office";
+                    return null;
+                }
+
+                function shippingBGN(method) {
+                    if (method === "address") return 9.00;
+                    if (method === "office") return 7.00;
+                    return 0.00;
+                }
+
+                function shippingEURFromBGN(bgn) {
+                    return bgn / BGN_PER_EUR;
                 }
 
                 function recalc() {
-                    const q = toNum(qtyInput?.value || 1);
-                    if (outBGN) outBGN.textContent = fmt(pBGN * q);
-                    if (outEUR) outEUR.textContent = fmt(pEUR * q);
+                    const q = Math.max(1, parseInt(qtyInput?.value || "1", 10) || 1);
+                    const dm = selectedDelivery();
+
+                    // Hide total until delivery is chosen
+                    if (!dm) {
+                        if (totalWrap) totalWrap.style.display = "none";
+                        if (shipLine) shipLine.textContent = "Изберете начин на доставка, за да се изчисли крайна сума.";
+                        if (shipEUR) shipEUR.textContent = "—";
+                        if (shipBGN) shipBGN.textContent = "—";
+                        // still show product-only numbers if you want:
+                        if (outBGN) outBGN.textContent = fmt(pBGN * q);
+                        if (outEUR) outEUR.textContent = fmt(pEUR * q);
+                        return;
+                    }
+
+                    const sBGN = shippingBGN(dm);
+                    const sEUR = shippingEURFromBGN(sBGN);
+
+                    // show shipping line
+                    if (shipLine) shipLine.textContent = "Доставка:";
+                    if (shipEUR) shipEUR.textContent = fmt(sEUR);
+                    if (shipBGN) shipBGN.textContent = fmt(sBGN);
+
+                    // total = (product * qty) + shipping
+                    const tBGN = (pBGN * q) + sBGN;
+                    const tEUR = (pEUR * q) + sEUR;
+
+                    if (outBGN) outBGN.textContent = fmt(tBGN);
+                    if (outEUR) outEUR.textContent = fmt(tEUR);
+
+                    if (totalWrap) totalWrap.style.display = "";
                 }
 
-                if (qtyInput) qtyInput.addEventListener("input", recalc);
+                // bind
+                qtyInput?.addEventListener("input", recalc);
+                rbAddress?.addEventListener("change", recalc);
+                rbOffice?.addEventListener("change", recalc);
+
+                // initial
                 recalc();
             })();
 
