@@ -33,11 +33,11 @@
                         <div class="price-row">
                             {% if product %}
                                 <div class="price-card">
-                                    <div class="price-old">€ 12,00</div>
+{#                                    <div class="price-old">€ 12,00</div>#}
                                     <div class="price">€ {{ product.price_eur }}</div>
                                 </div>
                                 <div class="price-card">
-                                    <div class="price-old">23,47 лв</div>
+{#                                    <div class="price-old">23,47 лв</div>#}
                                     <div class="price">{{ product.price_bgn }} лв</div>
                                 </div>
                             {% endif %}
@@ -293,7 +293,7 @@
             <h2 style="color: #ffffff">“Живот без шум”</h2>
             {#            <p class="price-pretitle">ПРОМО ЦЕНА ДО 26.12.2025</p>#}
 {#            <div class="cta-book-old">12,00 €| 23,47 лв</div>#}
-            <div class="cta-book-price">{{ product.price_bgn }} лв | {{ product.price_eur }} €</div>
+            <div class="cta-book-price">{{ product.price_eur }} € | {{ product.price_bgn }} лв </div>
 
             <a href="{% url 'checkout_info' %}" class="btn btn-primary btn-pill cta-book-btn">Купи сега</a>
         </div>
