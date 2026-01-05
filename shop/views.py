@@ -326,7 +326,7 @@ def stripe_create_checkout_session(request):
             },
             success_url=success_url,  # ⬅️ now to thank_you
             cancel_url=stripe_cancel_url(request),
-            currency="bgn",
+            currency="eur",
             customer_email=order.email or None,
         )
     except Exception as e:
@@ -967,7 +967,7 @@ def stripe_create_checkout_session(request):
             },
             success_url=success_url,  # ⬅️ now to thank_you
             cancel_url=stripe_cancel_url(request),
-            currency="bgn",
+            currency="eur",
             customer_email=order.email or None,
         )
     except Exception as e:
