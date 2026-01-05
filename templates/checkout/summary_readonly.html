@@ -217,7 +217,7 @@
                         <div class="summary-rows">
                             <div class="row">
                                 <span>Стойност на стоката</span>
-                                <span>{{ order.subtotal_bgn|floatformat:2 }} лв</span>
+                                <span>{{ order.subtotal_eur|floatformat:2 }} €</span>
                             </div>
 
                             {# ДИНОМИЧНА ДОСТАВКА ОТ ЕКОНТ #}
@@ -225,9 +225,9 @@
                                 <span>Доставка (Еконт)</span>
                                 <span>
         {% if order.shipping_bgn %}
-            {{ order.shipping_bgn|floatformat:2 }} лв
+            {{ order.shipping_bgn|floatformat:2 }} €
         {% else %}
-            – лв
+            – €
         {% endif %}
       </span>
                             </div>
@@ -237,12 +237,12 @@
                             <div>Крайна сума:</div>
                             <div class="total">
                                 {% if order.total_bgn %}
-                                    {{ order.total_bgn|floatformat:2 }} лв
+                                    {{ order.total_eur|floatformat:2 }} €
                                     <span class="muted">
-          (≈ € {{ order.total_eur|floatformat:2 }})
+          (≈ лв {{ order.total_bgn|floatformat:2 }})
         </span>
                                 {% else %}
-                                    {{ product.price_bgn|floatformat:2 }} лв
+                                    {{ product.price_eur|floatformat:2 }} €
                                 {% endif %}
                             </div>
                         </div>
