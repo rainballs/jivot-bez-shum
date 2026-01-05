@@ -76,7 +76,7 @@ def stripe_checkout_line_items(order: Order, product: Product):
     return [
         {
             "price_data": {
-                "currency": "bgn",
+                "currency": "eur",
                 "product_data": {"name": product.name},
                 "unit_amount": unit_cents,
             },
@@ -84,7 +84,7 @@ def stripe_checkout_line_items(order: Order, product: Product):
         },
         {
             "price_data": {
-                "currency": "bgn",
+                "currency": "eur",
                 "product_data": {"name": "Доставка"},
                 "unit_amount": ship_cents,
             },
