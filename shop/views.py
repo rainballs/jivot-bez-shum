@@ -323,7 +323,6 @@ def stripe_create_checkout_session(request):
             },
             success_url=success_url,  # ⬅️ now to thank_you
             cancel_url=stripe_cancel_url(request),
-            currency="eur",
             customer_email=order.email or None,
         )
     except Exception as e:
@@ -636,6 +635,8 @@ def checkout_confirm_cod(request):
         pass
 
     return redirect("thank_you")
+
+
 # shop/views.py
 import json
 import logging
@@ -964,7 +965,6 @@ def stripe_create_checkout_session(request):
             },
             success_url=success_url,  # ⬅️ now to thank_you
             cancel_url=stripe_cancel_url(request),
-            currency="eur",
             customer_email=order.email or None,
         )
     except Exception as e:
