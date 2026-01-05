@@ -46,33 +46,30 @@ def stripe_cancel_url(request):
 
 
 def _to_minor_units(amount: Decimal) -> int:
-    """BGN minor units (stotinki)."""
+    """Convert to cents (works for EUR too)."""
     return int((amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100))
 
 
-def _ship_bgn_for(order) -> Decimal:
+def _ship_eur_for(order) -> Decimal:
     """
-    Ако имаме изчислена цена от Еконт (shipping_bgn > 0),
-    ползваме нея. Иначе падаме обратно на 9 / 7 лв.
+    Prefer the already computed order.shipping_eur (from recompute_totals()).
+    Fallback: convert old 9/7 BGN to EUR if needed.
     """
     try:
-        if getattr(order, "shipping_bgn", None):
-            # shipping_bgn е Decimal – просто я връщаме
-            if order.shipping_bgn > 0:
-                return order.shipping_bgn
+        if getattr(order, "shipping_eur", None) and order.shipping_eur > 0:
+            return order.shipping_eur
     except Exception:
         pass
 
-    # fallback старото поведение
-    try:
-        return Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
-    except Exception:
-        return Decimal("7.00")
+    # fallback if shipping_eur not available yet
+    bgn = Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
+    rate = Decimal("1.95583")  # fixed conversion rate
+    return (bgn / rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def stripe_checkout_line_items(order: Order, product: Product):
-    unit_cents = _to_minor_units(product.price_bgn)
-    ship_cents = _to_minor_units(_ship_bgn_for(order))
+    unit_cents = _to_minor_units(product.price_eur)
+    ship_cents = _to_minor_units(_ship_eur_for(order))
     return [
         {
             "price_data": {
