@@ -22,59 +22,24 @@ import stripe
 from .forms import CheckoutInfoForm, PaymentMethodForm
 from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
 from .utils import send_order_notification
-from .econt_service import create_econt_label, calculate_econt_shipping  # <-- ADD THIS
+from .econt_service import create_econt_label
 
 logger = logging.getLogger("gunicorn.error")
 
+# Stripe config
 stripe.api_key = settings.STRIPE_SECRET_LIVE_KEY
 
-# Stripe no longer supports BGN for Bulgaria -> use EUR only
+# Currency constants (Stripe no longer supports BGN for Bulgaria)
 STRIPE_CURRENCY = "eur"
 BGN_PER_EUR = Decimal("1.95583")
 
 
-# -------------------- money helpers --------------------
-def _to_minor_units(amount: Decimal) -> int:
-    """EUR cents."""
-    return int((amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100))
-
-
-def _eur_to_bgn(eur: Decimal) -> Decimal:
-    return (eur * BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
-def _bgn_to_eur(bgn: Decimal) -> Decimal:
-    return (bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
-def _as_decimal(x, default=Decimal("0.00")) -> Decimal:
-    try:
-        if x is None:
-            return default
-        return Decimal(str(x))
-    except Exception:
-        return default
-
-
-# -------------------- product helpers --------------------
+# ---------- Helpers ----------
 def get_single_product():
     qs = Product.objects.filter(is_active=True).order_by("id")
     return qs.first() or Product.objects.first()
 
 
-def _safe_product_price_eur(product: Product) -> Decimal:
-    p = _as_decimal(getattr(product, "price_eur", None))
-    if p > 0:
-        return p
-
-    bgn = _as_decimal(getattr(product, "price_bgn", None))
-    if bgn > 0:
-        return _bgn_to_eur(bgn)
-
-    raise ValueError("Product has no valid price_eur/price_bgn")
-
-
-# -------------------- urls --------------------
 def _site_url(request):
     scheme = "https" if request.is_secure() else "http"
     return f"{scheme}://{request.get_host()}"
@@ -84,21 +49,101 @@ def stripe_cancel_url(request):
     return _site_url(request) + reverse("checkout_info")
 
 
-# -------------------- order helpers --------------------
+def _to_minor_units(amount: Decimal) -> int:
+    """Convert Decimal to cents (minor units) for EUR."""
+    return int((amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100))
+
+
+def _bgn_to_eur(bgn: Decimal) -> Decimal:
+    return (bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _safe_product_price_eur(product: Product) -> Decimal:
+    """
+    Prefer product.price_eur.
+    If missing, fallback convert from product.price_bgn.
+    """
+    p = getattr(product, "price_eur", None)
+    if p is not None and Decimal(p) > 0:
+        return Decimal(p)
+
+    bgn = getattr(product, "price_bgn", None)
+    if bgn is None:
+        raise ValueError("Product has no price_eur and no price_bgn.")
+    return _bgn_to_eur(Decimal(bgn))
+
+
+def _ship_eur_for(order: Order) -> Decimal:
+    """
+    Prefer order.shipping_eur (computed by recompute_totals()).
+    Fallback: convert old 9/7 BGN to EUR.
+    """
+    ship_eur = getattr(order, "shipping_eur", None)
+    if ship_eur is not None:
+        ship_eur = Decimal(ship_eur)
+        if ship_eur > 0:
+            return ship_eur
+
+    # fallback if shipping_eur not computed yet
+    bgn = Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
+    return _bgn_to_eur(bgn)
+
+
+def stripe_checkout_line_items(order: Order, product: Product):
+    """
+    ALWAYS returns EUR line items.
+    Includes product + shipping as separate line items.
+    """
+    unit_eur = _safe_product_price_eur(product)
+    ship_eur = _ship_eur_for(order)
+
+    unit_cents = _to_minor_units(unit_eur)
+    ship_cents = _to_minor_units(ship_eur)
+
+    # Stripe expects positive integers for unit_amount
+    if unit_cents < 1:
+        raise ValueError(f"Product unit_amount is too small: {unit_eur} EUR")
+    if ship_cents < 0:
+        raise ValueError(f"Shipping is negative: {ship_eur} EUR")
+
+    items = [
+        {
+            "price_data": {
+                "currency": STRIPE_CURRENCY,
+                "product_data": {"name": product.name},
+                "unit_amount": unit_cents,
+            },
+            "quantity": int(order.quantity or 1),
+        },
+        {
+            "price_data": {
+                "currency": STRIPE_CURRENCY,
+                "product_data": {"name": "Доставка"},
+                "unit_amount": ship_cents,
+            },
+            "quantity": 1,
+        },
+    ]
+
+    # Bulletproof guard: never allow BGN to reach Stripe
+    for it in items:
+        cur = (it.get("price_data") or {}).get("currency")
+        if cur != STRIPE_CURRENCY:
+            raise ValueError(f"Non-EUR currency detected in line_items: {cur}")
+
+    return items
+
+
 def _get_current_order(request) -> Order | None:
+    """
+    Single source of truth for current order:
+    - session current_order_id, else
+    - order_id from GET/POST (optional)
+    """
     oid = request.session.get("current_order_id")
     if not oid:
         oid = request.GET.get("order_id") or request.POST.get("order_id")
     return Order.objects.filter(pk=oid).first() if oid else None
-
-
-def _ensure_order(request) -> Order:
-    order = _get_current_order(request)
-    if order:
-        return order
-    order = Order.objects.create(quantity=1, paid=False)
-    request.session["current_order_id"] = order.pk
-    return order
 
 
 def _split_street_num(line: str) -> tuple[str, str]:
@@ -118,99 +163,7 @@ def _split_street_num(line: str) -> tuple[str, str]:
     return s, ""
 
 
-def _delivery_ready_for_pricing(order: Order) -> bool:
-    """Minimal check: enough data to ask Econt for a real price."""
-    if order.delivery_method == DeliveryMethod.TO_OFFICE:
-        return bool((order.city or "").strip()) and bool((getattr(order, "econt_office_code", "") or "").strip())
-    # TO_ADDRESS
-    return (
-            bool((order.city or "").strip())
-            and bool((order.postal_code or "").strip())
-            and bool((order.address_line or "").strip())
-    )
-
-
-def _apply_econt_shipping(order: Order, amount: Decimal, currency: str):
-    """
-    IMPORTANT:
-    - If Econt returns EUR -> store as shipping_eur directly (NO DIVIDE BY 1.95583)
-    - If Econt returns BGN -> convert once to EUR and store
-    """
-    currency = (currency or "").upper().strip()
-    amount = _as_decimal(amount)
-
-    if currency == "EUR":
-        ship_eur = amount
-    elif currency == "BGN":
-        ship_eur = _bgn_to_eur(amount)
-    else:
-        # unknown currency -> assume EUR (safer now)
-        ship_eur = amount
-
-    if ship_eur < 0:
-        ship_eur = Decimal("0.00")
-
-    order.shipping_eur = ship_eur
-    order.shipping_bgn = _eur_to_bgn(ship_eur)
-
-
-def _refresh_shipping_from_econt(order: Order) -> dict:
-    """
-    Calls Econt calculate API and saves shipping in BOTH currencies.
-    Returns dict {ok, shipping_eur, shipping_bgn, error?}
-    """
-    if not _delivery_ready_for_pricing(order):
-        # Not enough data yet, don't call Econt
-        order.shipping_eur = Decimal("0.00")
-        order.shipping_bgn = Decimal("0.00")
-        order.save(update_fields=["shipping_eur", "shipping_bgn"])
-        return {"ok": False, "error": "missing_delivery_data", "shipping_eur": "0.00", "shipping_bgn": "0.00"}
-
-    include_cod = (order.payment_method == PaymentMethod.COD)
-
-    res = calculate_econt_shipping(order, include_cod=include_cod)  # <-- your econt_service must implement this
-    if not res.get("ok"):
-        return {"ok": False, "error": res.get("error") or "econt_failed"}
-
-    amount = _as_decimal(res.get("amount"))
-    currency = res.get("currency") or "EUR"
-
-    _apply_econt_shipping(order, amount, currency)
-    order.save(update_fields=["shipping_eur", "shipping_bgn"])
-
-    return {
-        "ok": True,
-        "shipping_eur": f"{_as_decimal(order.shipping_eur):.2f}",
-        "shipping_bgn": f"{_as_decimal(order.shipping_bgn):.2f}",
-    }
-
-
-def _recompute_totals_from_db(order: Order, product: Product):
-    """
-    Your Order.recompute_totals() can exist, but THIS version is bulletproof:
-    - subtotal based on product EUR
-    - shipping from order.shipping_eur (already from Econt)
-    - totals computed from those
-    """
-    qty = int(order.quantity or 1)
-    unit_eur = _safe_product_price_eur(product)
-
-    subtotal_eur = (unit_eur * qty).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    shipping_eur = _as_decimal(getattr(order, "shipping_eur", None))
-    total_eur = (subtotal_eur + shipping_eur).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    order.subtotal_eur = subtotal_eur
-    order.total_eur = total_eur
-
-    order.subtotal_bgn = _eur_to_bgn(subtotal_eur)
-    order.total_bgn = _eur_to_bgn(total_eur)
-
-    # NOTE: shipping_bgn is already set when we refresh shipping
-    if getattr(order, "shipping_bgn", None) is None:
-        order.shipping_bgn = _eur_to_bgn(shipping_eur)
-
-
-# -------------------- pages --------------------
+# ---------- Pages ----------
 def home(request):
     product = get_single_product()
     return render(request, "pages/home.html", {"product": product})
@@ -223,9 +176,97 @@ def checkout_info(request):
         messages.error(request, "Няма наличен продукт.")
         return redirect("home")
 
-    # Ensure order exists
+    if request.method == "POST":
+        info_form = CheckoutInfoForm(request.POST)
+        pay_form = PaymentMethodForm(request.POST)
+
+        if info_form.is_valid() and pay_form.is_valid():
+            order = info_form.save(commit=False)
+
+            dm = request.POST.get("delivery_method", "address")
+            order.delivery_method = (
+                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+            )
+            order.payment_method = pay_form.cleaned_data["payment_method"]
+
+            if order.ship_same_as_billing:
+                order.full_name = order.billing_full_name or order.full_name
+                order.email = order.billing_email or order.email
+                order.phone = order.billing_phone or order.phone
+                order.city = order.billing_city or order.city
+                order.postal_code = order.billing_postcode or order.postal_code
+                order.address_line = order.billing_street or order.address_line
+
+            order.quantity = info_form.cleaned_data["quantity"]
+            order.paid = False
+
+            # hard validation for Econt before saving the order
+            missing_parts = []
+            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                if not (order.full_name or "").strip():
+                    missing_parts.append("име и фамилия")
+                if not (order.phone or "").strip():
+                    missing_parts.append("телефон")
+                if not (order.city or "").strip():
+                    missing_parts.append("град")
+                if not (order.postal_code or "").strip():
+                    missing_parts.append("пощенски код")
+                if not (order.address_line or "").strip():
+                    missing_parts.append("улица и номер")
+            else:  # TO_OFFICE
+                if not (order.city or "").strip():
+                    missing_parts.append("град")
+                if not (getattr(order, "econt_office_code", "") or "").strip():
+                    missing_parts.append("офис на Еконт")
+
+            if missing_parts:
+                messages.error(request, "За да продължите, попълнете: " + ", ".join(missing_parts) + ".")
+                return render(
+                    request,
+                    "checkout/info.html",
+                    {"product": product, "form": info_form, "pay_form": pay_form},
+                )
+
+            order.save()
+
+            # line item
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                quantity=order.quantity,
+                unit_price_bgn=getattr(product, "price_bgn", None),
+                unit_price_eur=_safe_product_price_eur(product),
+            )
+
+            # totals
+            order.recompute_totals()
+            order.save(
+                update_fields=[
+                    "subtotal_bgn",
+                    "subtotal_eur",
+                    "shipping_bgn",
+                    "shipping_eur",
+                    "total_bgn",
+                    "total_eur",
+                    "paid",
+                    "payment_method",
+                ]
+            )
+
+            request.session["current_order_id"] = order.id
+
+            return render(
+                request,
+                "checkout/info.html",
+                {"product": product, "form": info_form, "pay_form": pay_form, "order": order},
+            )
+
+        messages.error(request, "Моля, коригирайте грешките във формата.")
+        return render(request, "checkout/info.html", {"product": product, "form": info_form, "pay_form": pay_form})
+
+    # GET branch: create order if missing
     order = _get_current_order(request)
-    if not order and request.method == "GET":
+    if not order:
         order = Order.objects.create(
             quantity=1,
             delivery_method=DeliveryMethod.TO_ADDRESS,
@@ -239,77 +280,18 @@ def checkout_info(request):
             unit_price_bgn=getattr(product, "price_bgn", None),
             unit_price_eur=_safe_product_price_eur(product),
         )
-        request.session["current_order_id"] = order.pk
+        order.recompute_totals()
+        order.save()
+        request.session["current_order_id"] = order.id
 
-    if request.method == "POST":
-        info_form = CheckoutInfoForm(request.POST, instance=order)
-        pay_form = PaymentMethodForm(request.POST, instance=order)
-
-        if info_form.is_valid() and pay_form.is_valid():
-            order = info_form.save(commit=False)
-
-            dm = request.POST.get("delivery_method", "address")
-            order.delivery_method = (
-                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-            )
-
-            order.payment_method = pay_form.cleaned_data["payment_method"]
-            order.quantity = info_form.cleaned_data["quantity"]
-            order.paid = False
-
-            if order.ship_same_as_billing:
-                order.full_name = order.billing_full_name or order.full_name
-                order.email = order.billing_email or order.email
-                order.phone = order.billing_phone or order.phone
-                order.city = order.billing_city or order.city
-                order.postal_code = order.billing_postcode or order.postal_code
-                order.address_line = order.billing_street or order.address_line
-
-            order.save()
-
-            # Ensure we have an item
-            if not order.items.exists():
-                OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=order.quantity,
-                    unit_price_bgn=getattr(product, "price_bgn", None),
-                    unit_price_eur=_safe_product_price_eur(product),
-                )
-
-            # Refresh shipping if possible (won't call Econt if missing data)
-            _refresh_shipping_from_econt(order)
-
-            # Recompute totals from the current DB fields
-            _recompute_totals_from_db(order, product)
-            order.save(update_fields=[
-                "subtotal_bgn", "subtotal_eur",
-                "shipping_bgn", "shipping_eur",
-                "total_bgn", "total_eur",
-                "paid", "payment_method",
-                "delivery_method", "quantity",
-            ])
-
-            request.session["current_order_id"] = order.pk
-
-            return render(request, "checkout/info.html", {
-                "product": product,
-                "form": CheckoutInfoForm(instance=order),
-                "pay_form": PaymentMethodForm(instance=order, initial={"payment_method": order.payment_method}),
-                "order": order,
-            })
-
-        messages.error(request, "Моля, коригирайте грешките във формата.")
-    # GET render
     info_form = CheckoutInfoForm(instance=order)
-    pay_form = PaymentMethodForm(instance=order, initial={"payment_method": order.payment_method})
+    pay_form = PaymentMethodForm(initial={"payment_method": order.payment_method})
 
-    return render(request, "checkout/info.html", {
-        "product": product,
-        "form": info_form,
-        "pay_form": pay_form,
-        "order": order,
-    })
+    return render(
+        request,
+        "checkout/info.html",
+        {"product": product, "form": info_form, "pay_form": pay_form, "order": order},
+    )
 
 
 @transaction.atomic
@@ -326,11 +308,11 @@ def checkout_payment(request):
 
             if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
                 if not settings.STRIPE_PUBLIC_LIVE_KEY or not settings.STRIPE_SECRET_LIVE_KEY:
-                    messages.error(request, "Stripe не е конфигуриран.")
+                    messages.error(request, "Stripe не е конфигуриран (липсват STRIPE_PUBLIC_KEY / STRIPE_SECRET_KEY).")
                     return redirect("checkout_payment")
                 return redirect("stripe_create_session")
 
-            # COD
+            # COD flow
             order.paid = False
             order.save(update_fields=["paid"])
             request.session.pop("stripe_session_id", None)
@@ -341,44 +323,13 @@ def checkout_payment(request):
 
         messages.error(request, "Моля, изберете метод на плащане.")
     else:
-        form = PaymentMethodForm(instance=order, initial={"payment_method": order.payment_method or PaymentMethod.CARD})
+        initial = {"payment_method": order.payment_method or PaymentMethod.CARD}
+        form = PaymentMethodForm(instance=order, initial=initial)
 
     return render(request, "checkout/payment.html", {"product": product, "order": order, "form": form})
 
 
-# -------------------- Stripe --------------------
-def stripe_checkout_line_items(order: Order, product: Product):
-    unit_eur = _safe_product_price_eur(product)
-    ship_eur = _as_decimal(getattr(order, "shipping_eur", None))
-
-    unit_cents = _to_minor_units(unit_eur)
-    ship_cents = _to_minor_units(ship_eur)
-
-    if unit_cents < 1:
-        raise ValueError(f"Product unit amount too small: {unit_eur}")
-    if ship_cents < 0:
-        raise ValueError(f"Shipping negative: {ship_eur}")
-
-    return [
-        {
-            "price_data": {
-                "currency": STRIPE_CURRENCY,
-                "product_data": {"name": product.name},
-                "unit_amount": unit_cents,
-            },
-            "quantity": int(order.quantity or 1),
-        },
-        {
-            "price_data": {
-                "currency": STRIPE_CURRENCY,
-                "product_data": {"name": "Доставка"},
-                "unit_amount": ship_cents,
-            },
-            "quantity": 1,
-        },
-    ]
-
-
+# ---------- Stripe integration ----------
 def stripe_create_checkout_session(request):
     order = _get_current_order(request)
     if not order:
@@ -389,26 +340,12 @@ def stripe_create_checkout_session(request):
         messages.error(request, "Няма наличен продукт.")
         return redirect("home")
 
-    # IMPORTANT: refresh shipping right before payment (live Econt price)
-    ship_res = _refresh_shipping_from_econt(order)
-    if not ship_res.get("ok"):
-        messages.error(request, "Не успяхме да изчислим доставка. Моля, проверете данните за доставка.")
-        return redirect("checkout_info")
-
-    # totals (optional but nice)
-    _recompute_totals_from_db(order, product)
-    order.save(update_fields=["subtotal_eur", "subtotal_bgn", "total_eur", "total_bgn", "shipping_eur", "shipping_bgn"])
-
+    # Always go to thank_you after Stripe succeeds
     success_url = _site_url(request) + reverse("thank_you") + "?session_id={CHECKOUT_SESSION_ID}"
 
     try:
         line_items = stripe_checkout_line_items(order, product)
-
-        # hard guard
-        for it in line_items:
-            cur = (it.get("price_data") or {}).get("currency")
-            if cur != "eur":
-                raise ValueError(f"Non-EUR currency in Stripe line_items: {cur}")
+        logger.error("Stripe line_items (EUR): %s", line_items)  # helpful while debugging
 
         session = stripe.checkout.Session.create(
             mode="payment",
@@ -461,7 +398,8 @@ def stripe_webhook(request):
                 except Exception:
                     pass
 
-            if order.city and (getattr(order, "econt_office_code", "") or order.address_line):
+            # optional: create econt label only if delivery data is present
+            if order.city and (order.econt_office_code or order.address_line):
                 try:
                     create_econt_label(order)
                 except Exception:
@@ -498,11 +436,12 @@ def thank_you(request):
         except Exception as e:
             logger.error("Stripe verify on thank_you failed: %s", e)
 
-        # Create Econt label after Stripe (if possible)
+        # Create Econt label after Stripe (card flow) if we can
         if order:
             overrides = {}
+
             if order.delivery_method == DeliveryMethod.TO_OFFICE:
-                if getattr(order, "econt_office_code", ""):
+                if order.econt_office_code:
                     overrides["receiver_office_code"] = order.econt_office_code
             else:
                 street_line = (order.address_line or "") or (getattr(order, "billing_street", "") or "")
@@ -510,7 +449,12 @@ def thank_you(request):
                 overrides["receiver_street"] = street
                 if num:
                     overrides["receiver_num"] = num
-                postcode = getattr(order, "postal_code", "") or getattr(order, "billing_postcode", "")
+
+                postcode = (
+                    getattr(order, "postal_code", "")
+                    or getattr(order, "billing_postcode", "")
+                    or getattr(order, "billing_postal_code", "")
+                )
                 if postcode:
                     overrides["receiver_postcode"] = postcode
 
@@ -519,90 +463,124 @@ def thank_you(request):
             except Exception as e:
                 logger.error("Econt label after Stripe failed for order %s: %s", order.pk, e)
 
+    # clear session so refresh doesn’t reuse the same order
     request.session.pop("current_order_id", None)
     return render(request, "checkout/thank_you.html", {"order": order})
 
 
-# -------------------- AJAX: live totals for info.html --------------------
+# ---------- AJAX helpers ----------
 @require_POST
-def checkout_preview_totals(request):
-    """
-    Called by your info.html JS:
-    - updates order quantity / payment / delivery fields (lightweight)
-    - if delivery data is enough -> calls Econt calculate and stores shipping_eur/bgn
-    - returns shipping + totals (both EUR/BGN)
-    """
-    product = get_single_product()
-    if not product:
-        return JsonResponse({"ok": False, "error": "no_product"}, status=400)
+def checkout_inline_update(request):
+    order = _get_current_order(request)
+    if not order:
+        return JsonResponse({"ok": False, "error": "No current order"}, status=404)
 
-    order = _ensure_order(request)
-
-    # quantity
+    pm = request.POST.get("payment_method")
+    dm = request.POST.get("delivery_method")
     qty = request.POST.get("quantity")
+
+    changed = False
+
+    if pm:
+        order.payment_method = pm
+        changed = True
+
+    if dm:
+        order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+        changed = True
+
     if qty:
         try:
             q = int(qty)
             if q > 0:
                 order.quantity = q
+                order.recompute_totals()
+                changed = True
         except ValueError:
             pass
 
-    # payment
-    pm = request.POST.get("payment_method")
-    if pm:
-        if pm == "card":
-            order.payment_method = PaymentMethod.CARD
-        elif pm == "cod":
-            order.payment_method = PaymentMethod.COD
+    if changed:
+        order.save()
 
-    # delivery method
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def checkout_save_inline(request):
+    order = _get_current_order(request)
+    if not order:
+        order = Order.objects.create()
+        request.session["current_order_id"] = order.pk
+
+    for field in [
+        "billing_full_name",
+        "billing_email",
+        "billing_phone",
+        "billing_city",
+        "billing_street",
+        "billing_postcode",
+    ]:
+        val = request.POST.get(field)
+        if val is not None:
+            setattr(order, field, val)
+
+    same = request.POST.get("ship_same_as_billing")
+    if same is not None:
+        order.ship_same_as_billing = (same == "true")
+
     dm = request.POST.get("delivery_method")
     if dm == "address":
         order.delivery_method = DeliveryMethod.TO_ADDRESS
     elif dm == "office":
         order.delivery_method = DeliveryMethod.TO_OFFICE
 
-    # delivery data (from inline form)
-    # NOTE: keep your own field names consistent with your model
-    city = request.POST.get("city")
-    if city is not None:
-        order.city = city
-
-    # address fields stored in order.address_line + postal_code
-    receiver_street = request.POST.get("receiver_street", "").strip()
-    receiver_num = request.POST.get("receiver_num", "").strip()
-    receiver_postcode = request.POST.get("receiver_postcode", "").strip()
-    if receiver_postcode:
-        order.postal_code = receiver_postcode
-    if receiver_street or receiver_num:
-        # store as a single line (your model uses address_line)
-        line = receiver_street
-        if receiver_num:
-            line = (line + " " + receiver_num).strip()
-        order.address_line = line
-
-    # office code
-    office_code = request.POST.get("econt_office_code") or request.POST.get("office_code")
-    if office_code is not None:
-        setattr(order, "econt_office_code", office_code)
+    pm = request.POST.get("payment_method")
+    if pm:
+        if pm == "card":
+            order.payment_method = PaymentMethod.CARD
+        else:
+            order.payment_method = PaymentMethod.COD
 
     order.save()
+    return JsonResponse({"ok": True})
 
-    # Try refresh shipping (only if enough data)
-    ship = _refresh_shipping_from_econt(order)
 
-    # totals
-    _recompute_totals_from_db(order, product)
-    order.save(update_fields=["subtotal_eur", "subtotal_bgn", "total_eur", "total_bgn", "shipping_eur", "shipping_bgn"])
+@require_GET
+def checkout_summary(request, order_id=None):
+    if order_id is not None:
+        order = get_object_or_404(Order, pk=order_id)
+        request.session["current_order_id"] = order.pk
+    else:
+        order = _get_current_order(request)
+        if not order:
+            messages.error(request, "Няма активна поръчка.")
+            return redirect("checkout_info")
 
-    return JsonResponse({
-        "ok": True,
-        "shipping_known": bool(ship.get("ok")),
-        "shipping_eur": f"{_as_decimal(order.shipping_eur):.2f}",
-        "shipping_bgn": f"{_as_decimal(order.shipping_bgn):.2f}",
-        "total_eur": f"{_as_decimal(order.total_eur):.2f}",
-        "total_bgn": f"{_as_decimal(order.total_bgn):.2f}",
-        "subtotal_eur": f"{_as_decimal(order.subtotal_eur):.2f}",
-        "subtotal_bgn": f"{_as_decimal(order.subtotal_bgn):.2f}",
-    })
+    item = order.items.first()
+    product = item.product if item else get_single_product()
+
+    return render(request, "checkout/summary_readonly.html", {"order": order, "product": product})
+
+
+@require_POST
+def checkout_confirm_cod(request):
+    order = _get_current_order(request)
+    if not order:
+        messages.error(request, "Няма активна поръчка.")
+        return redirect("checkout_info")
+
+    if order.payment_method != PaymentMethod.COD:
+        messages.error(request, "Тази поръчка не е с наложен платеж.")
+        return redirect("checkout_summary")
+
+    res = create_econt_label(order, overrides={})
+    if not res.get("ok"):
+        messages.error(request, f"Грешка при Еконт: {res.get('error') or 'Неуспешно създаване на товарителница.'}")
+        return redirect("checkout_summary")
+
+    try:
+        send_order_notification(order, event="created")
+    except Exception:
+        pass
+
+    return redirect("thank_you")
