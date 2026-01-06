@@ -74,19 +74,11 @@ def _safe_product_price_eur(product: Product) -> Decimal:
 
 
 def _ship_eur_for(order: Order) -> Decimal:
-    """
-    Prefer order.shipping_eur (computed by recompute_totals()).
-    Fallback: convert old 9/7 BGN to EUR.
-    """
     ship_eur = getattr(order, "shipping_eur", None)
-    if ship_eur is not None:
-        ship_eur = Decimal(ship_eur)
-        if ship_eur > 0:
-            return ship_eur
-
-    # fallback if shipping_eur not computed yet
-    bgn = Decimal("9.00") if order.delivery_method == DeliveryMethod.TO_ADDRESS else Decimal("7.00")
-    return _bgn_to_eur(bgn)
+    if ship_eur is None:
+        return Decimal("0.00")
+    ship_eur = Decimal(str(ship_eur))
+    return ship_eur if ship_eur > 0 else Decimal("0.00")
 
 
 def stripe_checkout_line_items(order: Order, product: Product):
@@ -335,6 +327,11 @@ def stripe_create_checkout_session(request):
     if not order:
         return redirect("checkout_info")
 
+        # 🚨 Hard guard: Stripe requires shipping to be calculated live
+    if not getattr(order, "shipping_eur", None) or Decimal(str(order.shipping_eur)) <= 0:
+        messages.error(request, "Моля, попълнете данните за доставка, за да изчислим цената за доставка.")
+        return redirect("checkout_info")
+
     product = get_single_product()
     if not product:
         messages.error(request, "Няма наличен продукт.")
@@ -451,9 +448,9 @@ def thank_you(request):
                     overrides["receiver_num"] = num
 
                 postcode = (
-                    getattr(order, "postal_code", "")
-                    or getattr(order, "billing_postcode", "")
-                    or getattr(order, "billing_postal_code", "")
+                        getattr(order, "postal_code", "")
+                        or getattr(order, "billing_postcode", "")
+                        or getattr(order, "billing_postal_code", "")
                 )
                 if postcode:
                     overrides["receiver_postcode"] = postcode

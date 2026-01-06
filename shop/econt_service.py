@@ -1,7 +1,7 @@
 # shop/econt_service.py
 import base64
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -14,6 +14,37 @@ from django.conf import settings
 from .econt_client import EcontClient, EcontError, build_create_label_json, build_packing_list_from_order
 from .models import PaymentMethod, _bgn_to_eur
 from typing import List, Dict
+
+BGN_PER_EUR = Decimal("1.95583")
+
+
+def _q2(x: Decimal) -> Decimal:
+    return Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _money_to_eur_bgn(amount: Decimal, currency: str) -> tuple[Decimal, Decimal]:
+    """
+    Convert amount in given currency to (eur, bgn).
+    Handles EUR/BGN. If unknown -> treat as BGN (safe fallback).
+    """
+    cur = (currency or "").strip().upper()
+
+    amount = _q2(Decimal(str(amount)))
+
+    if cur == "EUR":
+        eur = amount
+        bgn = _q2(eur * BGN_PER_EUR)
+        return eur, bgn
+
+    if cur == "BGN" or cur == "":
+        bgn = amount
+        eur = _q2(bgn / BGN_PER_EUR)
+        return eur, bgn
+
+    # fallback: treat as BGN to avoid "too low" EUR
+    bgn = amount
+    eur = _q2(bgn / BGN_PER_EUR)
+    return eur, bgn
 
 
 def create_econt_label(order, overrides: dict | None = None) -> dict:
@@ -341,14 +372,12 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "error": err}
 
-    # --- извличаме цена на доставка: сума от всички services.price ---
+    # --- extract shipping price + currency (Econt may now return EUR) ---
     services_list = label.get("services") or []
     total_dec: Decimal | None = None
 
     if isinstance(services_list, list) and services_list:
-        total_dec = sum(
-            Decimal(str(s.get("price", 0))) for s in services_list
-        )
+        total_dec = sum(Decimal(str(s.get("price", 0) or 0)) for s in services_list)
 
     if total_dec is None:
         total_raw = label.get("totalPrice")
@@ -361,9 +390,20 @@ def calculate_econt_shipping(order, overrides: dict | None = None, include_cod: 
         order.save(update_fields=["econt_errors"])
         return {"ok": False, "error": err}
 
-    ship_bgn = total_dec.quantize(Decimal("0.01"))
+    # ✅ currency from label/services (Econt returns label.currency)
+    currency = (label.get("currency") or "").strip()
+    if not currency and isinstance(services_list, list) and services_list:
+        currency = (services_list[0].get("currency") or "").strip()
 
-    return {"ok": True, "ship_bgn": ship_bgn, "raw": label}
+    ship_eur, ship_bgn = _money_to_eur_bgn(total_dec, currency)
+
+    return {
+        "ok": True,
+        "ship_eur": ship_eur,
+        "ship_bgn": ship_bgn,
+        "currency": currency or None,
+        "raw": label,
+    }
 
 
 def search_offices(city: str, query: str = "") -> list[dict]:
