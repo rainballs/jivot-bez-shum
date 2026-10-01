@@ -41,6 +41,7 @@ class Command(BaseCommand):
         parser.add_argument("--stripe", action="store_true", help="compare with Stripe Checkout Sessions (read-only)")
         parser.add_argument("--csv", help="write the findings to this CSV file")
         parser.add_argument("--include-ok", action="store_true", help="also list orders without findings")
+        parser.add_argument("--exclude", default="", help="comma-separated order ids already handled (hidden from the report)")
 
     # ------------------------------------------------------------------ local checks
     def local_findings(self, o: Order, dup_nums: set, multi_created: set, now):
@@ -113,6 +114,10 @@ class Command(BaseCommand):
                       "recipient is the courier-charge payer although delivery was paid online"))
         if o.payment_method == PaymentMethod.COD and not paid_by_card and cd <= 0:
             f.append(("ECONT_NO_COD_ON_COD_ORDER", VERIFIED, "COD order but Econt shows no COD amount"))
+        elif o.payment_method == PaymentMethod.COD and not paid_by_card and o.subtotal_eur                 and abs(cd - Decimal(str(o.subtotal_eur))) > Decimal("0.05"):
+            # getMyAWB reports amounts in EUR; Econt converts the BGN amount we send (verified on demo)
+            f.append(("ECONT_COD_AMOUNT_MISMATCH", VERIFIED,
+                      f"Econt COD {cd} EUR differs from goods value {o.subtotal_eur} EUR"))
         return f
 
     def stripe_findings(self, orders):
@@ -148,7 +153,9 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         self.since = opts["since"]
         now = timezone.now()
-        orders = list(Order.objects.filter(created_at__gte=now - timedelta(days=self.since)).order_by("id"))
+        excluded = {int(x) for x in opts["exclude"].split(",") if x.strip().isdigit()}
+        orders = list(Order.objects.filter(created_at__gte=now - timedelta(days=self.since))
+                      .exclude(pk__in=excluded).order_by("id"))
 
         dup_nums = set(
             Order.objects.exclude(econt_shipment_num__isnull=True).exclude(econt_shipment_num="")

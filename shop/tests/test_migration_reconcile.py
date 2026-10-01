@@ -154,3 +154,38 @@ class ReconcileCommandTests(ShopTestCase):
         self.econt.mode_queue["getMyAWB"] = [requests.exceptions.ReadTimeout("x")]
         out = self.run_cmd("--econt")
         self.assertIn("provider checks incomplete", out)
+
+
+class InspectAndExcludeTests(ShopTestCase):
+    def test_econt_inspect_reports_missing_cod_and_is_read_only(self):
+        from django.core.management import call_command
+
+        o = make_order(method=PaymentMethod.COD, econt_shipment_num="S-1", shipment_status=ShipmentStatus.CREATED)
+        self.econt.mode_queue["getMyAWB"] = [FakeResponse(200, {"page": 1, "totalPages": 1, "results": [
+            {"shipmentNumber": "S-1", "cdAmount": 0, "courierServiceMasterPayer": "receiver", "status": "Доставена"}]})]
+        self.econt.mode_queue["getShipmentStatuses"] = [FakeResponse(200, {"shipmentStatuses": [
+            {"status": {"shipmentNumber": "S-1", "cdCollectedAmount": 0, "receiverDueAmount": 5.8}}]})]
+        before = list(Order.objects.values_list("pk", "shipment_status", "needs_review"))
+        out = StringIO()
+        call_command("econt_inspect", str(o.pk), stdout=out)
+        text = out.getvalue()
+        self.assertIn("does NOT ask for cash on delivery", text)
+        self.assertEqual(before, list(Order.objects.values_list("pk", "shipment_status", "needs_review")))
+        for secret in ("Иван", "ivan@example.com", "888 123"):
+            self.assertNotIn(secret, text)
+
+    def test_amount_mismatch_and_exclude(self):
+        a = make_order(method=PaymentMethod.COD, econt_shipment_num="S-A", shipment_status=ShipmentStatus.CREATED)
+        b = make_order(method=PaymentMethod.COD, econt_shipment_num="S-B", shipment_status=ShipmentStatus.CREATED)
+        rows = {"page": 1, "totalPages": 1, "results": [
+            {"shipmentNumber": "S-A", "cdAmount": 99, "courierServiceMasterPayer": "receiver"},
+            {"shipmentNumber": "S-B", "cdAmount": 12.78, "courierServiceMasterPayer": "receiver"}]}
+        self.econt.mode_queue["getMyAWB"] = [FakeResponse(200, rows)]
+        out = StringIO()
+        call_command("reconcile_orders", "--econt", stdout=out)
+        self.assertRegex(out.getvalue(), rf"#{a.pk}\s.*ECONT_COD_AMOUNT_MISMATCH")
+        self.assertNotRegex(out.getvalue(), rf"#{b.pk}\s")
+        self.econt.mode_queue["getMyAWB"] = [FakeResponse(200, rows)]
+        out = StringIO()
+        call_command("reconcile_orders", "--econt", "--exclude", str(a.pk), stdout=out)
+        self.assertNotRegex(out.getvalue(), rf"#{a.pk}\s")
