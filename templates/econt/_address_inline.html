@@ -48,6 +48,15 @@
         </label>
     </div>
 
+    <div class="field-grid">
+        <label>Квартал <span class="small muted">(ако Еконт го поиска)</span>
+            <input type="text" name="receiver_quarter" value="{{ prefill.receiver_quarter }}">
+        </label>
+        <label>Блок / друго <span class="small muted">(напр. бл. 5, ж.к. Люлин)</span>
+            <input type="text" name="receiver_other" value="{{ prefill.receiver_other }}">
+        </label>
+    </div>
+
     <div class="actions" style="margin-top:1rem">
         <button type="button" class="btn btn-primary" id="btn-inline-address-submit">Завърши поръчката</button>
     </div>

@@ -8,17 +8,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path("r3gUp7g5b8xjOw8Eu2E8lONZyxHPectd/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("", views.home, name="home"),
     path("checkout/", views.checkout_info, name="checkout_info"),
-    path("checkout/payment/", views.checkout_payment, name="checkout_payment"),  # hidden for now
     path("checkout/thank-you/", views.thank_you, name="thank_you"),
 
     path("checkout/summary/", views.checkout_summary, name="checkout_summary"),
-    path("checkout/summary/<int:order_id>/", views.checkout_summary, name="checkout_summary_by_id"),
     path("checkout/confirm-cod/", views.checkout_confirm_cod, name="checkout_confirm_cod"),
 
-    # Stripe (disabled for now)
+    # Stripe
     path("pay/stripe/create-session/", views.stripe_create_checkout_session, name="stripe_create_session"),
     path("pay/stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 
@@ -35,7 +33,6 @@ urlpatterns = [
     path("econt/partial/office/", econt_views.econt_partial_office, name="econt_partial_office"),
     path("econt/submit-inline/", econt_views.econt_submit_inline, name="econt_submit_inline"),
 
-    path("checkout/inline-update/", views.checkout_inline_update, name="checkout_inline_update"),
     path("checkout/save-inline/", views.checkout_save_inline, name="checkout_save_inline"),
     path(
         "terms/",

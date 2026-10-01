@@ -160,6 +160,14 @@
     </style>
 
     <script>
+        // Econt nomenclature values are interpolated into innerHTML templates: always escape them.
+        function escHtml(v) {
+            return String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[ch]));
+        }
+    </script>
+<script>
         (() => {
             const $ = s => document.querySelector(s);
             const cityInput = $('#city_input');
@@ -193,8 +201,8 @@
                 }
                 const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(qLower));
                 cityBox.innerHTML = filtered.map(c => `
-          <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
-            ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+          <div class="suggest-item" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}">
+            ${escHtml(c.name)} ${c.postCode ? '(' + escHtml(c.postCode) + ')' : ''}
           </div>`).join('');
                 cityBox.style.display = filtered.length ? 'block' : 'none';
             }
@@ -279,9 +287,9 @@
                 }
                 officeList.innerHTML = filtered.map(o => `
           <div class="office-item ${pickedOffice && pickedOffice.code === o.code ? 'active' : ''}"
-               data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
-            <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
-            <div class="muted small">${o.address || ''}</div>
+               data-code="${escHtml(o.code)}" data-name="${escHtml(o.name)}" data-addr="${escHtml(o.address || '')}">
+            <div class="office-name">${escHtml(o.name)} <span class="muted">(#${escHtml(o.code)})</span></div>
+            <div class="muted small">${escHtml(o.address || '')}</div>
           </div>`).join('');
             }
 

@@ -29,6 +29,6 @@ Payment:
 - Paid: {% if order.paid %}Yes{% else %}No{% endif %}
 
 {% if is_admin_mail %}
-Admin link: {{ site_url }}/r3gUp7g5b8xjOw8Eu2E8lONZyxHPectd/shop/order/{{ order.id }}/change/
+Admin link: {{ site_url }}/{{ admin_path }}shop/order/{{ order.id }}/change/
 Created at: {{ order.created_at|date:"Y-m-d H:i" }}
 {% endif %}

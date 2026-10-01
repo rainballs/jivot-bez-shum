@@ -27,6 +27,10 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 # SECURITY WARNING: keep the secret key used in production secret!
 DEBUG = env("DEBUG")
 SECRET_KEY = env("SECRET_KEY", default="dev-secret-key")
+if not DEBUG and SECRET_KEY in ("", "dev-secret-key"):
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("SECRET_KEY must be set in the environment when DEBUG is False.")
 ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")]
 
 # Application definition
@@ -130,13 +134,43 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "Filip.context_processors.static_build_hash",
 ]
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- Security (cookies / headers). Defaults are safe for an HTTPS production deployment. ---
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+# Opt-in (they depend on how nginx/the proxy is set up; see DEPLOYMENT notes):
+#   USE_X_FORWARDED_PROTO=True      -> trust the proxy's X-Forwarded-Proto header (request.is_secure())
+#   SECURE_SSL_REDIRECT=True        -> redirect http->https in Django (NOT needed if nginx already does it)
+#   SECURE_HSTS_SECONDS=31536000    -> only after verifying https works for all sub-domains
+if env.bool("USE_X_FORWARDED_PROTO", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", default="").split(",") if o.strip()]
+# Per-client rate limits use the real client IP: only enable behind a proxy that APPENDS to X-Forwarded-For.
+TRUST_X_FORWARDED_FOR = env.bool("TRUST_X_FORWARDED_FOR", default=False)
+ADMIN_URL = env("ADMIN_URL", default="r3gUp7g5b8xjOw8Eu2E8lONZyxHPectd/")
+
+# --- Checkout limits / fulfilment tuning ---
+MAX_ORDER_QUANTITY = env.int("MAX_ORDER_QUANTITY", default=20)
+# Try to create the Econt shipment right after payment is committed (best effort). The durable
+# fallback is `manage.py process_shipments`, which MUST be scheduled (cron/systemd timer, every minute).
+SHIPMENT_INLINE_DISPATCH = env.bool("SHIPMENT_INLINE_DISPATCH", default=True)
+SHIPMENT_MAX_ATTEMPTS = env.int("SHIPMENT_MAX_ATTEMPTS", default=5)
+SHIPMENT_STALE_AFTER_SECONDS = env.int("SHIPMENT_STALE_AFTER_SECONDS", default=600)
 
 # STRIPE TEST CREDENTIALS
 STRIPE_PUBLIC_KEY = env("STRIPE_PUBLIC_KEY", default="")
@@ -150,6 +184,7 @@ EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", 10))  # a stuck SMTP server must not hang webhooks/checkout
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
@@ -158,10 +193,26 @@ ORDER_NOTIFY_EMAIL = os.environ.get("ORDER_NOTIFY_EMAIL", EMAIL_HOST_USER)
 # For links inside emails (e.g., admin link)
 SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
 
+# ECONT_ENV=live (default, unchanged behaviour) uses the ECONT_LIVE_* variables.
+# ECONT_ENV=demo uses ECONT_BASE_URL / ECONT_USERNAME / ECONT_PASSWORD (the Econt demo server) - use it on
+# developer machines: a local runserver/shell with the production .env otherwise talks to LIVE Econt.
+# If the live base URL is missing the code falls back to the DEMO server, where "created" labels are NOT real
+# shipments; system check `shop.W001` warns about this.
+if os.getenv("ECONT_ENV", "live").lower() == "demo":
+    _ECONT_CONN = {
+        "BASE_URL": os.getenv("ECONT_BASE_URL", "https://demo.econt.com/ee/services"),
+        "USER": os.getenv("ECONT_USERNAME", ""),
+        "PASS": os.getenv("ECONT_PASSWORD", ""),
+    }
+else:
+    _ECONT_CONN = {
+        "BASE_URL": os.getenv("ECONT_LIVE_BASE_URL", "https://demo.econt.com/ee/services"),
+        "USER": os.getenv("ECONT_LIVE_USERNAME", ""),
+        "PASS": os.getenv("ECONT_LIVE_PASSWORD", ""),
+    }
+
 ECONT = {
-    "BASE_URL": os.getenv("ECONT_LIVE_BASE_URL", "https://demo.econt.com/ee/services"),
-    "USER": os.getenv("ECONT_LIVE_USERNAME", ""),
-    "PASS": os.getenv("ECONT_LIVE_PASSWORD", ""),
+    **_ECONT_CONN,
     "DEFAULTS": {
         "sender_name": os.getenv("ECONT_SENDER_NAME", ""),
         "sender_phone": os.getenv("ECONT_SENDER_PHONE", ""),
@@ -171,8 +222,13 @@ ECONT = {
         "label_format": "10x9",
         # this is the new one — required for COD:
         "cd_template": "DEFAULT",  # put the actual name from e-Econt here
-        "cod_agreement_number": "CD250332",
+        "cod_agreement_number": os.getenv("ECONT_COD_AGREEMENT_NUMBER", "CD250332"),  # unchanged default
+        # Currency in which the merchandise COD amount is sent. Kept BGN to preserve existing behaviour; see report.
+        "cod_currency": os.getenv("ECONT_COD_CURRENCY", "BGN"),
+        # Required by Econt for door deliveries sent on a Friday (and holidays): "workday" | "Halfday" | "" (off)
+        "holiday_delivery_day": os.getenv("ECONT_HOLIDAY_DELIVERY_DAY", "workday"),
     },
+    "TIMEOUT": (5, 25),  # (connect, read) seconds
 }
 
 LOGGING = {
@@ -189,6 +245,11 @@ LOGGING = {
         "level": "INFO",
     },
     "loggers": {
+        "shop": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         # your Econt debug
         "econt": {
             "handlers": ["console"],

@@ -1,37 +1,46 @@
 # shop/views.py
 import logging
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
+import stripe
 from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.http import (
-    HttpResponse,
-    HttpResponseBadRequest,
-    HttpResponseRedirect,
-    JsonResponse,
-)
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.http import require_http_methods, require_POST, require_GET
 
-import stripe
-
+from . import fulfillment, payments
+from .address import split_street_num
+from .checkout import (
+    BILLING_LIMITS,
+    SESSION_KEY,
+    apply_selection,
+    ensure_editable,
+    get_session_order,
+    readiness_error,
+    throttled,
+)
 from .forms import CheckoutInfoForm, PaymentMethodForm
-from .models import Order, OrderItem, PaymentMethod, Product, DeliveryMethod
-from .utils import send_order_notification
-from .econt_service import create_econt_label
+from .models import (
+    DeliveryMethod,
+    Order,
+    OrderItem,
+    PaymentMethod,
+    PaymentStatus,
+    Product,
+    ShipmentStatus,
+    StripeEvent,
+    _bgn_to_eur,
+)
+from .utils import notify_order_accepted
 
-logger = logging.getLogger("gunicorn.error")
+logger = logging.getLogger("shop")
 
-# Stripe config
-stripe.api_key = settings.STRIPE_SECRET_LIVE_KEY
-
-# Currency constants (Stripe no longer supports BGN for Bulgaria)
-STRIPE_CURRENCY = "eur"
-BGN_PER_EUR = Decimal("1.95583")
+SESSION_ID_RE = re.compile(r"^cs_(test|live)_[A-Za-z0-9]{10,200}$")
 
 
 # ---------- Helpers ----------
@@ -40,119 +49,47 @@ def get_single_product():
     return qs.first() or Product.objects.first()
 
 
-def _site_url(request):
-    scheme = "https" if request.is_secure() else "http"
-    return f"{scheme}://{request.get_host()}"
-
-
-def stripe_cancel_url(request):
-    return _site_url(request) + reverse("checkout_info")
-
-
-def _to_minor_units(amount: Decimal) -> int:
-    """Convert Decimal to cents (minor units) for EUR."""
-    return int((amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100))
-
-
-def _bgn_to_eur(bgn: Decimal) -> Decimal:
-    return (bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
 def _safe_product_price_eur(product: Product) -> Decimal:
-    """
-    Prefer product.price_eur.
-    If missing, fallback convert from product.price_bgn.
-    """
+    """Prefer product.price_eur; fall back to converting price_bgn."""
     p = getattr(product, "price_eur", None)
     if p is not None and Decimal(p) > 0:
         return Decimal(p)
-
     bgn = getattr(product, "price_bgn", None)
     if bgn is None:
         raise ValueError("Product has no price_eur and no price_bgn.")
     return _bgn_to_eur(Decimal(bgn))
 
 
-def _ship_eur_for(order: Order) -> Decimal:
-    ship_eur = getattr(order, "shipping_eur", None)
-    if ship_eur is None:
-        return Decimal("0.00")
-    ship_eur = Decimal(str(ship_eur))
-    return ship_eur if ship_eur > 0 else Decimal("0.00")
+def _new_order(request, product, *, quantity=1, payment_method=PaymentMethod.COD) -> Order | None:
+    """Create the session's order (rate limited: every anonymous visitor otherwise creates DB rows)."""
+    if throttled(request, "new_order", 30, 3600):
+        return None
+    with transaction.atomic():
+        order = Order.objects.create(
+            quantity=quantity,
+            delivery_method=DeliveryMethod.TO_ADDRESS,
+            payment_method=payment_method,
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=quantity,
+            unit_price_bgn=product.price_bgn,
+            unit_price_eur=_safe_product_price_eur(product),
+        )
+        order.recompute_totals()
+        order.save()
+        order.log_event("created", "checkout started")
+    request.session[SESSION_KEY] = order.id
+    return order
 
 
-def stripe_checkout_line_items(order: Order, product: Product):
-    """
-    ALWAYS returns EUR line items.
-    Includes product + shipping as separate line items.
-    """
-    unit_eur = _safe_product_price_eur(product)
-    ship_eur = _ship_eur_for(order)
-
-    unit_cents = _to_minor_units(unit_eur)
-    ship_cents = _to_minor_units(ship_eur)
-
-    # Stripe expects positive integers for unit_amount
-    if unit_cents < 1:
-        raise ValueError(f"Product unit_amount is too small: {unit_eur} EUR")
-    if ship_cents < 0:
-        raise ValueError(f"Shipping is negative: {ship_eur} EUR")
-
-    items = [
-        {
-            "price_data": {
-                "currency": STRIPE_CURRENCY,
-                "product_data": {"name": product.name},
-                "unit_amount": unit_cents,
-            },
-            "quantity": int(order.quantity or 1),
-        },
-        {
-            "price_data": {
-                "currency": STRIPE_CURRENCY,
-                "product_data": {"name": "Доставка"},
-                "unit_amount": ship_cents,
-            },
-            "quantity": 1,
-        },
-    ]
-
-    # Bulletproof guard: never allow BGN to reach Stripe
-    for it in items:
-        cur = (it.get("price_data") or {}).get("currency")
-        if cur != STRIPE_CURRENCY:
-            raise ValueError(f"Non-EUR currency detected in line_items: {cur}")
-
-    return items
-
-
-def _get_current_order(request) -> Order | None:
-    """
-    Single source of truth for current order:
-    - session current_order_id, else
-    - order_id from GET/POST (optional)
-    """
-    oid = request.session.get("current_order_id")
-    if not oid:
-        oid = request.GET.get("order_id") or request.POST.get("order_id")
-    return Order.objects.filter(pk=oid).first() if oid else None
-
-
-def _split_street_num(line: str) -> tuple[str, str]:
-    if not line:
-        return "", ""
-    s = line.strip()
-
-    m = re.search(r"(?:№\s*)(\d+[A-Za-zА-Яа-я\-\/]*)\s*$", s)
-    if not m:
-        m = re.search(r"\s(\d+[A-Za-zА-Яа-я\-\/]*)\s*$", s)
-
-    if m:
-        num = m.group(1)
-        street = s[: m.start(1)].rstrip(" ,№")
-        return street.strip(), num.strip()
-
-    return s, ""
+def _order_is_final(order: Order) -> bool:
+    return (
+            order.payment_status == PaymentStatus.PAID
+            or order.cod_confirmed_at is not None
+            or order.shipment_status != ShipmentStatus.NONE
+    )
 
 
 # ---------- Pages ----------
@@ -161,423 +98,304 @@ def home(request):
     return render(request, "pages/home.html", {"product": product})
 
 
-@transaction.atomic
+@require_http_methods(["GET", "POST"])
 def checkout_info(request):
     product = get_single_product()
     if not product:
         messages.error(request, "Няма наличен продукт.")
         return redirect("home")
 
+    order = get_session_order(request)
+    if order is not None and not ensure_editable(order):
+        if _order_is_final(order):
+            request.session.pop(SESSION_KEY, None)  # finished order: start a fresh checkout
+            order = None
+        else:  # a card payment is still being processed
+            return redirect("thank_you")
+
     if request.method == "POST":
-        info_form = CheckoutInfoForm(request.POST)
+        info_form = CheckoutInfoForm(request.POST, instance=order)
         pay_form = PaymentMethodForm(request.POST)
 
+        if order is None and throttled(request, "new_order", 30, 3600):
+            return HttpResponse("Твърде много заявки. Опитайте по-късно.", status=429)
+
         if info_form.is_valid() and pay_form.is_valid():
-            order = info_form.save(commit=False)
+            with transaction.atomic():
+                creating = order is None
+                order = info_form.save(commit=False)
+                dm = request.POST.get("delivery_method", "address")
+                order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
+                order.payment_method = pay_form.cleaned_data["payment_method"]
 
-            dm = request.POST.get("delivery_method", "address")
-            order.delivery_method = (
-                DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-            )
-            order.payment_method = pay_form.cleaned_data["payment_method"]
+                if order.ship_same_as_billing:
+                    order.full_name = order.billing_full_name or order.full_name
+                    order.email = order.billing_email or order.email
+                    order.phone = order.billing_phone or order.phone
+                    order.city = order.billing_city or order.city
+                    order.postal_code = order.billing_postcode or order.postal_code
+                    order.address_line = order.billing_street or order.address_line
 
-            if order.ship_same_as_billing:
-                order.full_name = order.billing_full_name or order.full_name
-                order.email = order.billing_email or order.email
-                order.phone = order.billing_phone or order.phone
-                order.city = order.billing_city or order.city
-                order.postal_code = order.billing_postcode or order.postal_code
-                order.address_line = order.billing_street or order.address_line
-
-            order.quantity = info_form.cleaned_data["quantity"]
-            order.paid = False
-
-            # hard validation for Econt before saving the order
-            missing_parts = []
-            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                qty = info_form.cleaned_data["quantity"]
+                missing_parts = []
                 if not (order.full_name or "").strip():
                     missing_parts.append("име и фамилия")
                 if not (order.phone or "").strip():
                     missing_parts.append("телефон")
                 if not (order.city or "").strip():
                     missing_parts.append("град")
-                if not (order.postal_code or "").strip():
-                    missing_parts.append("пощенски код")
-                if not (order.address_line or "").strip():
-                    missing_parts.append("улица и номер")
-            else:  # TO_OFFICE
-                if not (order.city or "").strip():
-                    missing_parts.append("град")
-                if not (getattr(order, "econt_office_code", "") or "").strip():
+                if order.delivery_method == DeliveryMethod.TO_ADDRESS:
+                    if not (order.postal_code or "").strip():
+                        missing_parts.append("пощенски код")
+                    if not (order.address_line or "").strip():
+                        missing_parts.append("улица и номер")
+                elif not (order.econt_office_code or "").strip():
                     missing_parts.append("офис на Еконт")
 
-            if missing_parts:
-                messages.error(request, "За да продължите, попълнете: " + ", ".join(missing_parts) + ".")
-                return render(
-                    request,
-                    "checkout/info.html",
-                    {"product": product, "form": info_form, "pay_form": pay_form},
-                )
+                if missing_parts:
+                    messages.error(request, "За да продължите, попълнете: " + ", ".join(missing_parts) + ".")
+                    return render(request, "checkout/info.html",
+                                  {"product": product, "form": info_form, "pay_form": pay_form})
 
-            order.save()
-
-            # line item
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=order.quantity,
-                unit_price_bgn=getattr(product, "price_bgn", None),
-                unit_price_eur=_safe_product_price_eur(product),
-            )
-
-            # totals
-            order.recompute_totals()
-            order.save(
-                update_fields=[
-                    "subtotal_bgn",
-                    "subtotal_eur",
-                    "shipping_bgn",
-                    "shipping_eur",
-                    "total_bgn",
-                    "total_eur",
-                    "paid",
-                    "payment_method",
-                ]
-            )
-
-            request.session["current_order_id"] = order.id
-
-            return render(
-                request,
-                "checkout/info.html",
-                {"product": product, "form": info_form, "pay_form": pay_form, "order": order},
-            )
+                order.invalidate_quote()
+                if order.address_line and not order.receiver_street:
+                    order.receiver_street, order.receiver_num = split_street_num(order.address_line)
+                order.save()
+                if creating or not order.items.exists():
+                    OrderItem.objects.create(
+                        order=order, product=product, quantity=qty,
+                        unit_price_bgn=product.price_bgn, unit_price_eur=_safe_product_price_eur(product),
+                    )
+                order.set_quantity(qty)
+                order.recompute_totals()
+                order.save(update_fields=[
+                    "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur", "total_bgn", "total_eur",
+                ])
+            request.session[SESSION_KEY] = order.id
+            return render(request, "checkout/info.html",
+                          {"product": product, "form": info_form, "pay_form": pay_form, "order": order})
 
         messages.error(request, "Моля, коригирайте грешките във формата.")
         return render(request, "checkout/info.html", {"product": product, "form": info_form, "pay_form": pay_form})
 
-    # GET branch: create order if missing
-    order = _get_current_order(request)
-    if not order:
-        order = Order.objects.create(
-            quantity=1,
-            delivery_method=DeliveryMethod.TO_ADDRESS,
-            payment_method=PaymentMethod.COD,
-            paid=False,
-        )
-        OrderItem.objects.create(
-            order=order,
-            product=product,
-            quantity=1,
-            unit_price_bgn=getattr(product, "price_bgn", None),
-            unit_price_eur=_safe_product_price_eur(product),
-        )
-        order.recompute_totals()
-        order.save()
-        request.session["current_order_id"] = order.id
+    # GET: create the order lazily (rate limited)
+    if order is None:
+        order = _new_order(request, product)
+        if order is None:
+            return HttpResponse("Твърде много заявки. Опитайте по-късно.", status=429)
 
     info_form = CheckoutInfoForm(instance=order)
     pay_form = PaymentMethodForm(initial={"payment_method": order.payment_method})
-
-    return render(
-        request,
-        "checkout/info.html",
-        {"product": product, "form": info_form, "pay_form": pay_form, "order": order},
-    )
-
-
-@transaction.atomic
-def checkout_payment(request):
-    order = _get_current_order(request)
-    if not order:
-        return redirect("checkout_info")
-    product = get_single_product()
-
-    if request.method == "POST":
-        form = PaymentMethodForm(request.POST, instance=order)
-        if form.is_valid():
-            order = form.save()
-
-            if order.payment_method in {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}:
-                if not settings.STRIPE_PUBLIC_LIVE_KEY or not settings.STRIPE_SECRET_LIVE_KEY:
-                    messages.error(request, "Stripe не е конфигуриран (липсват STRIPE_PUBLIC_KEY / STRIPE_SECRET_KEY).")
-                    return redirect("checkout_payment")
-                return redirect("stripe_create_session")
-
-            # COD flow
-            order.paid = False
-            order.save(update_fields=["paid"])
-            request.session.pop("stripe_session_id", None)
-
-            if order.delivery_method == DeliveryMethod.TO_ADDRESS:
-                return redirect("econt_collect_address")
-            return redirect("econt_collect_office")
-
-        messages.error(request, "Моля, изберете метод на плащане.")
-    else:
-        initial = {"payment_method": order.payment_method or PaymentMethod.CARD}
-        form = PaymentMethodForm(instance=order, initial=initial)
-
-    return render(request, "checkout/payment.html", {"product": product, "order": order, "form": form})
+    return render(request, "checkout/info.html",
+                  {"product": product, "form": info_form, "pay_form": pay_form, "order": order})
 
 
 # ---------- Stripe integration ----------
+@require_http_methods(["GET", "POST"])
 def stripe_create_checkout_session(request):
-    order = _get_current_order(request)
+    if request.method == "GET":  # old links/bookmarks: creating a payment session must be a CSRF-protected POST
+        return redirect("checkout_summary")
+
+    order = get_session_order(request)
     if not order:
         return redirect("checkout_info")
 
-        # 🚨 Hard guard: Stripe requires shipping to be calculated live
-    if not getattr(order, "shipping_eur", None) or Decimal(str(order.shipping_eur)) <= 0:
-        messages.error(request, "Моля, попълнете данните за доставка, за да изчислим цената за доставка.")
+    if not settings.STRIPE_SECRET_LIVE_KEY:
+        messages.error(request, "Плащането с карта временно не е налично.")
+        return redirect("checkout_summary")
+
+    if not order.is_card:
+        messages.error(request, "Тази поръчка не е с плащане с карта.")
+        return redirect("checkout_summary")
+
+    err = readiness_error(order)
+    if err:
+        messages.error(request, err)
         return redirect("checkout_info")
-
-    product = get_single_product()
-    if not product:
-        messages.error(request, "Няма наличен продукт.")
-        return redirect("home")
-
-    # Always go to thank_you after Stripe succeeds
-    success_url = _site_url(request) + reverse("thank_you") + "?session_id={CHECKOUT_SESSION_ID}"
 
     try:
-        line_items = stripe_checkout_line_items(order, product)
-        logger.error("Stripe line_items (EUR): %s", line_items)  # helpful while debugging
-
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            payment_method_types=["card"],
-            line_items=line_items,
-            metadata={
-                "order_id": str(order.id),
-                "delivery_method": str(order.delivery_method),
-            },
-            success_url=success_url,
-            cancel_url=stripe_cancel_url(request),
-            customer_email=order.email or None,
-        )
-    except Exception as e:
-        messages.error(request, f"Грешка при свързване със Stripe: {e}")
+        attempt = payments.create_checkout_session(order.pk, settings.SITE_URL.rstrip("/"))
+    except payments.PaymentNotAllowed as e:
+        logger.warning("payment not allowed order=%s: %s", order.pk, e)
+        messages.error(request, "Поръчката не може да бъде платена в момента. Моля, проверете данните си.")
         return redirect("checkout_info")
+    except stripe.StripeError:
+        logger.exception("Stripe session creation failed for order %s", order.pk)
+        messages.error(request, "Временна грешка при свързване със Stripe. Моля, опитайте отново.")
+        return redirect("checkout_summary")
 
-    request.session["stripe_session_id"] = session.id
-    return HttpResponseRedirect(session.url)
+    request.session["stripe_session_id"] = attempt.stripe_session_id
+    return HttpResponseRedirect(attempt.checkout_url)
 
 
-@csrf_exempt
+@csrf_exempt  # Stripe cannot send a CSRF token; authenticity is established by the signature below
+@require_POST
 def stripe_webhook(request):
-    payload = request.body
-    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+    payload = request.body  # raw bytes: the signature is computed over exactly this
+    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
     secret = settings.STRIPE_WEBHOOK_SECRET
 
     if not secret:
-        return HttpResponseBadRequest("Missing STRIPE_WEBHOOK_SECRET")
+        logger.error("STRIPE_WEBHOOK_SECRET is not configured; rejecting webhook")
+        return HttpResponse("webhook not configured", status=500)
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, secret)
-    except (ValueError, stripe.error.SignatureVerificationError):
+    except (ValueError, stripe.SignatureVerificationError):
         return HttpResponse(status=400)
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        order_id = (session.get("metadata") or {}).get("order_id")
-        if order_id:
-            try:
-                order = Order.objects.get(pk=order_id)
-            except Order.DoesNotExist:
-                return HttpResponse(status=200)
+    ev, created = StripeEvent.objects.get_or_create(
+        event_id=event["id"],
+        defaults={"event_type": event["type"], "livemode": bool(event.get("livemode"))},
+    )
+    if not created and ev.status in (StripeEvent.Status.PROCESSED, StripeEvent.Status.IGNORED,
+                                     StripeEvent.Status.REJECTED):
+        return HttpResponse(status=200)  # duplicate delivery: already handled
 
-            if not order.paid:
-                order.paid = True
-                order.save(update_fields=["paid"])
-                try:
-                    send_order_notification(order, event="paid")
-                except Exception:
-                    pass
+    try:
+        status, order, detail = payments.handle_event(event)
+    except Exception as e:
+        logger.exception("stripe event %s failed", event["id"])
+        StripeEvent.objects.filter(pk=ev.pk).update(status=StripeEvent.Status.ERROR, detail=type(e).__name__)
+        return HttpResponse(status=500)  # Stripe retries with backoff; the event row proves we saw it
 
-            # optional: create econt label only if delivery data is present
-            if order.city and (order.econt_office_code or order.address_line):
-                try:
-                    create_econt_label(order)
-                except Exception:
-                    pass
-
+    StripeEvent.objects.filter(pk=ev.pk).update(
+        status=status, order=order, detail=str(detail)[:500], processed_at=timezone.now(),
+    )
+    if status == StripeEvent.Status.REJECTED:
+        logger.error("stripe event %s rejected: %s", event["id"], detail)
     return HttpResponse(status=200)
 
 
 def thank_you(request):
-    session_id = request.GET.get("session_id")
-    order = _get_current_order(request)
+    order = get_session_order(request)
+    session_id = request.GET.get("session_id", "")
+    show_details = order is not None
 
-    if session_id and settings.STRIPE_SECRET_LIVE_KEY:
+    if session_id and SESSION_ID_RE.match(session_id) and settings.STRIPE_SECRET_LIVE_KEY \
+            and not throttled(request, "thank_you", 20, 60):
         try:
-            sess = stripe.checkout.Session.retrieve(
-                session_id,
-                api_key=settings.STRIPE_SECRET_LIVE_KEY,
-                expand=["payment_intent"],
-            )
-            meta = sess.get("metadata") or {}
-            stripe_order_id = meta.get("order_id")
-
-            if sess.get("payment_status") == "paid" and stripe_order_id:
-                try:
-                    paid_order = Order.objects.get(pk=stripe_order_id)
-                except Order.DoesNotExist:
-                    paid_order = None
+            sess = stripe.checkout.Session.retrieve(session_id, api_key=settings.STRIPE_SECRET_LIVE_KEY)
+        except Exception:
+            logger.exception("Stripe verify on thank_you failed")
+        else:
+            # Same verified, idempotent function the webhook uses. Never creates a shipment inline.
+            result, paid_order, _ = payments.record_session_payment(sess, source="return")
+            if result in ("applied", "already_applied", "duplicate_payment") and paid_order is not None:
+                if order is None:
+                    order = paid_order  # opened in another browser: show minimal info only
+                    show_details = False
+                elif order.pk != paid_order.pk:
+                    order, show_details = paid_order, False
                 else:
-                    if not paid_order.paid:
-                        paid_order.paid = True
-                        paid_order.save(update_fields=["paid"])
                     order = paid_order
-                    request.session["current_order_id"] = paid_order.pk
-        except Exception as e:
-            logger.error("Stripe verify on thank_you failed: %s", e)
 
-        # Create Econt label after Stripe (card flow) if we can
-        if order:
-            overrides = {}
-
-            if order.delivery_method == DeliveryMethod.TO_OFFICE:
-                if order.econt_office_code:
-                    overrides["receiver_office_code"] = order.econt_office_code
-            else:
-                street_line = (order.address_line or "") or (getattr(order, "billing_street", "") or "")
-                street, num = _split_street_num(street_line)
-                overrides["receiver_street"] = street
-                if num:
-                    overrides["receiver_num"] = num
-
-                postcode = (
-                        getattr(order, "postal_code", "")
-                        or getattr(order, "billing_postcode", "")
-                        or getattr(order, "billing_postal_code", "")
-                )
-                if postcode:
-                    overrides["receiver_postcode"] = postcode
-
-            try:
-                create_econt_label(order, overrides=overrides)
-            except Exception as e:
-                logger.error("Econt label after Stripe failed for order %s: %s", order.pk, e)
-
-    # clear session so refresh doesn’t reuse the same order
-    request.session.pop("current_order_id", None)
-    return render(request, "checkout/thank_you.html", {"order": order})
+    if order is not None:
+        order.refresh_from_db()
+        finished = order.payment_status == PaymentStatus.PAID or order.cod_confirmed_at
+        if finished and request.session.get(SESSION_KEY) == order.pk:
+            request.session.pop(SESSION_KEY, None)  # finished: refresh must not reuse the order
+    return render(request, "checkout/thank_you.html", {"order": order, "show_details": show_details})
 
 
 # ---------- AJAX helpers ----------
 @require_POST
-def checkout_inline_update(request):
-    order = _get_current_order(request)
-    if not order:
-        return JsonResponse({"ok": False, "error": "No current order"}, status=404)
-
-    pm = request.POST.get("payment_method")
-    dm = request.POST.get("delivery_method")
-    qty = request.POST.get("quantity")
-
-    changed = False
-
-    if pm:
-        order.payment_method = pm
-        changed = True
-
-    if dm:
-        order.delivery_method = DeliveryMethod.TO_ADDRESS if dm == "address" else DeliveryMethod.TO_OFFICE
-        changed = True
-
-    if qty:
-        try:
-            q = int(qty)
-            if q > 0:
-                order.quantity = q
-                order.recompute_totals()
-                changed = True
-        except ValueError:
-            pass
-
-    if changed:
-        order.save()
-
-    return JsonResponse({"ok": True})
-
-
-@require_POST
 def checkout_save_inline(request):
-    order = _get_current_order(request)
-    if not order:
-        order = Order.objects.create()
-        request.session["current_order_id"] = order.pk
+    order = get_session_order(request)
+    if order is None:
+        product = get_single_product()
+        order = _new_order(request, product) if product else None
+        if order is None:
+            return JsonResponse({"ok": False, "error": "Твърде много заявки."}, status=429)
 
-    for field in [
-        "billing_full_name",
-        "billing_email",
-        "billing_phone",
-        "billing_city",
-        "billing_street",
-        "billing_postcode",
-    ]:
+    if not ensure_editable(order):
+        return JsonResponse({"ok": False, "error": "locked"}, status=409)
+
+    error, touched = apply_selection(order, request.POST)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+
+    for field, maxlen in BILLING_LIMITS.items():
         val = request.POST.get(field)
         if val is not None:
-            setattr(order, field, val)
+            val = val.strip()
+            if len(val) > maxlen:
+                return JsonResponse({"ok": False, "error": "Твърде дълга стойност."}, status=400)
+            if val != getattr(order, field):
+                setattr(order, field, val)
+                touched.add(field)
 
     same = request.POST.get("ship_same_as_billing")
     if same is not None:
         order.ship_same_as_billing = (same == "true")
+        touched.add("ship_same_as_billing")
 
-    dm = request.POST.get("delivery_method")
-    if dm == "address":
-        order.delivery_method = DeliveryMethod.TO_ADDRESS
-    elif dm == "office":
-        order.delivery_method = DeliveryMethod.TO_OFFICE
-
-    pm = request.POST.get("payment_method")
-    if pm:
-        if pm == "card":
-            order.payment_method = PaymentMethod.CARD
-        else:
-            order.payment_method = PaymentMethod.COD
-
-    order.save()
+    if touched:
+        order.save(update_fields=sorted(touched))
     return JsonResponse({"ok": True})
 
 
 @require_GET
-def checkout_summary(request, order_id=None):
-    if order_id is not None:
-        order = get_object_or_404(Order, pk=order_id)
-        request.session["current_order_id"] = order.pk
-    else:
-        order = _get_current_order(request)
-        if not order:
-            messages.error(request, "Няма активна поръчка.")
-            return redirect("checkout_info")
+def checkout_summary(request):
+    order = get_session_order(request)
+    if not order:
+        messages.error(request, "Няма активна поръчка.")
+        return redirect("checkout_info")
 
     item = order.items.first()
     product = item.product if item else get_single_product()
-
     return render(request, "checkout/summary_readonly.html", {"order": order, "product": product})
 
 
 @require_POST
 def checkout_confirm_cod(request):
-    order = _get_current_order(request)
+    order = get_session_order(request)
     if not order:
         messages.error(request, "Няма активна поръчка.")
         return redirect("checkout_info")
 
+    if order.payment_status == PaymentStatus.PAID:
+        return redirect("thank_you")  # already paid by card: never turn it into cash on delivery
     if order.payment_method != PaymentMethod.COD:
         messages.error(request, "Тази поръчка не е с наложен платеж.")
         return redirect("checkout_summary")
+    if order.cod_confirmed_at and order.shipment_status != ShipmentStatus.NONE:
+        return redirect("thank_you")  # double submit
 
-    res = create_econt_label(order, overrides={})
-    if not res.get("ok"):
-        messages.error(request, f"Грешка при Еконт: {res.get('error') or 'Неуспешно създаване на товарителница.'}")
+    err = readiness_error(order)
+    if err:
+        messages.error(request, err)
+        return redirect("checkout_info")
+
+    # a card attempt that is still open must be made un-payable before we confirm cash on delivery
+    if order.payment_status == PaymentStatus.PENDING and not payments.release_pending_payment(order.pk):
+        messages.error(request, "Плащането с карта е в процес на обработка. Моля, изчакайте.")
+        return redirect("checkout_summary")
+    order.refresh_from_db()
+    if order.payment_status == PaymentStatus.PAID:
+        return redirect("thank_you")
+
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        if locked.cod_confirmed_at is None:
+            locked.cod_confirmed_at = timezone.now()
+            locked.save(update_fields=["cod_confirmed_at"])
+            locked.log_event("cod_confirmed", "customer confirmed cash on delivery")
+    fulfillment.request_shipment(order.pk)
+    outcome = fulfillment.attempt_shipment(order.pk, interactive=True)
+
+    if outcome == "rejected":
+        # Econt refused the data (definitive, nothing created): let the customer correct it
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            locked.cod_confirmed_at = None
+            locked.save(update_fields=["cod_confirmed_at"])
+            locked.transition_shipment(ShipmentStatus.NONE)
+        messages.error(request, f"Грешка при Еконт: {locked.econt_errors or 'Неуспешно създаване на товарителница.'}")
         return redirect("checkout_summary")
 
     try:
-        send_order_notification(order, event="created")
+        notify_order_accepted(Order.objects.get(pk=order.pk), event="created")
     except Exception:
-        pass
-
+        logger.exception("notification failed for order %s", order.pk)
     return redirect("thank_you")

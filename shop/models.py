@@ -1,9 +1,9 @@
-from django.db import models
-
-# Create your models here.
-from django.db import models
-from django.utils.translation import gettext_lazy as _
+import uuid
 from decimal import Decimal, ROUND_HALF_UP
+
+from django.db import models
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 BGN_PER_EUR = Decimal("1.95583")
 
@@ -40,6 +40,50 @@ class PaymentMethod(models.TextChoices):
     COD = "cod", _("Наложен платеж")
 
 
+CARD_METHODS = {PaymentMethod.CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY}
+
+
+class PaymentStatus(models.TextChoices):
+    """Verified payment state. Only the server (Stripe-verified) may set PAID for card orders."""
+    UNPAID = "unpaid", _("Неплатена")
+    PENDING = "pending", _("Чака плащане")
+    PAID = "paid", _("Платена")
+    FAILED = "failed", _("Неуспешно плащане")
+
+
+class ShipmentStatus(models.TextChoices):
+    """Fulfilment state, deliberately separate from payment state."""
+    NONE = "none", _("Няма заявка")
+    PENDING = "pending", _("Чака изпращане към Еконт")
+    IN_PROGRESS = "in_progress", _("Изпраща се към Еконт")
+    CREATED = "created", _("Товарителница създадена")
+    FAILED = "failed", _("Грешка при Еконт")
+    UNKNOWN = "unknown", _("Неясен резултат (проверка)")
+
+
+class InvalidTransition(Exception):
+    pass
+
+
+PAYMENT_TRANSITIONS = {
+    PaymentStatus.UNPAID: {PaymentStatus.PENDING, PaymentStatus.PAID, PaymentStatus.FAILED},
+    PaymentStatus.PENDING: {PaymentStatus.UNPAID, PaymentStatus.PAID, PaymentStatus.FAILED},
+    PaymentStatus.FAILED: {PaymentStatus.UNPAID, PaymentStatus.PENDING, PaymentStatus.PAID},
+    PaymentStatus.PAID: set(),  # terminal - refunds are handled manually in Stripe
+}
+
+SHIPMENT_TRANSITIONS = {
+    ShipmentStatus.NONE: {ShipmentStatus.PENDING},
+    ShipmentStatus.PENDING: {ShipmentStatus.IN_PROGRESS, ShipmentStatus.NONE},
+    ShipmentStatus.IN_PROGRESS: {
+        ShipmentStatus.CREATED, ShipmentStatus.FAILED, ShipmentStatus.UNKNOWN, ShipmentStatus.PENDING,
+    },
+    ShipmentStatus.FAILED: {ShipmentStatus.PENDING, ShipmentStatus.NONE},
+    ShipmentStatus.UNKNOWN: {ShipmentStatus.CREATED, ShipmentStatus.PENDING},
+    ShipmentStatus.CREATED: set(),
+}
+
+
 def _bgn_to_eur(amount_bgn: Decimal) -> Decimal:
     return (amount_bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
@@ -56,6 +100,16 @@ class Order(models.Model):
     city = models.CharField(max_length=120, blank=True, verbose_name=_("Град"))
     postal_code = models.CharField(max_length=16, blank=True, verbose_name=_("Пощенски код"))
     office_text = models.CharField(max_length=255, blank=True, verbose_name=_("Офис / АПС"))
+    # Structured receiver address (Econt requires street and number separately). `address_line` is the
+    # human-readable combination; these fields are what the shipment payload is built from.
+    receiver_street = models.CharField(max_length=255, blank=True, default="")
+    receiver_num = models.CharField(max_length=32, blank=True, default="")
+    receiver_entrance = models.CharField(max_length=16, blank=True, default="")
+    receiver_floor = models.CharField(max_length=16, blank=True, default="")
+    receiver_apartment = models.CharField(max_length=16, blank=True, default="")
+    # Econt asks for these when a street exists in several quarters / for "ж.к." addresses (needs a block)
+    receiver_quarter = models.CharField(max_length=64, blank=True, default="")
+    receiver_other = models.CharField(max_length=128, blank=True, default="")
 
     quantity = models.PositiveIntegerField(default=1)
     subtotal_bgn = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -78,6 +132,7 @@ class Order(models.Model):
         default=PaymentMethod.CARD,
         verbose_name=_("Метод на плащане"),
     )
+    # Legacy flag, kept in sync with payment_status by Order.transition_payment(); never edit directly.
     paid = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -98,14 +153,138 @@ class Order(models.Model):
     # If True, prefill shipping on the next step with the billing data (you already use this in the view)
     ship_same_as_billing = models.BooleanField(default=True, verbose_name=_("Използвай фактурния адрес за доставка"))
 
+    # --- Unguessable public identifier (never expose the sequential pk in URLs) ---
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    # --- Verified payment state (source of truth; `payment_method` is only the customer's choice) ---
+    payment_status = models.CharField(
+        max_length=16, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID, db_index=True,
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    paid_amount_minor = models.PositiveIntegerField(null=True, blank=True)
+    paid_currency = models.CharField(max_length=3, blank=True, default="")
+    stripe_payment_intent_id = models.CharField(max_length=80, blank=True, default="", db_index=True)
+
+    # COD must be explicitly confirmed by the customer before anything is shipped.
+    cod_confirmed_at = models.DateTimeField(null=True, blank=True)
+    # Set when Econt returned a live price for the current address/method; cleared when delivery data changes.
+    shipping_quoted_at = models.DateTimeField(null=True, blank=True)
+
+    # --- Fulfilment state ---
+    shipment_status = models.CharField(
+        max_length=16, choices=ShipmentStatus.choices, default=ShipmentStatus.NONE, db_index=True,
+    )
+    shipment_attempts = models.PositiveSmallIntegerField(default=0)
+    shipment_next_attempt_at = models.DateTimeField(null=True, blank=True)
+    shipment_claimed_at = models.DateTimeField(null=True, blank=True)
+    # What we actually asked Econt to collect (recorded at submission, for audit/reconciliation).
+    econt_cod_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    econt_cod_currency = models.CharField(max_length=3, blank=True, default="")
+    econt_receiver_pays_delivery = models.BooleanField(null=True, blank=True)
+    econt_label_url = models.URLField(max_length=500, blank=True, default="")
+
+    # --- Operator attention ---
+    needs_review = models.BooleanField(default=False, db_index=True)
+    review_reason = models.TextField(blank=True, default="")
+    notified_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         verbose_name = _("Поръчка")
         verbose_name_plural = _("Поръчки")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["econt_shipment_num"],
+                condition=Q(econt_shipment_num__isnull=False) & ~Q(econt_shipment_num=""),
+                name="uniq_order_econt_shipment_num",
+            ),
+            models.CheckConstraint(
+                condition=~Q(shipment_status="created")
+                          | (Q(econt_shipment_num__isnull=False) & ~Q(econt_shipment_num="")),
+                name="order_created_shipment_has_number",
+            ),
+        ]
 
     def __str__(self):
         return f"Order #{self.id or '—'} — {self.full_name}"
 
+    # ------------------------------------------------------------------ state helpers
+    @property
+    def is_card(self) -> bool:
+        return self.payment_method in CARD_METHODS
+
+    @property
+    def is_locked(self) -> bool:
+        """Once a payment attempt exists / money moved / a label exists, checkout data is frozen."""
+        return (
+            self.payment_status in (PaymentStatus.PENDING, PaymentStatus.PAID)
+            or self.cod_confirmed_at is not None
+            or self.shipment_status != ShipmentStatus.NONE
+        )
+
+    @property
+    def delivery_ready(self) -> bool:
+        """Complete, quoted delivery data - required before taking money or confirming COD."""
+        if not (self.full_name or "").strip() or not (self.phone or "").strip() or not (self.city or "").strip():
+            return False
+        if self.delivery_method == DeliveryMethod.TO_OFFICE:
+            ok = bool((self.econt_office_code or "").strip())
+        else:
+            ok = (
+                bool((self.receiver_street or "").strip())
+                and bool((self.receiver_num or "").strip())
+                and bool((self.postal_code or "").strip())
+            )
+        return ok and self.shipping_quoted_at is not None
+
+    def log_event(self, kind: str, message: str = "", **data):
+        return OrderEvent.objects.create(order=self, kind=kind, message=message[:255], data=data)
+
+    def flag_review(self, reason: str, save: bool = True):
+        """Make an ambiguous/inconsistent state visible to operators. Idempotent per reason."""
+        if reason not in (self.review_reason or ""):
+            self.review_reason = (f"{self.review_reason}\n" if self.review_reason else "") + reason
+        self.needs_review = True
+        if save and self.pk:
+            Order.objects.filter(pk=self.pk).update(needs_review=True, review_reason=self.review_reason)
+            self.log_event("review_flagged", reason)
+
+    def transition_payment(self, new, save: bool = True):
+        new = PaymentStatus(new)
+        old = PaymentStatus(self.payment_status)
+        if new == old:
+            return
+        if new not in PAYMENT_TRANSITIONS[old]:
+            raise InvalidTransition(f"payment {old} -> {new} not allowed (order {self.pk})")
+        self.payment_status = new
+        if new == PaymentStatus.PAID:
+            self.paid = True
+        if save:
+            self.save(update_fields=["payment_status", "paid"])
+            self.log_event("payment_status", f"{old} -> {new}")
+
+    def transition_shipment(self, new, save: bool = True, extra_fields=()):
+        new = ShipmentStatus(new)
+        old = ShipmentStatus(self.shipment_status)
+        if new == old:
+            return
+        if new not in SHIPMENT_TRANSITIONS[old]:
+            raise InvalidTransition(f"shipment {old} -> {new} not allowed (order {self.pk})")
+        self.shipment_status = new
+        if save:
+            self.save(update_fields=["shipment_status", *extra_fields])
+            self.log_event("shipment_status", f"{old} -> {new}")
+
+    def set_quantity(self, qty: int):
+        """Single place that keeps Order.quantity and the OrderItem in sync."""
+        self.quantity = qty
+        self.items.update(quantity=qty)
+
+    def invalidate_quote(self):
+        """Delivery data changed: the previous Econt price/quote is no longer valid."""
+        self.shipping_quoted_at = None
+
+    # ------------------------------------------------------------------ display helpers
     def billing_full_address(self) -> str:
         parts = [
             self.billing_city,
@@ -129,7 +308,12 @@ class Order(models.Model):
         ВАЖНО:
         - Ако вече имаме реална цена от Еконт (shipping_bgn > 0),
           НЕ я пипаме, само синхронизираме EUR.
+        - Placeholder стойностите НЕ са цена за плащане: плащане/потвърждение
+          се позволява само когато shipping_quoted_at е зададено (виж delivery_ready).
         """
+        if self.shipping_quoted_at and self.shipping_eur and self.shipping_eur > 0 \
+                and self.shipping_bgn and self.shipping_bgn > 0:
+            return  # both currencies come from the same Econt quote; do not re-derive (avoids 1-cent drift)
         if self.shipping_bgn and self.shipping_bgn > 0:
             # вече имаме цена от Еконт → само синхронизираме евро
             self.shipping_eur = _bgn_to_eur(self.shipping_bgn)
@@ -154,17 +338,6 @@ class Order(models.Model):
         self.total_bgn = sbgn + self.shipping_bgn
         self.total_eur = seur + self.shipping_eur
 
-    # def save(self, *args, **kwargs):
-    #     creating = self.pk is None
-    #     super().save(*args, **kwargs)  # first save to obtain PK if creating
-    #     # Only recompute when there are items; skip on the very first save
-    #     if self.items.exists():
-    #         self.recompute_totals()
-    #         super().save(update_fields=[
-    #             "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur",
-    #             "total_bgn", "total_eur"
-    #         ])
-
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
@@ -179,3 +352,101 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} x{self.quantity}"
+
+
+class PaymentAttempt(models.Model):
+    """One Stripe Checkout Session created for an order, with the amount we expect to be paid."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", "open"
+        PAID = "paid", "paid"
+        EXPIRED = "expired", "expired"
+        FAILED = "failed", "failed"
+        SUPERSEDED = "superseded", "superseded"
+
+    order = models.ForeignKey(Order, related_name="payment_attempts", on_delete=models.CASCADE)
+    stripe_session_id = models.CharField(max_length=120, unique=True)
+    payment_intent_id = models.CharField(max_length=120, blank=True, default="")
+    amount_minor = models.PositiveIntegerField()
+    currency = models.CharField(max_length=3)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
+    checkout_url = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.stripe_session_id} ({self.status})"
+
+
+class StripeEvent(models.Model):
+    """Durable webhook de-duplication / audit. event_id is unique: each Stripe event is processed once."""
+
+    class Status(models.TextChoices):
+        RECEIVED = "received", "received"
+        PROCESSED = "processed", "processed"
+        IGNORED = "ignored", "ignored"
+        REJECTED = "rejected", "rejected"  # verified event that did not match our records
+        ERROR = "error", "error"  # processing raised: Stripe will retry
+
+    event_id = models.CharField(max_length=80, unique=True)
+    event_type = models.CharField(max_length=80)
+    livemode = models.BooleanField(default=False)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.RECEIVED)
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name="stripe_events")
+    detail = models.TextField(blank=True, default="")
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-received_at"]
+
+    def __str__(self):
+        return f"{self.event_id} {self.event_type} {self.status}"
+
+
+class OrderEvent(models.Model):
+    """Append-only audit trail of payment and shipping changes. Never store personal data in `data`."""
+    order = models.ForeignKey(Order, related_name="events", on_delete=models.CASCADE)
+    kind = models.CharField(max_length=40, db_index=True)
+    message = models.CharField(max_length=255, blank=True, default="")
+    data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"#{self.order_id} {self.kind}"
+
+
+class ShipmentAttempt(models.Model):
+    """One call to Econt createLabel. The row is written BEFORE the call so a crash is visible afterwards."""
+
+    class Outcome(models.TextChoices):
+        STARTED = "started", "started (no result recorded)"
+        CREATED = "created", "created"
+        REJECTED = "rejected", "rejected by Econt (definitive)"
+        NOT_SENT = "not_sent", "request never reached Econt"
+        UNKNOWN = "unknown", "unknown - Econt may have created it"
+
+    order = models.ForeignKey(Order, related_name="shipment_attempts_log", on_delete=models.CASCADE)
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    number = models.PositiveSmallIntegerField(default=1)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    outcome = models.CharField(max_length=16, choices=Outcome.choices, default=Outcome.STARTED, db_index=True)
+    http_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    shipment_num = models.CharField(max_length=64, blank=True, default="")
+    error = models.TextField(blank=True, default="")
+    request_summary = models.JSONField(default=dict, blank=True)
+    response_summary = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"order {self.order_id} attempt {self.number} {self.outcome}"

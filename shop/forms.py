@@ -1,5 +1,6 @@
 # shop/forms.py
 from django import forms
+from django.conf import settings
 from django.core.validators import RegexValidator
 from .models import Order, PaymentMethod
 
@@ -18,6 +19,7 @@ class CheckoutInfoForm(forms.ModelForm):
     # keep your existing quantity setup
     quantity = forms.IntegerField(
         min_value=1,
+        max_value=settings.MAX_ORDER_QUANTITY,
         initial=1,
         widget=forms.NumberInput(attrs={"class": "qty-input", "inputmode": "numeric"}),
         label="",

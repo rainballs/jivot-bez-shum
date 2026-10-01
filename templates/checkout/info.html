@@ -232,6 +232,14 @@
     </style>
 
     <script>
+        // Econt nomenclature values are interpolated into innerHTML templates: always escape them.
+        function escHtml(v) {
+            return String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[ch]));
+        }
+    </script>
+<script>
 
         // parse a single-line BG address into parts
         function splitAddressBG(raw) {
@@ -367,6 +375,17 @@
                 if (bc) fd.append("billing_city", bc.value);
                 if (bs) fd.append("billing_street", bs.value);
                 if (bpc) fd.append("billing_postcode", bpc.value);
+                appendSelections(fd);
+            }
+
+            // Final selections travel WITH the submit; the server validates and stores them atomically with the quote.
+            function appendSelections(fd) {
+                const pay = document.querySelector('.pay-tiles input[type="radio"]:checked');
+                const dm = document.querySelector('input[name="delivery_method"]:checked');
+                const qty = document.querySelector('input[name="quantity"]');
+                if (pay) fd.set("payment_method", pay.value);
+                if (dm) fd.set("delivery_method", dm.value);
+                if (qty && qty.value) fd.set("quantity", qty.value);
             }
 
             /* ====== 1) shipping preview + total includes delivery ====== */
@@ -721,8 +740,8 @@
                     }
                     const filtered = cities.filter(c => (c.name || '').toLowerCase().includes(q));
                     cityBox.innerHTML = filtered.map(c => `
-                <div class="suggest-item" data-id="${c.id}" data-name="${c.name}">
-                    ${c.name} ${c.postCode ? '(' + c.postCode + ')' : ''}
+                <div class="suggest-item" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}">
+                    ${escHtml(c.name)} ${c.postCode ? '(' + escHtml(c.postCode) + ')' : ''}
                 </div>`).join('');
                     cityBox.style.display = filtered.length ? 'block' : 'none';
                 }
@@ -785,9 +804,9 @@
                         return;
                     }
                     officeList.innerHTML = filtered.map(o => `
-                <div class="office-item" data-code="${o.code}" data-name="${o.name}" data-addr="${o.address || ''}">
-                    <div class="office-name">${o.name} <span class="muted">(#${o.code})</span></div>
-                    <div class="muted small">${o.address || ''}</div>
+                <div class="office-item" data-code="${escHtml(o.code)}" data-name="${escHtml(o.name)}" data-addr="${escHtml(o.address || '')}">
+                    <div class="office-name">${escHtml(o.name)} <span class="muted">(#${escHtml(o.code)})</span></div>
+                    <div class="muted small">${escHtml(o.address || '')}</div>
                 </div>`).join('');
                 }
 
@@ -846,6 +865,7 @@
                         if (topName) fd.set("full_name", topName.value);
                         if (topPhone) fd.set("phone", topPhone.value);
                         if (topCity) fd.set("city", topCity.value);
+                        appendSelections(fd);
 
                         fetch(submitUrl, {
                             method: "POST",

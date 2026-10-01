@@ -7,13 +7,13 @@
             <h1>Благодарим за поръчката!</h1>
             {% if order %}
                 <p>Номер на поръчка: <strong>#{{ order.id }}</strong></p>
-                <p>Статус: {% if order.paid %}<strong>Платена</strong>{% else %}Чака плащане{% endif %}</p>
-                <p>Крайна сума: <strong>€ {{ order.total_eur }}</strong> / <strong>{{ order.total_bgn }} лв</strong></p>
-                <p>Ще се свържем с вас на {{ order.email }}.</p>
-                {% if order and order.econt_label_pdf %}
-                    <p><a href="{{ order.econt_label_pdf.url }}" target="_blank" rel="noopener">
-                        Принтирай товарителница (Econt)
-                    </a></p>
+                <p>Статус:
+                    {% if order.payment_status == "paid" %}<strong>Платена</strong>
+                    {% elif order.cod_confirmed_at %}<strong>Потвърдена – плащане при доставка</strong>
+                    {% else %}Чака плащане{% endif %}</p>
+                {% if show_details %}
+                    <p>Крайна сума: <strong>€ {{ order.total_eur }}</strong> / <strong>{{ order.total_bgn }} лв</strong></p>
+                    <p>Ще се свържем с вас на {{ order.email }}.</p>
                 {% endif %}
             {% else %}
                 <p>Поръчката е завършена.</p>

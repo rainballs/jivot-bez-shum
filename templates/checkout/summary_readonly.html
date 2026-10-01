@@ -189,9 +189,12 @@
                                     </button>
                                 </form>
                             {% else %}
-                                <a href="{% url 'stripe_create_session' %}" class="btn btn-primary">
-                                    Плати с карта
-                                </a>
+                                <form method="post" action="{% url 'stripe_create_session' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary">
+                                        Плати с карта
+                                    </button>
+                                </form>
                             {% endif %}
                         </div>
                     </div>
@@ -224,8 +227,8 @@
                             <div class="row">
                                 <span>Доставка (Еконт)</span>
                                 <span>
-        {% if order.shipping_bgn %}
-            {{ order.shipping_bgn|floatformat:2 }} €
+        {% if order.shipping_quoted_at %}
+            {{ order.shipping_eur|floatformat:2 }} €
         {% else %}
             – €
         {% endif %}
