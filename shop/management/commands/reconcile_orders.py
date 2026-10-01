@@ -115,7 +115,7 @@ class Command(BaseCommand):
         if o.payment_method == PaymentMethod.COD and not paid_by_card and cd <= 0:
             f.append(("ECONT_NO_COD_ON_COD_ORDER", VERIFIED, "COD order but Econt shows no COD amount"))
         elif o.payment_method == PaymentMethod.COD and not paid_by_card and o.subtotal_eur                 and abs(cd - Decimal(str(o.subtotal_eur))) > Decimal("0.05"):
-            # getMyAWB reports amounts in EUR; Econt converts the BGN amount we send (verified on demo)
+            # getMyAWB reports amounts in EUR (old BGN orders were converted by Econt - verified on demo)
             f.append(("ECONT_COD_AMOUNT_MISMATCH", VERIFIED,
                       f"Econt COD {cd} EUR differs from goods value {o.subtotal_eur} EUR"))
         return f

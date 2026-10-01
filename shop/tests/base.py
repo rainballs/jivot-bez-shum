@@ -133,8 +133,7 @@ def stripe_event(session, etype="checkout.session.completed", event_id=None, liv
 
 # ------------------------------------------------------------------------------------- factories
 def make_product():
-    return Product.objects.create(name="Живот без шум", slug="book", price_bgn=Decimal("25.00"),
-                                  price_eur=Decimal("12.78"))
+    return Product.objects.create(name="Живот без шум", slug="book", price_eur=Decimal("12.78"))
 
 
 def make_order(product=None, *, qty=1, method=PaymentMethod.CARD, delivery=DeliveryMethod.TO_ADDRESS,
@@ -150,11 +149,9 @@ def make_order(product=None, *, qty=1, method=PaymentMethod.CARD, delivery=Deliv
         base.update(econt_office_code="1000", office_text="Офис София")
     base.update(fields)
     order = Order.objects.create(**base)
-    OrderItem.objects.create(order=order, product=product, quantity=qty,
-                             unit_price_bgn=product.price_bgn, unit_price_eur=product.price_eur)
+    OrderItem.objects.create(order=order, product=product, quantity=qty, unit_price_eur=product.price_eur)
     if quoted:
         order.shipping_eur = Decimal("5.94")
-        order.shipping_bgn = Decimal("11.62")
         order.shipping_quoted_at = timezone.now()
     order.recompute_totals()
     order.save()

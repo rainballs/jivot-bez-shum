@@ -246,9 +246,9 @@ def build_create_label_json(
         weight_kg: float = 0.8,
         parcels: int = 1,
         cod_amount=0,
-        cod_currency: str = "BGN",
+        cod_currency: str = "EUR",
         declared_value=0,
-        declared_currency: str = "BGN",
+        declared_currency: str = "EUR",
         receiver_pays_delivery: bool = False,
         label_format: str = "10x9",
         cod_agreement_number: str | None = None,
@@ -397,7 +397,7 @@ def build_packing_list_from_order(order) -> list[dict]:
     """
     Econt packingList (array of PackingListElement) from the order's items.
       inventoryNum -> SKU/index, description -> product name, weight -> kg for the row,
-      count -> qty, price -> unit price (BGN)
+      count -> qty, price -> unit price (EUR)
     """
     UNIT_WEIGHT_KG = Decimal("0.400")
     packing = []
@@ -408,6 +408,6 @@ def build_packing_list_from_order(order) -> list[dict]:
             "description": str(it.product.name),
             "weight": float((UNIT_WEIGHT_KG * Decimal(qty)).quantize(Decimal("0.001"))),
             "count": qty,
-            "price": float(it.unit_price_bgn or 0),
+            "price": float(it.unit_price_eur or 0),
         })
     return packing

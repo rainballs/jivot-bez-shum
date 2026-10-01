@@ -74,7 +74,7 @@ def plan_for_order(order: Order, *, for_create: bool) -> ShipmentPlan:
 
     for_create=False is used for quoting/validation BEFORE payment, from the customer's selection.
     """
-    cur = str(settings.ECONT["DEFAULTS"].get("cod_currency", "BGN")).upper()
+    cur = "EUR"
 
     if order.payment_status == PaymentStatus.PAID:
         return ShipmentPlan("prepaid", Decimal("0"), cur, False)
@@ -82,8 +82,7 @@ def plan_for_order(order: Order, *, for_create: bool) -> ShipmentPlan:
     if order.payment_method == PaymentMethod.COD:
         if for_create and not order.cod_confirmed_at:
             raise NotFulfillable("COD order has not been confirmed by the customer")
-        amount = order.subtotal_eur if cur == "EUR" else order.subtotal_bgn
-        amount = Decimal(str(amount or 0)).quantize(Decimal("0.01"))
+        amount = Decimal(str(order.subtotal_eur or 0)).quantize(Decimal("0.01"))
         if amount <= 0:
             raise NotFulfillable("COD order with zero merchandise amount")
         return ShipmentPlan("cod", amount, cur, True)
@@ -106,7 +105,7 @@ def build_label_for_order(order: Order, plan: ShipmentPlan) -> dict:
     city = (order.city or order.billing_city or "").strip()
     qty = int(order.quantity or 1)
     weight = max(0.8, round(0.4 * qty, 3))
-    subtotal_bgn = Decimal(str(order.subtotal_bgn or 0))
+    subtotal_eur = Decimal(str(order.subtotal_eur or 0))
 
     cod = plan.cod_amount if plan.kind == "cod" else Decimal("0")
     return build_create_label_json(
@@ -131,8 +130,8 @@ def build_label_for_order(order: Order, plan: ShipmentPlan) -> dict:
         parcels=1,
         cod_amount=cod,
         cod_currency=plan.cod_currency,
-        declared_value=subtotal_bgn,
-        declared_currency="BGN",
+        declared_value=subtotal_eur,
+        declared_currency="EUR",
         receiver_pays_delivery=plan.receiver_pays_delivery,
         label_format=d.get("label_format", "10x9"),
         cod_agreement_number=d.get("cod_agreement_number") if cod > 0 else None,

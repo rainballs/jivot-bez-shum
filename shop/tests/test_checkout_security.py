@@ -362,7 +362,8 @@ class CodConfirmationTests(CheckoutBase):
         self.assertEqual(c.post("/checkout/confirm-cod/").status_code, 302)
         self.assertEqual(len(self.econt.creates()), 1)
         sent = self.econt.creates()[0]
-        self.assertEqual(sent["services"]["cdAmount"], 25.0)
+        self.assertEqual(sent["services"]["cdAmount"], 12.78)
+        self.assertEqual(sent["services"]["cdCurrency"], "EUR")
         self.assertEqual(sent["paymentReceiverMethod"], "CASH")
         order.refresh_from_db()
         self.assertEqual(order.shipment_status, ShipmentStatus.CREATED)

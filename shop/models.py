@@ -5,13 +5,13 @@ from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-BGN_PER_EUR = Decimal("1.95583")
-
 
 class Product(models.Model):
     name = models.CharField(max_length=200, verbose_name=_("Име"))
     slug = models.SlugField(max_length=220, unique=True)
-    price_bgn = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_("Цена (лв)"))
+    # The shop sells in EUR only. price_bgn is a legacy column kept for old data; it is no longer used anywhere.
+    price_bgn = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False,
+                                    verbose_name=_("Цена (лв) - остаряло"))
     price_eur = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_("Цена (€)"))
     image = models.ImageField(upload_to="products/", blank=True, null=True, verbose_name=_("Изображение"))
     is_active = models.BooleanField(default=True)
@@ -84,10 +84,6 @@ SHIPMENT_TRANSITIONS = {
 }
 
 
-def _bgn_to_eur(amount_bgn: Decimal) -> Decimal:
-    return (amount_bgn / BGN_PER_EUR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
 class Order(models.Model):
     full_name = models.CharField(max_length=150, verbose_name=_("Име и фамилия"))
     email = models.EmailField(verbose_name=_("Имейл адрес"))
@@ -112,6 +108,8 @@ class Order(models.Model):
     receiver_other = models.CharField(max_length=128, blank=True, default="")
 
     quantity = models.PositiveIntegerField(default=1)
+    # Amounts are in EUR. The *_bgn columns only hold the values of old orders (kept for history, never written
+    # or displayed any more).
     subtotal_bgn = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     subtotal_eur = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     shipping_bgn = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -301,49 +299,32 @@ class Order(models.Model):
         parts = [self.city, self.address_line, self.postal_code, self.office_text]
         return ", ".join(p for p in parts if p)
 
+    # Placeholder delivery estimate (EUR) shown before Econt has quoted the real price. It is NEVER charged:
+    # payment and COD confirmation require shipping_quoted_at (see delivery_ready).
+    ESTIMATE_SHIPPING_ADDRESS = Decimal("4.60")
+    ESTIMATE_SHIPPING_OFFICE = Decimal("3.58")
+
     def set_shipping_flat(self):
-        """
-        Default доставка: 9.00 лв до адрес, 7.00 лв до офис.
-
-        ВАЖНО:
-        - Ако вече имаме реална цена от Еконт (shipping_bgn > 0),
-          НЕ я пипаме, само синхронизираме EUR.
-        - Placeholder стойностите НЕ са цена за плащане: плащане/потвърждение
-          се позволява само когато shipping_quoted_at е зададено (виж delivery_ready).
-        """
-        if self.shipping_quoted_at and self.shipping_eur and self.shipping_eur > 0 \
-                and self.shipping_bgn and self.shipping_bgn > 0:
-            return  # both currencies come from the same Econt quote; do not re-derive (avoids 1-cent drift)
-        if self.shipping_bgn and self.shipping_bgn > 0:
-            # вече имаме цена от Еконт → само синхронизираме евро
-            self.shipping_eur = _bgn_to_eur(self.shipping_bgn)
+        """Keep a real Econt price if there is one; otherwise use the placeholder estimate for the method."""
+        if self.shipping_eur and self.shipping_eur > 0:
             return
-
-        # иначе – placeholder 9 / 7 лв (преди да сме говорили с Еконт)
-        if self.delivery_method == DeliveryMethod.TO_ADDRESS:
-            ship_bgn = Decimal("9.00")
-        else:
-            ship_bgn = Decimal("7.00")
-
-        self.shipping_bgn = ship_bgn
-        self.shipping_eur = _bgn_to_eur(ship_bgn)
+        self.shipping_eur = (
+            self.ESTIMATE_SHIPPING_ADDRESS if self.delivery_method == DeliveryMethod.TO_ADDRESS
+            else self.ESTIMATE_SHIPPING_OFFICE
+        )
 
     def recompute_totals(self):
         items = list(self.items.all())
-        sbgn = sum((i.unit_price_bgn * i.quantity for i in items), start=Decimal("0"))
-        seur = sum((i.unit_price_eur * i.quantity for i in items), start=Decimal("0"))
-        self.subtotal_bgn = sbgn
-        self.subtotal_eur = seur
-        self.set_shipping_flat()  # ← uses delivery_method
-        self.total_bgn = sbgn + self.shipping_bgn
-        self.total_eur = seur + self.shipping_eur
+        self.subtotal_eur = sum((i.unit_price_eur * i.quantity for i in items), start=Decimal("0"))
+        self.set_shipping_flat()
+        self.total_eur = self.subtotal_eur + self.shipping_eur
 
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField(default=1)
-    unit_price_bgn = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price_bgn = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False)
     unit_price_eur = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:

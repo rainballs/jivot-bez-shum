@@ -38,7 +38,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.MIGRATE_HEADING(
                 f"\n#{o.pk}  created {o.created_at:%Y-%m-%d}  method={o.payment_method}  "
                 f"payment={o.payment_status}  shipment={o.shipment_status}"))
-            self.stdout.write(f"  we expect : goods {o.subtotal_eur} EUR / {o.subtotal_bgn} BGN, "
+            self.stdout.write(f"  we expect : goods {o.subtotal_eur} EUR, "
                               f"shipping {o.shipping_eur} EUR, total {o.total_eur} EUR; "
                               f"COD requested (new orders only): {o.econt_cod_amount} {o.econt_cod_currency}")
             num = (o.econt_shipment_num or "").strip()

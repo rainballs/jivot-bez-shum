@@ -20,9 +20,9 @@ Items:
 {% endwith %}
 
 Totals:
-- Subtotal: {{ order.subtotal_bgn }} лв / € {{ order.subtotal_eur }}
-- Shipping: {{ order.shipping_bgn }} лв / € {{ order.shipping_eur }}
-- Total: {{ order.total_bgn }} лв / € {{ order.total_eur }}
+- Subtotal: € {{ order.subtotal_eur }}
+- Shipping: € {{ order.shipping_eur }}
+- Total: € {{ order.total_eur }}
 
 Payment:
 - Method: {{ order.get_payment_method_display|default:"Наложен платеж" }}

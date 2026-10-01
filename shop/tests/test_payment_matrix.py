@@ -50,10 +50,10 @@ class PayloadMatrixTests(ShopTestCase):
     def test_genuine_cod_asks_goods_amount_only_and_recipient_pays_delivery(self):
         order = make_order(method=PaymentMethod.COD, qty=2, cod_confirmed_at=timezone.now())
         label = self.label(order)
-        self.assertEqual(order.subtotal_bgn, Decimal("50.00"))
-        self.assertEqual(label["services"]["cdAmount"], 50.0)  # goods only (shipping NOT included)
-        self.assertNotEqual(label["services"]["cdAmount"], float(order.total_bgn))
-        self.assertEqual(label["services"]["cdCurrency"], "BGN")
+        self.assertEqual(order.subtotal_eur, Decimal("25.56"))
+        self.assertEqual(label["services"]["cdAmount"], 25.56)  # goods only (shipping NOT included)
+        self.assertNotEqual(label["services"]["cdAmount"], float(order.total_eur))
+        self.assertEqual(label["services"]["cdCurrency"], "EUR")
         self.assertEqual(label["services"]["cdType"], "get")
         self.assertEqual(label["paymentReceiverMethod"], "CASH")
         self.assertNotIn("paymentReceiverAmount", label)  # used to be set to the COD amount (wrong semantics)
@@ -73,7 +73,7 @@ class PayloadMatrixTests(ShopTestCase):
 
     def test_quote_uses_selected_method(self):
         order = make_order(method=PaymentMethod.COD)
-        self.assertEqual(self.label(order, for_create=False)["services"]["cdAmount"], 25.0)
+        self.assertEqual(self.label(order, for_create=False)["services"]["cdAmount"], 12.78)
 
     def test_delivery_method_decides_office_vs_address_not_stale_fields(self):
         order = make_order(method=PaymentMethod.CARD, delivery=DeliveryMethod.TO_ADDRESS, econt_office_code="9999")
@@ -99,7 +99,9 @@ class PayloadMatrixTests(ShopTestCase):
         order = paid(make_order(qty=3))
         label = self.label(order)
         self.assertEqual(label["packingList"][0]["count"], 3)
-        self.assertEqual(label["services"]["declaredValueAmount"], 75.0)
+        self.assertEqual(label["services"]["declaredValueAmount"], 38.34)
+        self.assertEqual(label["services"]["declaredValueCurrency"], "EUR")
+        self.assertEqual(label["packingList"][0]["price"], 12.78)  # unit price in EUR
         self.assertGreaterEqual(label["weight"], 1.2)
 
 
@@ -126,7 +128,8 @@ class EndToEndMatrixTests(ShopTestCase):
         order = make_order(method=PaymentMethod.COD, cod_confirmed_at=timezone.now())
         self.assertEqual(self.run_shipment(order), "created")
         order.refresh_from_db()
-        self.assertEqual(order.econt_cod_amount, Decimal("25.00"))
+        self.assertEqual(order.econt_cod_amount, Decimal("12.78"))
+        self.assertEqual(order.econt_cod_currency, "EUR")
         self.assertTrue(order.econt_receiver_pays_delivery)
         self.assertFalse(order.needs_review)
 

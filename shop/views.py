@@ -34,7 +34,6 @@ from .models import (
     Product,
     ShipmentStatus,
     StripeEvent,
-    _bgn_to_eur,
 )
 from .utils import notify_order_accepted
 
@@ -50,14 +49,11 @@ def get_single_product():
 
 
 def _safe_product_price_eur(product: Product) -> Decimal:
-    """Prefer product.price_eur; fall back to converting price_bgn."""
+    """The product price in EUR (the only currency the shop uses)."""
     p = getattr(product, "price_eur", None)
-    if p is not None and Decimal(p) > 0:
-        return Decimal(p)
-    bgn = getattr(product, "price_bgn", None)
-    if bgn is None:
-        raise ValueError("Product has no price_eur and no price_bgn.")
-    return _bgn_to_eur(Decimal(bgn))
+    if p is None or Decimal(p) <= 0:
+        raise ValueError("Product has no valid price_eur.")
+    return Decimal(p)
 
 
 def _new_order(request, product, *, quantity=1, payment_method=PaymentMethod.COD) -> Order | None:
@@ -74,7 +70,6 @@ def _new_order(request, product, *, quantity=1, payment_method=PaymentMethod.COD
             order=order,
             product=product,
             quantity=quantity,
-            unit_price_bgn=product.price_bgn,
             unit_price_eur=_safe_product_price_eur(product),
         )
         order.recompute_totals()
@@ -164,13 +159,11 @@ def checkout_info(request):
                 if creating or not order.items.exists():
                     OrderItem.objects.create(
                         order=order, product=product, quantity=qty,
-                        unit_price_bgn=product.price_bgn, unit_price_eur=_safe_product_price_eur(product),
+                        unit_price_eur=_safe_product_price_eur(product),
                     )
                 order.set_quantity(qty)
                 order.recompute_totals()
-                order.save(update_fields=[
-                    "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur", "total_bgn", "total_eur",
-                ])
+                order.save(update_fields=["subtotal_eur", "shipping_eur", "total_eur"])
             request.session[SESSION_KEY] = order.id
             return render(request, "checkout/info.html",
                           {"product": product, "form": info_form, "pay_form": pay_form, "order": order})

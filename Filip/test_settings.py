@@ -37,7 +37,6 @@ ECONT = {
         "label_format": "10x9",
         "cd_template": "DEFAULT",
         "cod_agreement_number": "CD000000",
-        "cod_currency": "BGN",
         "holiday_delivery_day": "workday",
     },
     "TIMEOUT": (1, 1),

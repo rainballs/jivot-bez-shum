@@ -106,7 +106,7 @@ def _field(post, name: str, maxlen: int) -> str:
 
 
 QUOTE_FIELDS = {"shipping_quoted_at"}
-TOTAL_FIELDS = {"quantity", "subtotal_bgn", "subtotal_eur", "shipping_bgn", "shipping_eur", "total_bgn", "total_eur"}
+TOTAL_FIELDS = {"quantity", "subtotal_eur", "shipping_eur", "total_eur"}
 
 
 def apply_selection(order: Order, post) -> tuple[str | None, set[str]]:
@@ -240,13 +240,11 @@ def save_delivery_and_quote(order: Order, post, to_office: bool) -> str | None:
     order.save()
 
     order.shipping_eur = quote["ship_eur"]
-    order.shipping_bgn = quote["ship_bgn"]
     order.shipping_quoted_at = timezone.now()
     order.recompute_totals()
     # narrow save: the quote call above can take seconds; do not overwrite fields other requests changed meanwhile
     order.save(update_fields=[
-        "shipping_eur", "shipping_bgn", "shipping_quoted_at",
-        "subtotal_bgn", "subtotal_eur", "total_bgn", "total_eur",
+        "shipping_eur", "shipping_quoted_at", "subtotal_eur", "total_eur",
     ])
     order.log_event("quoted", "delivery validated and priced", method=order.delivery_method,
                     ship_eur=str(order.shipping_eur))

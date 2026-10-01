@@ -12,7 +12,7 @@
                     {% elif order.cod_confirmed_at %}<strong>Потвърдена – плащане при доставка</strong>
                     {% else %}Чака плащане{% endif %}</p>
                 {% if show_details %}
-                    <p>Крайна сума: <strong>€ {{ order.total_eur }}</strong> / <strong>{{ order.total_bgn }} лв</strong></p>
+                    <p>Крайна сума: <strong>€ {{ order.total_eur }}</strong></p>
                     <p>Ще се свържем с вас на {{ order.email }}.</p>
                 {% endif %}
             {% else %}

@@ -29,7 +29,7 @@
 {% with items=order.items.all %}
 {% if items %}
 {% for item in items %}
-- {{ item.product.name }} x {{ item.quantity }} → {{ item.unit_price_bgn }} лв
+- {{ item.product.name }} x {{ item.quantity }} → € {{ item.unit_price_eur }}
 {% endfor %}
 {% else %}
 (няма артикули намерени)
@@ -39,9 +39,9 @@
 ----------------------------------------
 СУМИ
 ----------------------------------------
-Междинна сума: {{ order.subtotal_bgn }} лв
-Доставка: {{ order.shipping_bgn }} лв
-Общо за плащане: {{ order.total_bgn }} лв
+Междинна сума: € {{ order.subtotal_eur }}
+Доставка: € {{ order.shipping_eur }}
+Общо за плащане: € {{ order.total_eur }}
 
 За допълнителни въпроси моля пишете ни като отговорите на philipstoyanov@icloud.com с номер на поръчката.
 

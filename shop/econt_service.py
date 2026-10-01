@@ -19,21 +19,20 @@ from .fulfillment import build_label_for_order, plan_for_order
 
 log = logging.getLogger("econt")
 
-BGN_PER_EUR = Decimal("1.95583")
+BGN_PER_EUR = Decimal("1.95583")  # only used if Econt ever answers in BGN
 
 
 def _q2(x: Decimal) -> Decimal:
     return Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _money_to_eur_bgn(amount: Decimal, currency: str) -> tuple[Decimal, Decimal]:
-    """Convert an Econt amount in the given currency to (eur, bgn). Unknown currency -> treated as BGN."""
+def _to_eur(amount: Decimal, currency: str) -> Decimal:
+    """Econt answers in EUR. A BGN answer (legacy accounts) is converted at the fixed rate."""
     cur = (currency or "").strip().upper()
     amount = _q2(Decimal(str(amount)))
-
-    if cur == "EUR":
-        return amount, _q2(amount * BGN_PER_EUR)
-    return _q2(amount / BGN_PER_EUR), amount
+    if cur in ("BGN", "ЛВ", "ЛВ."):
+        return _q2(amount / BGN_PER_EUR)
+    return amount
 
 
 def quote_shipping(order, validate_first: bool = True) -> dict:
@@ -42,7 +41,7 @@ def quote_shipping(order, validate_first: bool = True) -> dict:
     and ask Econt for the delivery price. Uses the SAME payload builder as shipment creation and the payment the
     customer selected, but never creates anything.
 
-    Returns {"ok": True, "ship_eur", "ship_bgn", "currency"} or {"ok": False, "error": <customer-safe text>,
+    Returns {"ok": True, "ship_eur", "currency"} or {"ok": False, "error": <customer-safe text>,
     "retryable": bool}.
     """
     try:
@@ -77,8 +76,7 @@ def quote_shipping(order, validate_first: bool = True) -> dict:
     if not currency and isinstance(services_list, list) and services_list:
         currency = (services_list[0].get("currency") or "").strip()
 
-    ship_eur, ship_bgn = _money_to_eur_bgn(total_dec, currency)
-    return {"ok": True, "ship_eur": ship_eur, "ship_bgn": ship_bgn, "currency": currency or None}
+    return {"ok": True, "ship_eur": _to_eur(total_dec, currency), "currency": currency or None}
 
 
 # ----------------------------------------------------------------------------- nomenclatures

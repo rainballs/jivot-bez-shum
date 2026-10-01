@@ -121,11 +121,9 @@
                                 {% if product %}
                                     <div class="price-row">
                                         <span class="pill">€ <span data-price-eur>{{ product.price_eur }}</span></span>
-                                        <span class="pill"><span data-price-bgn>{{ product.price_bgn }}</span> лв</span>
                                     </div>
                                     <div class="small muted" data-ship-line>
-                                        Доставка: <span data-ship-eur>—</span> € /
-                                        <span data-ship-bgn>—</span> лв
+                                        Доставка: <span data-ship-eur>—</span> €
                                     </div>
                                 {% endif %}
                             </div>
@@ -161,11 +159,7 @@
     <span data-total-eur>
       {% if order and order.total_eur %}{{ order.total_eur|floatformat:2 }}{% else %}
           {{ product.price_eur|floatformat:2 }}{% endif %}
-    </span> € /
-                                <span data-total-bgn>
-      {% if order and order.total_bgn %}{{ order.total_bgn|floatformat:2 }}{% else %}
-          {{ product.price_bgn|floatformat:2 }}{% endif %}
-    </span> лв
+    </span> €
                             </div>
                         </div>
 
@@ -392,12 +386,9 @@
             (function setupSummaryWithShipping() {
                 const qtyInput = document.querySelector('input[name="quantity"]');
 
-                const outBGN = document.querySelector("[data-total-bgn]");
                 const outEUR = document.querySelector("[data-total-eur]");
 
                 const shipLine = document.querySelector("[data-ship-line]");
-                const shipEUR = document.querySelector("[data-ship-eur]");
-                const shipBGN = document.querySelector("[data-ship-bgn]");
 
                 const totalWrap = document.querySelector("[data-total-wrap]");
 
@@ -414,11 +405,7 @@
                 }
 
                 // product prices from DOM
-                const pBGN = toNum(document.querySelector("[data-price-bgn]")?.textContent);
                 const pEUR = toNum(document.querySelector("[data-price-eur]")?.textContent);
-
-                // fixed conversion rate for display consistency
-                const BGN_PER_EUR = 1.95583;
 
                 function selectedDelivery() {
                     if (rbAddress?.checked) return "address";
@@ -426,14 +413,11 @@
                     return null;
                 }
 
-                function shippingBGN(method) {
-                    if (method === "address") return 9.00;
-                    if (method === "office") return 7.00;
+                // estimate only: the real price comes from Econt when the address is submitted
+                function shippingEstimate(method) {
+                    if (method === "address") return 4.60;
+                    if (method === "office") return 3.58;
                     return 0.00;
-                }
-
-                function shippingEURFromBGN(bgn) {
-                    return bgn / BGN_PER_EUR;
                 }
 
                 function recalc() {
@@ -444,27 +428,20 @@
                     if (!dm) {
                         if (totalWrap) totalWrap.style.display = "none";
                         if (shipLine) shipLine.textContent = "Изберете начин на доставка, за да се изчисли крайна сума.";
-                        if (shipEUR) shipEUR.textContent = "—";
-                        if (shipBGN) shipBGN.textContent = "—";
                         // still show product-only numbers if you want:
-                        if (outBGN) outBGN.textContent = fmt(pBGN * q);
                         if (outEUR) outEUR.textContent = fmt(pEUR * q);
                         return;
                     }
 
-                    const sBGN = shippingBGN(dm);
-                    const sEUR = shippingEURFromBGN(sBGN);
+                    const sEUR = shippingEstimate(dm);
 
                     // show shipping line
-                    if (shipLine) shipLine.textContent = "Доставка:";
-                    if (shipEUR) shipEUR.textContent = fmt(sEUR);
-                    if (shipBGN) shipBGN.textContent = fmt(sBGN);
+                    // (rewrites the whole line: the old code replaced it with plain text and lost the amount)
+                    if (shipLine) shipLine.innerHTML = "Доставка: <span data-ship-eur>" + fmt(sEUR) + "</span> € (ориентировъчно)";
 
                     // total = (product * qty) + shipping
-                    const tBGN = (pBGN * q) + sBGN;
                     const tEUR = (pEUR * q) + sEUR;
 
-                    if (outBGN) outBGN.textContent = fmt(tBGN);
                     if (outEUR) outEUR.textContent = fmt(tEUR);
 
                     if (totalWrap) totalWrap.style.display = "";

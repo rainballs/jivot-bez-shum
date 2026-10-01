@@ -223,8 +223,7 @@ ECONT = {
         # this is the new one — required for COD:
         "cd_template": "DEFAULT",  # put the actual name from e-Econt here
         "cod_agreement_number": os.getenv("ECONT_COD_AGREEMENT_NUMBER", "CD250332"),  # unchanged default
-        # Currency in which the merchandise COD amount is sent. Kept BGN to preserve existing behaviour; see report.
-        "cod_currency": os.getenv("ECONT_COD_CURRENCY", "BGN"),
+        # The shop is EUR-only: COD amount, declared value and packing list are sent in EUR.
         # Required by Econt for door deliveries sent on a Friday (and holidays): "workday" | "Halfday" | "" (off)
         "holiday_delivery_day": os.getenv("ECONT_HOLIDAY_DELIVERY_DAY", "workday"),
     },

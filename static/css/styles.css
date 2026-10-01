@@ -2934,3 +2934,14 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
         order: 2;
     }
 }
+
+/* Mobile: centre the hero "Купи сега" button */
+@media (max-width: 768px) {
+    .hero-cta {
+        display: block;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: center;
+    }
+}

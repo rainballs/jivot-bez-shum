@@ -16,13 +16,15 @@ from .models import (
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "price_bgn", "price_eur", "is_active")
+    list_display = ("name", "price_eur", "is_active")
+    fields = ("name", "slug", "price_eur", "image", "is_active")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
 
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
+    fields = ("product", "quantity", "unit_price_eur")
     extra = 0
 
 
@@ -132,7 +134,6 @@ class OrderAdmin(admin.ModelAdmin):
         ("Суми", {
             "fields": (
                 "quantity",
-                "subtotal_bgn", "shipping_bgn", "total_bgn",
                 "subtotal_eur", "shipping_eur", "total_eur",
             )
         }),
@@ -151,7 +152,8 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ("order", "product", "quantity", "unit_price_bgn")
+    list_display = ("order", "product", "quantity", "unit_price_eur")
+    fields = ("order", "product", "quantity", "unit_price_eur")
 
 
 @admin.register(StripeEvent)

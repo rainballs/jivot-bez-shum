@@ -211,7 +211,6 @@
                                 <div class="title">Живот без шум</div>
                                 <div class="price-row">
                                     <span class="pill">€ {{ product.price_eur }}</span>
-                                    <span class="pill">{{ product.price_bgn }} лв</span>
                                 </div>
                                 <div class="small muted">Количество: {{ order.quantity }}</div>
                             </div>
@@ -239,11 +238,8 @@
                         <div class="total-row">
                             <div>Крайна сума:</div>
                             <div class="total">
-                                {% if order.total_bgn %}
+                                {% if order.total_eur %}
                                     {{ order.total_eur|floatformat:2 }} €
-                                    <span class="muted">
-          (≈ лв {{ order.total_bgn|floatformat:2 }})
-        </span>
                                 {% else %}
                                     {{ product.price_eur|floatformat:2 }} €
                                 {% endif %}
