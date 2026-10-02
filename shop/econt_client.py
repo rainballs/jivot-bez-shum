@@ -365,6 +365,16 @@ def build_create_label_json(
     if receiver_pays_delivery:
         payload["paymentReceiverMethod"] = "CASH"
 
+    # Compatibility with the payload that created portal-visible labels in production for months: these three
+    # fields were sent by the original integration. They do not change what Econt charges (verified on the demo
+    # server: identical receiver/sender dues, COD collected separately) but are restored so the request matches
+    # the proven shape exactly.
+    payload["payer"] = "RECEIVER" if receiver_pays_delivery else "SENDER"
+    if declared > 0:
+        payload["declaredValue"] = declared
+    if receiver_pays_delivery and cod > 0:
+        payload["paymentReceiverAmount"] = cod
+
     if packing_list:
         plt = (packing_list_type or "digital").strip().lower()
         if plt not in ("file", "digital", "loading"):

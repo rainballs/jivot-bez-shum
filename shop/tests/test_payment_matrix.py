@@ -34,7 +34,7 @@ class PayloadMatrixTests(ShopTestCase):
         self.assertNotIn("invoiceNum", services)
         self.assertNotIn("paymentReceiverMethod", label)
         self.assertNotIn("paymentReceiverAmount", label)
-        self.assertNotIn("payer", label)  # not an Econt field (verified on demo: silently ignored)
+        self.assertEqual(label["payer"], "SENDER")  # original integration's field, kept for compatibility
 
     def test_card_paid_requests_no_cod_and_sender_pays_delivery(self):
         order = paid(make_order(method=PaymentMethod.CARD))
@@ -56,7 +56,10 @@ class PayloadMatrixTests(ShopTestCase):
         self.assertEqual(label["services"]["cdCurrency"], "EUR")
         self.assertEqual(label["services"]["cdType"], "get")
         self.assertEqual(label["paymentReceiverMethod"], "CASH")
-        self.assertNotIn("paymentReceiverAmount", label)  # used to be set to the COD amount (wrong semantics)
+        # same three fields the original (portal-visible) integration sent
+        self.assertEqual(label["paymentReceiverAmount"], label["services"]["cdAmount"])
+        self.assertEqual(label["payer"], "RECEIVER")
+        self.assertEqual(label["declaredValue"], label["services"]["declaredValueAmount"])
 
     def test_cod_not_confirmed_cannot_be_created(self):
         order = make_order(method=PaymentMethod.COD)
