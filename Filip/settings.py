@@ -224,6 +224,8 @@ ECONT = {
         "cd_template": "DEFAULT",  # put the actual name from e-Econt here
         "cod_agreement_number": os.getenv("ECONT_COD_AGREEMENT_NUMBER", "CD250332"),  # unchanged default
         # The shop is EUR-only: COD amount, declared value and packing list are sent in EUR.
+        # Diagnostic switch: send our order id as Econt's "orderNumber" (off by default).
+        "send_order_number": os.getenv("ECONT_SEND_ORDER_NUMBER", "").lower() in ("1", "true", "yes"),
         # Required by Econt for door deliveries sent on a Friday (and holidays): "workday" | "Halfday" | "" (off)
         "holiday_delivery_day": os.getenv("ECONT_HOLIDAY_DELIVERY_DAY", "workday"),
     },

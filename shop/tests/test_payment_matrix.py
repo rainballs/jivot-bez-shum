@@ -193,3 +193,22 @@ class SendDateTests(ShopTestCase):
         cfg = {**settings.ECONT, "DEFAULTS": {**settings.ECONT["DEFAULTS"], "holiday_delivery_day": ""}}
         with override_settings(ECONT=cfg):
             self.assertNotIn("holidayDeliveryDay", build_label_for_order(order, plan_for_order(order, for_create=True)))
+
+
+class OrderNumberSwitchTests(ShopTestCase):
+    """orderNumber is an optional extra: off by default, switchable from the environment."""
+
+    def label_for_paid_order(self):
+        order = paid(make_order())
+        return build_label_for_order(order, plan_for_order(order, for_create=True))
+
+    def test_not_sent_by_default(self):
+        self.assertNotIn("orderNumber", self.label_for_paid_order())
+
+    def test_can_be_enabled(self):
+        from django.conf import settings
+        from django.test import override_settings
+
+        cfg = {**settings.ECONT, "DEFAULTS": {**settings.ECONT["DEFAULTS"], "send_order_number": True}}
+        with override_settings(ECONT=cfg):
+            self.assertRegex(self.label_for_paid_order()["orderNumber"], r"^\d+$")

@@ -137,7 +137,9 @@ def build_label_for_order(order: Order, plan: ShipmentPlan) -> dict:
         cod_agreement_number=d.get("cod_agreement_number") if cod > 0 else None,
         invoice_num=f"{order.pk} {date.today().strftime('%d.%m.%y')}" if cod > 0 else None,
         sms_notification=True,
-        order_number=str(order.pk),
+        # Off by default: Econt never echoes it back, we do not need it, and it is the one extra field that could
+        # make e-Econt file the label outside "Пратки от мен" (see ECONT_SEND_ORDER_NUMBER).
+        order_number=str(order.pk) if d.get("send_order_number") else None,
         holiday_delivery_day=settings.ECONT["DEFAULTS"].get("holiday_delivery_day") or None,
         packing_list=build_packing_list_from_order(order),
         packing_list_type="digital",
