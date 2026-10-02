@@ -119,3 +119,21 @@ class MailboxWarningTests(ShopTestCase):
             self.assertEqual({n: lv for lv, n, _ in collect_checks(config_only=True)}[name], WARN)
         with override_settings(ORDER_NOTIFY_EMAIL="owner@icloud.com", EMAIL_HOST_USER="shop@gmail.com"):
             self.assertNotEqual({n: lv for lv, n, _ in collect_checks(config_only=True)}[name], WARN)
+
+
+class HandOverFilterTests(ShopTestCase):
+    def test_admin_lists_the_parcels_still_to_take_to_econt(self):
+        from django.conf import settings
+
+        waiting = make_order(full_name="Чака Предаване")
+        sent = make_order(full_name="Вече Изпратена")
+        Order.objects.filter(pk=waiting.pk).update(shipment_status=ShipmentStatus.CREATED, econt_shipment_num="W1",
+                                                   econt_status="Очаква предаване към Еконт")
+        Order.objects.filter(pk=sent.pk).update(shipment_status=ShipmentStatus.CREATED, econt_shipment_num="S1",
+                                                econt_status="Доставена")
+        get_user_model().objects.create_superuser("root", "r@example.com", "pw")
+        c = Client()
+        c.login(username="root", password="pw")
+        html = c.get(f"/{settings.ADMIN_URL}shop/order/?handover=waiting").content.decode()
+        self.assertIn("Чака Предаване", html)
+        self.assertNotIn("Вече Изпратена", html)

@@ -58,6 +58,23 @@ class PaymentAttemptInline(ReadOnlyInline):
     readonly_fields = fields
 
 
+class HandOverFilter(admin.SimpleListFilter):
+    """'Which parcels do I still have to take to Econt?' - labels created but not yet accepted by Econt."""
+    title = "Еконт: за изпращане"
+    parameter_name = "handover"
+
+    def lookups(self, request, model_admin):
+        return [("waiting", "Чака предаване към Еконт"), ("done", "Предадени / в движение")]
+
+    def queryset(self, request, queryset):
+        created = queryset.filter(shipment_status=ShipmentStatus.CREATED)
+        if self.value() == "waiting":
+            return created.filter(econt_status__startswith="Очаква предаване")
+        if self.value() == "done":
+            return created.exclude(econt_status__startswith="Очаква предаване").exclude(econt_status__isnull=True)
+        return queryset
+
+
 @admin.action(description="Повтори изпращането към Еконт (само при ГРЕШКА)")
 def action_requeue_failed(modeladmin, request, queryset):
     n = 0
@@ -93,7 +110,7 @@ class OrderAdmin(admin.ModelAdmin):
         "id", "full_name", "payment_method", "payment_status", "shipment_status", "needs_review",
         "econt_shipment_num", "econt_status", "label_link", "total_eur", "created_at",
     )
-    list_filter = ("needs_review", "payment_status", "shipment_status", "payment_method", "delivery_method", "created_at")
+    list_filter = (HandOverFilter, "needs_review", "payment_status", "shipment_status", "payment_method", "delivery_method", "created_at")
     search_fields = ("full_name", "email", "phone", "city", "office_text", "econt_shipment_num", "stripe_payment_intent_id")
     actions = [action_requeue_failed, action_retry_unknown, action_clear_review]
     inlines = [OrderItemInline, PaymentAttemptInline, ShipmentAttemptInline, OrderEventInline]
