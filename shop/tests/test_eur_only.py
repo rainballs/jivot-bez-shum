@@ -45,6 +45,7 @@ class EurOnlyTests(ShopTestCase):
         for m in mail.outbox:
             self.assert_no_bgn(m.body, f"e-mail {m.subject}")
             self.assertIn("€", m.body)
+            self.assertNotIn("30.11.2025", m.body)  # stale launch-date promise removed
 
     def test_terms_state_prices_are_in_euro(self):
         html = (ROOT / "templates/legal/terms.html").read_text(encoding="utf-8")
