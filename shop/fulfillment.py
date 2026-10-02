@@ -25,6 +25,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q as models_Q
 from django.utils import timezone
 
 from .address import split_street_num
@@ -338,6 +339,15 @@ def _after_created(order_id, attempt, plan, result) -> str:
             log.critical("could not even record unknown outcome for order=%s num=%s", order_id, num)
         return "unknown"
 
+    try:  # the order e-mail already went out without the shipment number (card orders): tell the admin now
+        fresh = Order.objects.get(pk=order_id)
+        if fresh.notified_at:
+            from .utils import send_shipment_notice
+
+            send_shipment_notice(fresh)
+    except Exception:
+        log.exception("shipment notice failed for order %s", order_id)
+
     if problems:
         log.error("econt label intent mismatch order=%s num=%s problems=%s", order_id, num, problems)
         _alert(order_id, "Econt label does not match the intended payment configuration", "; ".join(problems))
@@ -465,3 +475,43 @@ def allow_retry_after_manual_check(order_id: int, who: str = "operator") -> None
         order.shipment_attempts = 0 if order.shipment_status == ShipmentStatus.FAILED else order.shipment_attempts
         order.transition_shipment(ShipmentStatus.PENDING, extra_fields=["shipment_next_attempt_at", "shipment_attempts"])
         order.log_event("shipment_requeued", f"{who} confirmed no shipment exists / fixed data")
+
+
+# ------------------------------------------------------------------ Econt status mirror (read-only)
+FINAL_STATUS_WORDS = ("доставена", "delivered", "върната", "returned", "унищожена", "анулирана", "cancelled")
+
+
+def refresh_econt_statuses(limit: int = 40, max_age_days: int = 30, min_interval_minutes: int = 15, now=None) -> int:
+    """
+    Copy Econt's own status text onto recent shipments (read-only call), so the admin order list shows what Econt
+    shows - including labels that are created but not yet handed over, which e-Econt's "Пратки от мен" may not list.
+    Returns the number of orders updated. Never raises.
+    """
+    now = now or timezone.now()
+    qs = (
+        Order.objects.filter(shipment_status=ShipmentStatus.CREATED, created_at__gte=now - timedelta(days=max_age_days))
+        .exclude(econt_shipment_num__isnull=True).exclude(econt_shipment_num="")
+        .filter(models_Q(econt_status_checked_at__isnull=True)
+                | models_Q(econt_status_checked_at__lt=now - timedelta(minutes=min_interval_minutes)))
+        .order_by("econt_status_checked_at")
+    )
+    orders = [o for o in qs[: limit * 2] if not any(w in (o.econt_status or "").lower() for w in FINAL_STATUS_WORDS)][:limit]
+    if not orders:
+        return 0
+    try:
+        body = EcontClient().shipment_statuses([o.econt_shipment_num for o in orders])
+    except Exception as e:
+        log.warning("econt status refresh failed: %s", type(e).__name__)
+        return 0
+    by_num = {}
+    for item in body.get("shipmentStatuses") or []:
+        s = item.get("status") or {}
+        if s.get("shipmentNumber"):
+            by_num[str(s["shipmentNumber"])] = s
+    updated = 0
+    for o in orders:
+        s = by_num.get(o.econt_shipment_num)
+        text = (s or {}).get("shortDeliveryStatus") or ("НЕ Е НАМЕРЕНА в Еконт" if s is None else "")
+        Order.objects.filter(pk=o.pk).update(econt_status=(text or "")[:64], econt_status_checked_at=now)
+        updated += 1
+    return updated

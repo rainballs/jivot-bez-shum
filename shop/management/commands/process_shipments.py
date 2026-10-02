@@ -46,6 +46,10 @@ class Command(BaseCommand):
                 self.stderr.write(f"order {pk}: ERROR (see log)")
                 continue
             self.stdout.write(f"order {pk}: {outcome}")
+        try:
+            fulfillment.refresh_econt_statuses()
+        except Exception:
+            log.exception("econt status refresh failed")
         resent = notify_pending_orders()
         if resent:
             self.stdout.write(f"re-sent {resent} missing order e-mail(s)")

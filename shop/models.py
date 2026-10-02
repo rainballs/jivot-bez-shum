@@ -119,7 +119,8 @@ class Order(models.Model):
 
     econt_shipment_num = models.CharField(max_length=64, blank=True, null=True)
     econt_label_pdf = models.FileField(upload_to="econt_labels/", blank=True, null=True)
-    econt_status = models.CharField(max_length=64, blank=True, null=True)
+    econt_status = models.CharField(max_length=64, blank=True, null=True)  # Econt's own status text (refreshed)
+    econt_status_checked_at = models.DateTimeField(null=True, blank=True)
     econt_errors = models.TextField(blank=True, null=True)
     # optional, if you let user pick office:
     econt_office_code = models.CharField(max_length=16, blank=True, null=True)
@@ -293,6 +294,19 @@ class Order(models.Model):
             self.billing_postcode,
         ]
         return ", ".join(p for p in parts if p)
+
+    @property
+    def econt_tracking_url(self) -> str:
+        return f"https://www.econt.com/services/track-shipment/{self.econt_shipment_num}" if self.econt_shipment_num else ""
+
+    @property
+    def delivery_target(self) -> str:
+        """Human-readable destination for e-mails/admin (office code is the source of truth for office orders)."""
+        if self.delivery_method == DeliveryMethod.TO_OFFICE:
+            office = (self.office_text or "").strip()
+            code = (self.econt_office_code or "").strip()
+            return f"Офис на Еконт {code}" + (f" – {office}" if office else "") + (f", {self.city}" if self.city else "")
+        return ", ".join(p for p in (self.address_line, self.postal_code, self.city) if p)
 
     def shipping_full_address(self) -> str:
         # Uses your existing shipping fields

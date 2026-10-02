@@ -58,6 +58,9 @@ def collect_checks(now=None, config_only=False):
     mail_ok = "smtp" in settings.EMAIL_BACKEND.lower() and settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD
     add(OK if mail_ok else FAIL, "E-mail (SMTP) configured")
     add(OK if getattr(settings, "ORDER_NOTIFY_EMAIL", None) else FAIL, "Admin notification address set")
+    same = (settings.ORDER_NOTIFY_EMAIL or "").strip().lower() == (settings.EMAIL_HOST_USER or "").strip().lower()
+    add(WARN if same else OK, "Admin notifications go to a different mailbox than the sender",
+        "ORDER_NOTIFY_EMAIL equals the SMTP account: Gmail files such mail under 'Sent', not the inbox" if same else "")
     add(OK if getattr(settings, "SECURE_HSTS_SECONDS", 0) else WARN, "HSTS enabled")
 
     if config_only:

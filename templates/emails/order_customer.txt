@@ -17,11 +17,9 @@
 ----------------------------------------
 Метод: {{ order.get_delivery_method_display }}
 Куриер: {{ order.get_courier_display }}
-{% if order.delivery_method == "address" %}
-Адрес: {{ order.address_line }}, {{ order.postal_code }} {{ order.city }}
-{% else %}
-Офис на куриера: {{ order.office_text }}
-{% endif %}
+Към: {{ order.delivery_target }}
+{% if order.econt_shipment_num %}Товарителница: {{ order.econt_shipment_num }}
+Проследяване: {{ order.econt_tracking_url }}{% endif %}
 
 ----------------------------------------
 АРТИКУЛИ

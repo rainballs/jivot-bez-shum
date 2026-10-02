@@ -8,11 +8,14 @@ Customer:
 Delivery:
 - Method: {{ order.get_delivery_method_display }}
 - Courier: {{ order.get_courier_display }}
-{% if order.delivery_method == "address" %}
-- Address: {{ order.address_line }}, {{ order.postal_code }} {{ order.city }}
-{% else %}
-- Office/APS: {{ order.office_text }}
-{% endif %}
+- To: {{ order.delivery_target }}
+
+Econt:
+{% if order.econt_shipment_num %}- Shipment (товарителница): {{ order.econt_shipment_num }}
+- Label PDF: {{ order.econt_label_url|default:"-" }}
+- Tracking: {{ order.econt_tracking_url }}
+- Cash on delivery requested: {% if order.econt_cod_amount %}€ {{ order.econt_cod_amount }}{% else %}none (prepaid){% endif %}
+{% else %}- Shipment not created yet (shipment status: {{ order.get_shipment_status_display }}){% endif %}
 
 Items:
 {% with first_item=order.items.all.0 %}

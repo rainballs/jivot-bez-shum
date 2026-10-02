@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.utils.html import format_html
 
 from . import fulfillment
 from .models import (
@@ -90,7 +91,7 @@ def action_clear_review(modeladmin, request, queryset):
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
         "id", "full_name", "payment_method", "payment_status", "shipment_status", "needs_review",
-        "econt_shipment_num", "total_eur", "created_at",
+        "econt_shipment_num", "econt_status", "label_link", "total_eur", "created_at",
     )
     list_filter = ("needs_review", "payment_status", "shipment_status", "payment_method", "delivery_method", "created_at")
     search_fields = ("full_name", "email", "phone", "city", "office_text", "econt_shipment_num", "stripe_payment_intent_id")
@@ -103,7 +104,7 @@ class OrderAdmin(admin.ModelAdmin):
         "stripe_payment_intent_id", "cod_confirmed_at", "shipping_quoted_at",
         "shipment_status", "shipment_attempts", "shipment_next_attempt_at", "shipment_claimed_at",
         "econt_cod_amount", "econt_cod_currency", "econt_receiver_pays_delivery", "econt_label_url",
-        "econt_shipment_num", "econt_status", "econt_errors", "econt_label_pdf",
+        "econt_shipment_num", "econt_status", "econt_status_checked_at", "econt_errors", "econt_label_pdf",
         "needs_review", "review_reason", "notified_at", "created_at", "delivery_preview",
     )
 
@@ -127,7 +128,8 @@ class OrderAdmin(admin.ModelAdmin):
         ("Еконт (изпращане)", {
             "fields": (
                 "shipment_status", "shipment_attempts", "shipment_next_attempt_at", "shipment_claimed_at",
-                "econt_shipment_num", "econt_status", "econt_errors", "econt_label_url", "econt_label_pdf",
+                "econt_shipment_num", "econt_status", "econt_status_checked_at", "econt_errors", "econt_label_url",
+                "econt_label_pdf",
                 "econt_cod_amount", "econt_cod_currency", "econt_receiver_pays_delivery", "shipping_quoted_at",
             )
         }),
@@ -139,6 +141,12 @@ class OrderAdmin(admin.ModelAdmin):
         }),
         ("Технически", {"fields": ("courier", "public_id", "notified_at", "created_at")}),
     )
+
+    @admin.display(description="Етикет")
+    def label_link(self, obj):
+        if not obj.econt_label_url:
+            return "—"
+        return format_html('<a href="{}" target="_blank" rel="noopener">PDF</a>', obj.econt_label_url)
 
     @admin.display(description="Адрес за доставка (преглед)")
     def delivery_preview(self, obj):

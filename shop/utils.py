@@ -94,6 +94,33 @@ def notify_pending_orders(max_age_days: int = 3, limit: int = 20) -> int:
     return sum(1 for o in qs if notify_order_accepted(o, event="paid" if o.paid else "created"))
 
 
+def send_shipment_notice(order):
+    """Admin-only e-mail with the shipment number and label link, for labels created after the order e-mail went out
+    (card orders: the payment e-mail is sent before Econt has created the label)."""
+    admin_email = getattr(settings, "ORDER_NOTIFY_EMAIL", None)
+    if not admin_email:
+        return
+    body = (
+        f"Товарителница за поръчка #{order.pk}\n\n"
+        f"Номер: {order.econt_shipment_num}\n"
+        f"Етикет (PDF): {order.econt_label_url or '-'}\n"
+        f"Проследяване: {order.econt_tracking_url}\n"
+        f"Към: {order.delivery_target}\n"
+        f"Наложен платеж: {('€ ' + str(order.econt_cod_amount)) if order.econt_cod_amount else 'няма (платена онлайн)'}\n\n"
+        f"Admin: {settings.SITE_URL}/{settings.ADMIN_URL}shop/order/{order.pk}/change/\n"
+    )
+    try:
+        send_mail(
+            subject=f"[Order #{order.pk}] Еконт товарителница {order.econt_shipment_num}",
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[admin_email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Failed to send shipment notice for order %s", order.pk)
+
+
 def send_admin_alert(order, subject: str, detail: str = ""):
     """Operator-facing alert (no customer data besides the order number)."""
     admin_email = getattr(settings, "ORDER_NOTIFY_EMAIL", None)
