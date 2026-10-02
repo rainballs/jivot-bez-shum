@@ -137,3 +137,20 @@ class HandOverFilterTests(ShopTestCase):
         html = c.get(f"/{settings.ADMIN_URL}shop/order/?handover=waiting").content.decode()
         self.assertIn("Чака Предаване", html)
         self.assertNotIn("Вече Изпратена", html)
+
+
+class AdminRecipientsTests(ShopTestCase):
+    def test_several_admin_addresses_all_receive_the_order_email(self):
+        with override_settings(ORDER_NOTIFY_EMAIL="shop@gmail.com, owner@icloud.com"):
+            order = make_order(method=PaymentMethod.COD)
+            self.session_for(order).post("/checkout/confirm-cod/")
+        admin = [m for m in mail.outbox if "[Order #" in m.subject and "created" in m.subject]
+        self.assertEqual(len(admin), 1)
+        self.assertEqual(admin[0].to, ["shop@gmail.com", "owner@icloud.com"])
+
+    def test_mailbox_warning_clears_when_another_address_is_listed(self):
+        from shop.management.commands.check_production import OK, collect_checks
+
+        name = "Admin notifications go to a different mailbox than the sender"
+        with override_settings(ORDER_NOTIFY_EMAIL="shop@gmail.com, owner@icloud.com", EMAIL_HOST_USER="shop@gmail.com"):
+            self.assertEqual({n: lv for lv, n, _ in collect_checks(config_only=True)}[name], OK)

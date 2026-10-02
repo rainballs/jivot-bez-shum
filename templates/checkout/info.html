@@ -799,13 +799,23 @@
                     pickCity(item.dataset.id, item.dataset.name);
                 });
 
-                officeSearch.addEventListener('input', renderOffices);
+                officeSearch.addEventListener('input', () => {
+                    if (officeCode.value) {
+                        officeCode.value = '';
+                        pickedInfo.style.display = 'none';
+                        updateSubmitState();
+                    }
+                    renderOffices();
+                });
                 officeList.addEventListener('click', (e) => {
                     const it = e.target.closest('.office-item');
                     if (!it) return;
                     officeCode.value = it.dataset.code;
                     pickedInfo.textContent = `Избран офис: ${it.dataset.name} (#${it.dataset.code}) ${it.dataset.addr || ''}`;
                     pickedInfo.style.display = 'block';
+                    // show the choice in the search field and close the list (typing again reopens it)
+                    officeSearch.value = `${it.dataset.name} (#${it.dataset.code})`;
+                    officeList.innerHTML = '';
                     updateSubmitState();
                 });
 

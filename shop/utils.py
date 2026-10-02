@@ -8,6 +8,12 @@ from django.utils import timezone
 logger = logging.getLogger("shop.notify")
 
 
+def admin_recipients() -> list[str]:
+    """ORDER_NOTIFY_EMAIL may list several addresses separated by commas (e.g. the owner's own mailbox AND the shop's)."""
+    raw = getattr(settings, "ORDER_NOTIFY_EMAIL", "") or ""
+    return [a.strip() for a in str(raw).split(",") if a.strip()]
+
+
 def send_order_notification(order, event="created") -> int:
     """
     Send 2 emails:
@@ -19,10 +25,10 @@ def send_order_notification(order, event="created") -> int:
     sent = 0
     site_url = getattr(settings, "SITE_URL", "http://127.0.0.1:8000")
     subject_status = "PAID" if order.paid else "UNPAID"
-    admin_email = getattr(settings, "ORDER_NOTIFY_EMAIL", None)
+    admin_emails = admin_recipients()
     customer_email = getattr(order, "email", None)
 
-    if admin_email:
+    if admin_emails:
         admin_ctx = {"order": order, "event": event, "site_url": site_url, "is_admin_mail": True,
                      "admin_path": settings.ADMIN_URL}
         admin_subject = f"[Order #{order.id}] {event} — {subject_status} — {order.full_name}"
@@ -32,7 +38,7 @@ def send_order_notification(order, event="created") -> int:
                 subject=admin_subject,
                 message=admin_body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[admin_email],
+                recipient_list=admin_emails,
                 fail_silently=False,
             )
             sent += 1
@@ -97,8 +103,8 @@ def notify_pending_orders(max_age_days: int = 3, limit: int = 20) -> int:
 def send_shipment_notice(order):
     """Admin-only e-mail with the shipment number and label link, for labels created after the order e-mail went out
     (card orders: the payment e-mail is sent before Econt has created the label)."""
-    admin_email = getattr(settings, "ORDER_NOTIFY_EMAIL", None)
-    if not admin_email:
+    admin_emails = admin_recipients()
+    if not admin_emails:
         return
     body = (
         f"Товарителница за поръчка #{order.pk}\n\n"
@@ -114,7 +120,7 @@ def send_shipment_notice(order):
             subject=f"[Order #{order.pk}] Еконт товарителница {order.econt_shipment_num}",
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[admin_email],
+            recipient_list=admin_emails,
             fail_silently=False,
         )
     except Exception:
@@ -123,8 +129,8 @@ def send_shipment_notice(order):
 
 def send_admin_alert(order, subject: str, detail: str = ""):
     """Operator-facing alert (no customer data besides the order number)."""
-    admin_email = getattr(settings, "ORDER_NOTIFY_EMAIL", None)
-    if not admin_email:
+    admin_emails = admin_recipients()
+    if not admin_emails:
         return
     body = (
         f"{subject}\n\nOrder: #{order.pk}\nPayment: {order.payment_status} ({order.payment_method})\n"
@@ -136,7 +142,7 @@ def send_admin_alert(order, subject: str, detail: str = ""):
             subject=f"[ALERT] Order #{order.pk}: {subject}"[:200],
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[admin_email],
+            recipient_list=admin_emails,
             fail_silently=False,
         )
     except Exception:

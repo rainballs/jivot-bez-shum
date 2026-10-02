@@ -2945,3 +2945,35 @@ label.checkbox.checkbox--sm > input[type="checkbox"]:checked::after {
         text-align: center;
     }
 }
+
+
+/* <button class="btn"> used the browser's own font/line-height, so it looked smaller than <a class="btn"> */
+button.btn {
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
+}
+
+/* Summary page: "Редактирай данните" and the pay / confirm button are the same size */
+.summary-actions {
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.summary-actions > a,
+.summary-actions > form {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.summary-actions .btn {
+    width: 100%;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
